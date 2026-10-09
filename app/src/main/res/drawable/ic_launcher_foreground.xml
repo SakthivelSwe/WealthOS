@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Glowing Shield Outer -->
+    <path
+        android:pathData="M 54,20 L 80,32 L 80,60 C 80,78 60,92 54,94 C 48,92 28,78 28,60 L 28,32 Z"
+        android:strokeWidth="3.5"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="28" android:startY="20"
+                android:endX="80" android:endY="94"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFD700" />
+                <item android:offset="0.5" android:color="#FFA500" />
+                <item android:offset="1.0" android:color="#FF8C00" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Shield Inner Glow -->
+    <path
+        android:pathData="M 54,25 L 75,35 L 75,59 C 75,73 59,85 54,87 C 49,85 33,73 33,59 L 33,35 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54" android:startY="25"
+                android:endX="54" android:endY="87"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#33FFD700" />
+                <item android:offset="1.0" android:color="#00FFA500" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- OS Logo: Stylized overlapping circles (Infinity/Coin) -->
+    <path
+        android:pathData="M 44,52 A 10,10 0 1,1 43.99,52"
+        android:strokeWidth="3.5"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="34" android:startY="42"
+                android:endX="54" android:endY="62"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="1.0" android:color="#FFE5B4" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path
+        android:pathData="M 64,52 A 10,10 0 1,1 63.99,52"
+        android:strokeWidth="3.5"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="54" android:startY="42"
+                android:endX="74" android:endY="62"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="1.0" android:color="#FFE5B4" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Central interlocking dot -->
+    <path
+        android:pathData="M 54,52 A 2,2 0 1,1 53.99,52"
+        android:fillColor="#FFD700" />
+</vector>
