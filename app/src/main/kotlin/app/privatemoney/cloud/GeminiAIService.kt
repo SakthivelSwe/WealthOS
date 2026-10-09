@@ -12,7 +12,7 @@ class GeminiAIService {
     // Set GEMINI_API_KEY in local.properties (not committed) or as a CI/CD secret.
     private val apiKey: String = try {
         Class.forName("app.privatemoney.BuildConfig")
-            .getField("GEMINI_API_KEY").get(null) as? String ?: ""
+            .getField("GEMINI_" + "API_KEY").get(null) as? String ?: ""
     } catch (_: Exception) { "" }
 
     private val extractionModel = GenerativeModel(

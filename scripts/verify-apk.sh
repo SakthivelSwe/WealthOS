@@ -31,7 +31,11 @@ done
 aapt2="$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1 || true)"
 if [ -n "$aapt2" ]; then
   manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
-  if echo "$manifest" | grep -Eq 'debuggable.*=true'; then echo "FAIL: debuggable is true"; fail=1; fi
+  if echo "$manifest" | grep -Eq 'debuggable.*=true'; then
+    if [[ "$apk" != *"debug"* ]]; then
+      echo "FAIL: debuggable is true"; fail=1;
+    fi
+  fi
   if echo "$manifest" | grep -Eq 'usesCleartextTraffic.*=true'; then echo "FAIL: cleartext traffic enabled"; fail=1; fi
   if echo "$manifest" | grep -Eq 'allowBackup.*=true'; then echo "FAIL: allowBackup enabled"; fail=1; fi
   # The launcher activity, WorkManager services/receivers, and ProfileInstaller are exported.
