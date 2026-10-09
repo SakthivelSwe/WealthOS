@@ -1,0 +1,43 @@
+# Build
+.gradle/
+build/
+*/bin/
+*.apk
+*.aab
+*.aar
+captures/
+.cxx/
+.idea/
+*.iml
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+local.properties
+!local.properties.example
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+keystore*.b64
+google-services.json
+supabase/.env
+supabase/.temp/
+supabase/functions/**/.env
+
+# Personal / financial data
+*.db
+*.sqlite
+*.sqlite3
+*.mbackup
+*.enc
+statements/
+receipts/
+backups/
+private/
+
+# OS
+.DS_Store
+Thumbs.db

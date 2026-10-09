@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Private Money OS</string>
+
+    <string name="tab_home">Home</string>
+    <string name="tab_ledger">Ledger</string>
+    <string name="tab_plans">Plans</string>
+    <string name="tab_insights">Insights</string>
+    <string name="tab_more">More</string>
+    <string name="add_fab">+  Add</string>
+    <string name="not_yet_available">Not yet available.</string>
+
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="type_expense">Expense</string>
+    <string name="type_income">Income</string>
+    <string name="type_transfer">Transfer</string>
+
+    <string name="available_now">Available now</string>
+    <string name="safe_today">Safe to spend today</string>
+    <string name="why">Why?</string>
+    <string name="this_month">This month</string>
+    <string name="income">Income</string>
+    <string name="expense">Expense</string>
+    <string name="saved">Saved</string>
+    <string name="recent">Recent</string>
+    <string name="see_all">See all</string>
+    <string name="no_transactions_title">No transactions yet</string>
+    <string name="no_transactions_body">Tap Add to record your first expense or income.</string>
+    <string name="close">Close</string>
+    <string name="safe_title">How safe-to-spend is calculated</string>
+    <string name="liquid_balance">Liquid balance</string>
+    <string name="upcoming_bills">Upcoming bills</string>
+    <string name="debt_payments">Debt payments</string>
+    <string name="goal_contributions">Goal contributions</string>
+    <string name="card_due">Credit card due</string>
+    <string name="safety_buffer">Safety buffer</string>
+    <string name="discretionary">Discretionary</string>
+    <string name="safe_note">Bills, debts, goals and the buffer are not set up yet, so they are zero. This figure is a plain calculation, not AI.</string>
+    <plurals name="days_left">
+        <item quantity="one">%d day left this month</item>
+        <item quantity="other">%d days left this month</item>
+    </plurals>
+
+    <string name="delete_title">Delete transaction?</string>
+    <string name="delete_body">It is removed from your balances. A deleted record is kept internally for audit.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="category">Category</string>
+    <string name="account">Account</string>
+    <string name="from_account">From account</string>
+    <string name="to_account">To account</string>
+    <string name="merchant_optional">Merchant (optional)</string>
+    <string name="note_optional">Note (optional)</string>
+    <string name="save_expense">Save expense</string>
+    <string name="save_income">Save income</string>
+    <string name="save_transfer">Save transfer</string>
+    <string name="backspace">Delete digit</string>
+    <string name="err_amount_required">Enter an amount.</string>
+    <string name="err_amount_invalid">That amount is not valid.</string>
+    <string name="err_category_required">Choose a category.</string>
+    <string name="err_account_required">Choose an account.</string>
+    <string name="err_destination_required">Choose the destination account.</string>
+    <string name="err_same_account">Choose two different accounts.</string>
+    <string name="err_save_failed">Could not save. Nothing was changed.</string>
+
+    <string name="privacy_headline">Your money stays on this phone by default.</string>
+    <string name="privacy_body">Transactions, budgets, goals and accounts are stored encrypted on this device. Cloud backup and AI are optional and off until you turn them on.</string>
+    <string name="currency">Currency</string>
+    <string name="first_account">First account</string>
+    <string name="account_name">Account name</string>
+    <string name="starting_balance">Starting balance</string>
+    <string name="start">Start</string>
+    <string name="err_name_required">Enter an account name.</string>
+    <string name="err_balance_invalid">Enter a valid starting balance.</string>
+    <string name="acct_bank">Bank</string>
+    <string name="acct_cash">Cash</string>
+    <string name="acct_upi">UPI wallet</string>
+    <string name="acct_savings">Savings</string>
+    <string name="acct_card">Credit card</string>
+    <string name="acct_investment">Investment</string>
+    <string name="acct_loan">Loan</string>
+    <string name="acct_other_asset">Other asset</string>
+    <string name="acct_other_liability">Other liability</string>
+
+    <string name="security">Security</string>
+    <string name="app_lock">App lock</string>
+    <string name="app_lock_hint">Ask for fingerprint, face or device PIN when opening the app.</string>
+    <string name="app_lock_unavailable">Set up a screen lock or biometric on this phone to use app lock.</string>
+    <string name="lock_after">Lock after leaving the app for</string>
+    <string name="lock_immediately">Immediately</string>
+    <string name="lock_1_min">1 minute</string>
+    <string name="lock_5_min">5 minutes</string>
+    <string name="about">About</string>
+    <string name="about_body">Version 0.1.0. Screenshots and recent-apps previews are blocked.</string>
+    <string name="locked_title">Locked</string>
+    <string name="locked_body">Authenticate to see your finances.</string>
+    <string name="unlock">Unlock</string>
+    <string name="unlock_prompt">Unlock Private Money OS</string>
+</resources>

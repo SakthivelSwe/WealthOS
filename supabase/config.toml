@@ -1,0 +1,10 @@
+project_id = "private-money-os"
+
+[functions.health]
+verify_jwt = false
+
+[functions.ai-analyze]
+verify_jwt = true
+
+[functions.ai-categorize]
+verify_jwt = true

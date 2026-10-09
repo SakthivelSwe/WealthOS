@@ -1,0 +1,6 @@
+# Copy to local.properties (git-ignored).
+sdk.dir=C\:\\Users\\YOU\\AppData\\Local\\Android\\Sdk
+
+# Optional cloud features (publishable key only; never the service-role key)
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=

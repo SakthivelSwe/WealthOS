@@ -1,0 +1,82 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write # only to create the GitHub Release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda # v4.4.4
+      - uses: gradle/actions/wrapper-validation@da187c8e6ffbd3802e00f2477aa5a822b25f2dda # v4.4.4
+
+      - name: Tests and lint
+        run: ./gradlew --no-daemon :domain:test :app:testDebugUnitTest :app:lintRelease
+
+      - name: Decode keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          umask 077
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK (AGP signs and zip-aligns)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Verify signature, content and checksum
+        run: |
+          set -euo pipefail
+          apk="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          bt="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$bt/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/signature.txt"
+          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true\|Verified using v3 scheme (APK Signature Scheme v3): true" "$RUNNER_TEMP/signature.txt"
+          bash scripts/verify-apk.sh "$apk"
+          mkdir -p dist
+          cp "$apk" "dist/PrivateMoneyOS-${GITHUB_REF_NAME}.apk"
+          (cd dist && sha256sum "PrivateMoneyOS-${GITHUB_REF_NAME}.apk" > "PrivateMoneyOS-${GITHUB_REF_NAME}.apk.sha256")
+          grep -E "certificate SHA-256 digest" "$RUNNER_TEMP/signature.txt" > "dist/signing-certificate-sha256.txt"
+
+      - name: Keep R8 mapping privately (workflow artifact, not a release asset)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: r8-mapping-${{ github.ref_name }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          retention-days: 90
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Private Money OS $GITHUB_REF_NAME" \
+            --notes "Signed release APK. Verify before installing: compare the SHA-256 in the .sha256 file with the downloaded APK, and the signing certificate fingerprint in signing-certificate-sha256.txt. See README for steps."
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
