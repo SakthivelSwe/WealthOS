@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import app.privatemoney.cloud.CloudSyncService
+import app.privatemoney.data.local.AppDatabase
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -246,8 +248,8 @@ private fun MoreScreen(app: App, onManageAccounts: () -> Unit, onImport: () -> U
             android.widget.Toast.makeText(context, "Cloud Backup is starting...", android.widget.Toast.LENGTH_SHORT).show()
             kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    val db = app.privatemoney.data.local.AppDatabase.getDatabase(context)
-                    app.privatemoney.cloud.CloudSyncService(context, db).backupDatabase("0000")
+                    val db = AppDatabase.getDatabase(context)
+                    CloudSyncService(context, db).backupDatabase("0000")
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
                         android.widget.Toast.makeText(context, "Backup successful!", android.widget.Toast.LENGTH_SHORT).show()
                     }
