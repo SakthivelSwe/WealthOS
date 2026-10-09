@@ -31,9 +31,5 @@
             </intent-filter>
         </activity>
 
-        <!-- Exported benchmarking/tooling hook from androidx.profileinstaller; not needed, so no external entry point. -->
-        <receiver
-            android:name="androidx.profileinstaller.ProfileInstallReceiver"
-            tools:node="remove" />
     </application>
 </manifest>
