@@ -34,19 +34,19 @@ object DefaultCategories {
                 add(DefaultCategory("cat_${slug}_${sub.lowercase().replace(' ', '_')}", "cat_$slug", sub, CategoryKind.EXPENSE, nw, color))
             }
         }
-        group("food", "Food", NeedWant.NEED, 0xFFC9A66B, listOf("Groceries", "Restaurant", "Snacks", "Coffee", "Delivery"))
-        group("transport", "Transport", NeedWant.NEED, 0xFF7FA6D9, listOf("Fuel", "Metro", "Bus", "Taxi", "Maintenance"))
-        group("shopping", "Shopping", NeedWant.WANT, 0xFFB58BC9, listOf("Clothing", "Electronics", "Personal care", "Household"))
-        group("bills", "Bills", NeedWant.NEED, 0xFFD1A85A, listOf("Rent", "Electricity", "Internet", "Mobile", "Subscriptions"))
-        group("health", "Health", NeedWant.NEED, 0xFFE0736B, listOf("Medicine", "Doctor", "Fitness"))
-        group("education", "Education", NeedWant.NEED, 0xFF6FB7C4, listOf("Courses", "Books", "Certifications"))
-        group("entertainment", "Entertainment", NeedWant.WANT, 0xFFC98B9E)
-        group("travel", "Travel", NeedWant.WANT, 0xFF8BC9A6)
-        group("family", "Family", NeedWant.NEED, 0xFFC9B58B)
-        group("investment", "Investment", NeedWant.SAVING, 0xFF7FD1AE)
-        group("loan_emi", "Loan / EMI", NeedWant.NEED, 0xFFA3A3AD)
-        group("misc", "Misc", NeedWant.WANT, 0xFF8E8E96)
-        listOf("Salary", "Business", "Interest", "Other income").forEachIndexed { i, name ->
+        group("food", "🍔 Food", NeedWant.NEED, 0xFFC9A66B, listOf("Groceries", "Restaurant", "Snacks", "Coffee", "Delivery"))
+        group("transport", "🚗 Transport", NeedWant.NEED, 0xFF7FA6D9, listOf("Fuel", "Metro", "Bus", "Taxi", "Maintenance"))
+        group("shopping", "🛍️ Shopping", NeedWant.WANT, 0xFFB58BC9, listOf("Clothing", "Electronics", "Personal care", "Household"))
+        group("bills", "🧾 Bills", NeedWant.NEED, 0xFFD1A85A, listOf("Rent", "Electricity", "Internet", "Mobile", "Subscriptions"))
+        group("health", "❤️ Health", NeedWant.NEED, 0xFFE0736B, listOf("Medicine", "Doctor", "Fitness"))
+        group("education", "📚 Education", NeedWant.NEED, 0xFF6FB7C4, listOf("Courses", "Books", "Certifications"))
+        group("entertainment", "🍿 Entertainment", NeedWant.WANT, 0xFFC98B9E)
+        group("travel", "✈️ Travel", NeedWant.WANT, 0xFF8BC9A6)
+        group("family", "👨‍👩‍👧 Family", NeedWant.NEED, 0xFFC9B58B)
+        group("investment", "📈 Investment", NeedWant.SAVING, 0xFF7FD1AE)
+        group("loan_emi", "🏦 Loan / EMI", NeedWant.NEED, 0xFFA3A3AD)
+        group("misc", "📦 Misc", NeedWant.WANT, 0xFF8E8E96)
+        listOf("💰 Salary", "💼 Business", "📈 Interest", "🎁 Other income").forEachIndexed { i, name ->
             add(DefaultCategory("cat_income_$i", null, name, CategoryKind.INCOME, null, 0xFF7FD1AE))
         }
     }

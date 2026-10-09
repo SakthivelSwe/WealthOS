@@ -94,8 +94,10 @@ fun HomeScreen(state: HomeUiState, onOpenLedger: () -> Unit) {
             item { EmptyState(stringResource(R.string.no_transactions_title), stringResource(R.string.no_transactions_body)) }
         }
         items(state.recent, key = { it.id }) { row ->
-            TransactionRow(row, onClick = onOpenLedger)
-            Hairline()
+            Column(Modifier.animateItem()) {
+                TransactionRow(row, onClick = onOpenLedger)
+                Hairline()
+            }
         }
     }
 

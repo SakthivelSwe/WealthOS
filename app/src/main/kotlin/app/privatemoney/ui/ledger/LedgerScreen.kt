@@ -76,11 +76,13 @@ fun LedgerRoute(viewModel: LedgerViewModel) {
                     if (item != null) {
                         when (item) {
                             is LedgerItem.Header -> {
-                                SectionLabel(dateLabel(item.date), Modifier.padding(top = 16.dp, bottom = 4.dp))
+                                SectionLabel(dateLabel(item.date), Modifier.padding(top = 16.dp, bottom = 4.dp).animateItem())
                             }
                             is LedgerItem.Transaction -> {
-                                TransactionRow(item.row, onClick = { pendingActionTxn = item.row.id })
-                                Hairline()
+                                Column(Modifier.animateItem()) {
+                                    TransactionRow(item.row, onClick = { pendingActionTxn = item.row.id })
+                                    Hairline()
+                                }
                             }
                         }
                     }

@@ -96,7 +96,8 @@ private fun CategoryGlyph(label: String) {
         modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label.take(1).uppercase(), style = MaterialTheme.typography.titleSmall, color = LocalFinanceColors.current.muted)
+        val glyph = if (label.contains(" ")) label.split(" ").first() else label.take(1).uppercase()
+        Text(glyph, style = MaterialTheme.typography.titleSmall, color = LocalFinanceColors.current.muted)
     }
 }
 
