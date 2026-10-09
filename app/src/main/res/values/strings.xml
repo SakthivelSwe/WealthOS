@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Private Money OS</string>
+    <string name="app_name">WealthOS</string>
 
     <string name="tab_home">Home</string>
     <string name="tab_ledger">Ledger</string>
@@ -97,5 +97,5 @@
     <string name="locked_title">Locked</string>
     <string name="locked_body">Authenticate to see your finances.</string>
     <string name="unlock">Unlock</string>
-    <string name="unlock_prompt">Unlock Private Money OS</string>
+    <string name="unlock_prompt">Unlock WealthOS</string>
 </resources>
