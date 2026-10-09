@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -236,6 +239,26 @@ private fun MoreScreen(app: App, onManageAccounts: () -> Unit, onImport: () -> U
         }
         Button(onClick = onImport, modifier = Modifier.fillMaxWidth()) {
             Text("Import Statement")
+        }
+
+        SectionLabel("Cloud Services")
+        Button(onClick = {
+            android.widget.Toast.makeText(context, "Cloud Backup is starting...", android.widget.Toast.LENGTH_SHORT).show()
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val db = app.privatemoney.data.local.AppDatabase.getDatabase(context)
+                    app.privatemoney.cloud.CloudSyncService(context, db).backupDatabase("0000")
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Backup successful!", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Backup failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }, modifier = Modifier.fillMaxWidth()) {
+            Text("Backup to Cloud")
         }
 
         Hairline()

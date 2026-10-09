@@ -53,7 +53,11 @@ fun ImportScreen(onBack: () -> Unit) {
                     // Simulated logic
                     statusMessage = when (detected) {
                         app.privatemoney.domain.imports.DetectedFormat.ZIP_XLSX -> "XLSX detected. Ready to process."
-                        app.privatemoney.domain.imports.DetectedFormat.PDF -> "PDF detected. Ready to process."
+                        app.privatemoney.domain.imports.DetectedFormat.PDF -> {
+                            val text = "Extracting text from PDF (simulated for now)..."
+                            val result = app.privatemoney.cloud.GeminiAIService().extractTransactions(text)
+                            "AI Parsing Complete: $result"
+                        }
                         app.privatemoney.domain.imports.DetectedFormat.TEXT -> {
                             val text = String(bytes, Charsets.UTF_8)
                             val rows = CsvFormat.parse(text)
