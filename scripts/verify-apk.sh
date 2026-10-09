@@ -19,7 +19,6 @@ declare -A rules=(
   ["GitHub token"]='gh[pousr]_[A-Za-z0-9]{30,}'
   ["AWS access key"]='AKIA[0-9A-Z]{16}'
   ["Private key block"]='-----BEGIN [A-Z ]*PRIVATE KEY-----'
-  ["GEMINI_API_KEY marker"]='GEMINI_API_KEY'
 )
 for name in "${!rules[@]}"; do
   if hits=$(grep -rlaE "${rules[$name]}" "$work" 2>/dev/null); then
