@@ -17,12 +17,29 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Sensitive content is hidden from screenshots and the recents preview by default.
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        updateSecureFlag()
         setContent {
             val locked by app.lock.locked.collectAsState()
-            PmosRoot(app, locked, onUnlock = ::promptUnlock)
+            PmosRoot(
+                app = app,
+                locked = locked,
+                onUnlock = ::promptUnlock,
+                onSecureFlagChange = ::updateSecureFlag,
+            )
         }
+    }
+
+    fun updateSecureFlag() {
+        if (app.settings.blockScreenshots) {
+            window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateSecureFlag()
     }
 
     override fun onStart() {

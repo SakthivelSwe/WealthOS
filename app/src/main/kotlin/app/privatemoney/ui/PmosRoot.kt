@@ -133,7 +133,12 @@ private enum class Tab(val label: Int, val icon: ImageVector) {
 }
 
 @Composable
-fun PmosRoot(app: App, locked: Boolean, onUnlock: () -> Unit) {
+fun PmosRoot(
+    app: App,
+    locked: Boolean,
+    onUnlock: () -> Unit,
+    onSecureFlagChange: () -> Unit = {},
+) {
     val factory = remember(app) { appViewModelFactory(app) }
     var onboarded by remember { mutableStateOf(app.settings.onboarded) }
     var currentThemeMode by remember {
@@ -159,6 +164,7 @@ fun PmosRoot(app: App, locked: Boolean, onUnlock: () -> Unit) {
                         isMasked = !isMasked
                         app.settings.maskAmounts = isMasked
                     },
+                    onSecureFlagChange = onSecureFlagChange,
                 )
             }
         }
@@ -229,6 +235,7 @@ private fun MainShell(
     onThemeChange: (ThemeMode) -> Unit,
     isMasked: Boolean,
     onToggleMask: () -> Unit,
+    onSecureFlagChange: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var adding by rememberSaveable { mutableStateOf(false) }
@@ -290,6 +297,7 @@ private fun MainShell(
                     onToggleMask = onToggleMask,
                     onManageAccounts = { managingAccounts = true },
                     onImport = { importing = true },
+                    onSecureFlagChange = onSecureFlagChange,
                 )
             }
         }
@@ -390,6 +398,7 @@ private fun MoreHubScreen(
     onToggleMask: () -> Unit,
     onManageAccounts: () -> Unit,
     onImport: () -> Unit,
+    onSecureFlagChange: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -530,6 +539,29 @@ private fun MoreHubScreen(
         SectionLabel("SECURITY & VAULT LOCK")
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Screenshot Protection Toggle
+                var blockScreenshots by remember { mutableStateOf(app.settings.blockScreenshots) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Block Screenshots", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (blockScreenshots) "Screenshots & screen recording are blocked" else "Screenshots allowed across all screens",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = finance.muted,
+                        )
+                    }
+                    Switch(
+                        checked = blockScreenshots,
+                        onCheckedChange = {
+                            blockScreenshots = it
+                            app.settings.blockScreenshots = it
+                            onSecureFlagChange()
+                        },
+                    )
+                }
+
+                Hairline()
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(R.string.app_lock), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -584,7 +616,7 @@ private fun MoreHubScreen(
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("WealthOS v0.2.0 Prime", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    "Encrypted with SQLCipher AES-256 and wrapped with Android Keystore. Screenshots and recent-apps previews are hardware-protected.",
+                    "Encrypted with SQLCipher AES-256 and wrapped with Android Keystore. Screenshot capture is permitted by default across all screens for your records.",
                     style = MaterialTheme.typography.bodySmall,
                     color = finance.muted,
                     lineHeight = 18.sp,

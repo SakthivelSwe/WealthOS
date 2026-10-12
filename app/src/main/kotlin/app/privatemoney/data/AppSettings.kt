@@ -56,6 +56,10 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_USER_NAME, "WealthOS User") ?: "WealthOS User"
         set(value) = prefs.edit().putString(KEY_USER_NAME, value).apply()
 
+    var blockScreenshots: Boolean
+        get() = prefs.getBoolean(KEY_BLOCK_SCREENSHOTS, false)
+        set(value) = prefs.edit().putBoolean(KEY_BLOCK_SCREENSHOTS, value).apply()
+
     companion object {
         const val DEFAULT_TIMEOUT_MS = 60_000L
         private const val KEY_ONBOARDED = "onboarded"
@@ -70,5 +74,6 @@ class AppSettings(context: Context) {
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_MASK_AMOUNTS = "mask_amounts"
         private const val KEY_USER_NAME = "user_name"
+        private const val KEY_BLOCK_SCREENSHOTS = "block_screenshots"
     }
 }
