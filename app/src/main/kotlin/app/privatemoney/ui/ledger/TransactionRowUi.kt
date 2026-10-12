@@ -16,6 +16,10 @@ data class TransactionRowUi(
     val date: LocalDate,
     val amountMinor: Long,
     val currency: Currency,
+    val notes: String? = null,
+    val accountId: String = "",
+    val toAccountId: String? = null,
+    val categoryId: String? = null,
 )
 
 internal fun TxnEntity.toRowUi(categoryNames: Map<String, String>): TransactionRowUi = TransactionRowUi(
@@ -27,4 +31,8 @@ internal fun TxnEntity.toRowUi(categoryNames: Map<String, String>): TransactionR
     date = LocalDate.parse(localDate),
     amountMinor = amountMinor,
     currency = Currency.fromCode(currency) ?: Currency.INR,
+    notes = notes,
+    accountId = accountId,
+    toAccountId = toAccountId,
+    categoryId = categoryId,
 )

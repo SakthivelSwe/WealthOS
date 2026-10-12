@@ -44,6 +44,18 @@ class AppSettings(context: Context) {
         get() = prefs.getInt(KEY_SAVINGS_PCT, 20)
         set(value) = prefs.edit().putInt(KEY_SAVINGS_PCT, value).apply()
 
+    var themeModeStr: String
+        get() = prefs.getString(KEY_THEME_MODE, "DARK") ?: "DARK"
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value).apply()
+
+    var maskAmounts: Boolean
+        get() = prefs.getBoolean(KEY_MASK_AMOUNTS, false)
+        set(value) = prefs.edit().putBoolean(KEY_MASK_AMOUNTS, value).apply()
+
+    var userName: String
+        get() = prefs.getString(KEY_USER_NAME, "WealthOS User") ?: "WealthOS User"
+        set(value) = prefs.edit().putString(KEY_USER_NAME, value).apply()
+
     companion object {
         const val DEFAULT_TIMEOUT_MS = 60_000L
         private const val KEY_ONBOARDED = "onboarded"
@@ -55,5 +67,8 @@ class AppSettings(context: Context) {
         private const val KEY_NEEDS_PCT = "needs_pct"
         private const val KEY_WANTS_PCT = "wants_pct"
         private const val KEY_SAVINGS_PCT = "savings_pct"
+        private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_MASK_AMOUNTS = "mask_amounts"
+        private const val KEY_USER_NAME = "user_name"
     }
 }

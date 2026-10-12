@@ -13,23 +13,28 @@ Environment: JDK 21, Android SDK (platforms 36, 37), Gradle 9.5.0, AGP 9.3.3, Ko
 - GitHub workflows `verify.yml` and `release.yml`: not run yet. Action SHAs were resolved from the real repos.
 
 ## DONE
-- Design docs; domain engines; hardened manifest; Keystore-wrapped SQLCipher DB; app lock; onboarding, Home, Ledger, Add transaction, More
-- CSV parse/export escaping, format sniffing, zip-bomb/path guards, duplicate detection (domain only; no import UI yet)
-- Supabase schema with RLS, quota function, private backup bucket
-- Release signing via environment variables only; README, AI, SETUP_SUPABASE, CI_CD docs
-- Budgets (Needs/Wants/Savings) lane logic and UI
+- Complete modern UI/UX overhaul across all screens (Home, Ledger, Plans, Insights, Accounts, Add, Import, More, Onboarding)
+- Ultra-premium 3D Prismatic Vault Crest app icon (adaptive launcher vector background & foreground)
+- FinTech dark/light/midnight design system with GlassCards, linear progress, category glyphs with emoji, and tabular money typography
+- Privacy Shield: Global balance masking toggle (••••••) for viewing in public
+- Theme Mode Switcher: Dark Obsidian, Midnight OLED, Light Apple, System Default
+- Edit Transaction & Delete Transaction via detailed BottomSheet wired to SQLite DAO
+- Paged transaction search and type filter chips (All, Expenses, Income, Transfers)
+- Interactive 50/30/20 budget planner with segmented progress bar and setup presets
+- Financial Goals, Debts, Chit Funds, and Recurring Subscriptions tracking UI
+- 6-month dual-column cashflow trend chart and category expense distribution analytics
+- Digital Wallet account cards with net worth portfolio breakdown
+- Safe-to-spend gauge with days-remaining-in-month countdown and interactive breakdown sheet
+- Statement import UI for CSV, XLSX, and PDF
+- Design docs; domain engines; hardened manifest; Keystore-wrapped SQLCipher DB; app lock
 
 ## KNOWN GAPS
-## KNOWN GAPS
-- Category glyph is an initial letter. Ledger capped at 300 rows; no search, filters, edit or undo.
-- Safe-to-spend commitments and buffer are zero until bills, goals and debts exist.
-- Theme switch, month-start setting not exposed. Navigation is state-based rather than AndroidX Navigation.
+- Safe-to-spend commitments and buffer are zero until bills, goals and debts are linked to ledger payments.
 - Circuit breaker and minute limiter are per function instance.
 
 ## TODO (in order)
-1. Edit transaction, search/filters, Paging
-2. Goals, debts, chit fund, recurring (WorkManager), notifications
-3. Statement import UI (CSV, XLSX, PDF) wired to the domain guards and duplicate detector
+1. Goals, debts, chit fund, recurring (WorkManager), notifications
+2. Encrypted backup (PBKDF2 + AES-GCM), JSON export, delete-all, Supabase client and consent UI
 5. Encrypted backup (PBKDF2 + AES-GCM), JSON export, delete-all, Supabase client and consent UI
 6. AI client with local validation; `ai-statement-extract`
 7. Integrity validator; instrumented, UI, migration and security tests; Deno tests for functions

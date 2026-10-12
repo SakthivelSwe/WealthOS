@@ -1,20 +1,38 @@
 package app.privatemoney.ui.accounts
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.CurrencyRupee
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -23,10 +41,12 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,18 +54,39 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.privatemoney.data.local.AccountEntity
 import app.privatemoney.domain.model.AccountType
 import app.privatemoney.domain.model.Currency
 import app.privatemoney.ui.MoneyFormat
+import app.privatemoney.ui.components.EmptyState
+import app.privatemoney.ui.components.GlassCard
+import app.privatemoney.ui.components.Hairline
+import app.privatemoney.ui.components.MoneyText
+import app.privatemoney.ui.components.MoneyTint
+import app.privatemoney.ui.components.SectionLabel
 import app.privatemoney.ui.theme.LocalFinanceColors
+import app.privatemoney.ui.theme.MoneyStyles
+
+private val AccountEntity.isLiability: Boolean
+    get() = runCatching { AccountType.valueOf(type).isLiability }.getOrDefault(false)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () -> Unit) {
     val accounts by viewModel.activeAccounts.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    val finance = LocalFinanceColors.current
 
     if (showAddDialog) {
         AddAccountScreen(
@@ -54,7 +95,7 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
                 viewModel.addAccount(name, type, openingBalance, currency)
                 showAddDialog = false
             },
-            onCancel = { showAddDialog = false }
+            onCancel = { showAddDialog = false },
         )
         return
     }
@@ -62,40 +103,175 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Accounts") },
+                title = {
+                    Column {
+                        Text("Accounts & Wallets", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("${accounts.size} active vaults", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp),
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Account")
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        if (accounts.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No accounts found.", color = LocalFinanceColors.current.muted)
+        val totalAssets = accounts.filter { !it.isLiability }.sumOf { it.openingBalanceMinor }
+        val totalLiabilities = accounts.filter { it.isLiability }.sumOf { it.openingBalanceMinor }
+
+        LazyColumn(
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 100.dp),
+            modifier = Modifier.padding(padding),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // Portfolio Summary Card
+            item {
+                PortfolioSummaryCard(
+                    totalAssets = totalAssets,
+                    totalLiabilities = totalLiabilities,
+                    currency = currency,
+                )
             }
-        } else {
-            LazyColumn(
-                contentPadding = padding,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(accounts) { account ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { /* Edit in future */ }) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row {
-                                Text(account.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                Text(MoneyFormat.format(account.openingBalanceMinor, currency), style = MaterialTheme.typography.titleMedium)
-                            }
-                            Text(account.type, style = MaterialTheme.typography.bodySmall, color = LocalFinanceColors.current.muted)
-                        }
+
+            item {
+                SectionLabel("YOUR ACCOUNTS (${accounts.size})")
+            }
+
+            if (accounts.isEmpty()) {
+                item {
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        EmptyState(
+                            title = "No accounts configured",
+                            body = "Add bank accounts, cash, or UPI wallets to track all balances.",
+                            icon = Icons.Default.Wallet,
+                        )
                     }
+                }
+            } else {
+                items(accounts, key = { it.id }) { account ->
+                    AccountWalletCard(account = account, currency = currency)
+                }
+            }
+        }
+    }
+}
+
+/** Virtual Wallet Card aesthetic for accounts. */
+@Composable
+private fun AccountWalletCard(account: AccountEntity, currency: Currency) {
+    val finance = LocalFinanceColors.current
+    val acctType = runCatching { AccountType.valueOf(account.type) }.getOrDefault(AccountType.BANK)
+
+    val (cardBrush, icon) = when (acctType) {
+        AccountType.BANK -> Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))) to Icons.Default.AccountBalance
+        AccountType.UPI_WALLET -> Brush.linearGradient(listOf(Color(0xFF3B0764), Color(0xFF1E1B4B))) to Icons.Default.QrCode2
+        AccountType.CASH -> Brush.linearGradient(listOf(Color(0xFF064E3B), Color(0xFF022C22))) to Icons.Default.Payments
+        AccountType.SAVINGS -> Brush.linearGradient(listOf(Color(0xFF134E4A), Color(0xFF042F2E))) to Icons.Default.Savings
+        AccountType.CREDIT_CARD -> Brush.linearGradient(listOf(Color(0xFF4C0519), Color(0xFF1C1917))) to Icons.Default.CreditCard
+        AccountType.INVESTMENT -> Brush.linearGradient(listOf(Color(0xFF451A03), Color(0xFF1C1917))) to Icons.Default.TrendingUp
+        else -> Brush.linearGradient(listOf(Color(0xFF1F2937), Color(0xFF111827))) to Icons.Default.Wallet
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(cardBrush)
+            .border(1.dp, finance.glassBorder, RoundedCornerShape(22.dp))
+            .padding(20.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x2EFFFFFF)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Column {
+                        Text(account.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(account.type.replace('_', ' '), style = TextStyle(fontSize = 11.sp, color = Color(0xB3FFFFFF), fontWeight = FontWeight.Medium))
+                    }
+                }
+
+                // Status Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x26FFFFFF))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        if (account.isLiability) "LIABILITY" else "ASSET",
+                        style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (account.isLiability) Color(0xFFFDA4AF) else Color(0xFF6EE7B7)),
+                    )
+                }
+            }
+
+            Hairline(modifier = Modifier.padding(vertical = 2.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Opening Balance", style = TextStyle(fontSize = 12.sp, color = Color(0x99FFFFFF)))
+                MoneyText(
+                    minor = account.openingBalanceMinor,
+                    currency = currency,
+                    style = MoneyStyles.large,
+                    tint = if (account.isLiability) MoneyTint.NEGATIVE else MoneyTint.POSITIVE,
+                )
+            }
+        }
+    }
+}
+
+/** Portfolio summary showing Assets vs Liabilities. */
+@Composable
+private fun PortfolioSummaryCard(totalAssets: Long, totalLiabilities: Long, currency: Currency) {
+    val finance = LocalFinanceColors.current
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("NET PORTFOLIO VALUE", style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = finance.muted, letterSpacing = 1.sp))
+            MoneyText(
+                minor = totalAssets - totalLiabilities,
+                currency = currency,
+                style = MoneyStyles.hero,
+                tint = MoneyTint.NEUTRAL,
+            )
+
+            Hairline()
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text("Total Assets", style = TextStyle(fontSize = 11.sp, color = finance.muted))
+                    MoneyText(totalAssets, currency, style = MoneyStyles.row, tint = MoneyTint.POSITIVE)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Total Liabilities", style = TextStyle(fontSize = 11.sp, color = finance.muted))
+                    MoneyText(totalLiabilities, currency, style = MoneyStyles.row, tint = MoneyTint.NEGATIVE)
                 }
             }
         }
@@ -107,7 +283,7 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
 private fun AddAccountScreen(
     currency: Currency,
     onSave: (String, AccountType, Long) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(AccountType.BANK) }
@@ -117,49 +293,55 @@ private fun AddAccountScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("New Account") },
+                title = { Text("Add New Account", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onCancel) {
                         Icon(Icons.Default.Close, contentDescription = "Cancel")
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Account Name") },
-                modifier = Modifier.fillMaxWidth()
+                placeholder = { Text("e.g. HDFC Main, Cash, Chase") },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             ExposedDropdownMenuBox(
                 expanded = expanded,
-                onExpandedChange = { expanded = it }
+                onExpandedChange = { expanded = it },
             ) {
                 OutlinedTextField(
-                    value = type.name,
+                    value = type.name.replace('_', ' '),
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Account Type") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.menuAnchor().fillMaxWidth()
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
                 ) {
                     AccountType.entries.forEach { t ->
                         DropdownMenuItem(
-                            text = { Text(t.name) },
+                            text = { Text(t.name.replace('_', ' ')) },
                             onClick = {
                                 type = t
                                 expanded = false
-                            }
+                            },
                         )
                     }
                 }
@@ -169,8 +351,13 @@ private fun AddAccountScreen(
                 value = balanceStr,
                 onValueChange = { balanceStr = it },
                 label = { Text("Opening Balance (${currency.code})") },
-                modifier = Modifier.fillMaxWidth()
+                placeholder = { Text("0.00") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
             )
+
+            Spacer(Modifier.weight(1f))
 
             Button(
                 onClick = {
@@ -180,9 +367,10 @@ private fun AddAccountScreen(
                     }
                 },
                 enabled = name.isNotBlank(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
             ) {
-                Text("Save")
+                Text("Create Account Vault", fontWeight = FontWeight.Bold)
             }
         }
     }

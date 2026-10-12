@@ -66,6 +66,9 @@ class LedgerRepository(private val db: AppDatabase, private val clock: () -> Lon
     /** Soft delete keeps the record for audit; balances ignore deleted transactions. */
     suspend fun delete(id: String): Boolean = db.ledgerDao().softDelete(id, clock()) > 0
 
+    suspend fun updateDetails(id: String, merchant: String?, description: String?, notes: String?): Boolean =
+        db.ledgerDao().updateDetails(id, merchant, description, notes, clock()) > 0
+
     fun observeRecent(limit: Int): Flow<List<TxnEntity>> = db.ledgerDao().observeRecent(limit)
 
     fun pagingSource(query: String = ""): PagingSource<Int, TxnEntity> = 

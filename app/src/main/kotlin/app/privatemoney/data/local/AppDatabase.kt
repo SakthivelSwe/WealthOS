@@ -53,6 +53,9 @@ interface LedgerDao {
     @Query("UPDATE txn SET deletedAt = :at, updatedAt = :at WHERE id = :id AND deletedAt IS NULL")
     suspend fun softDelete(id: String, at: Long): Int
 
+    @Query("UPDATE txn SET merchant = :merchant, description = :description, notes = :notes, updatedAt = :updatedAt WHERE id = :id AND deletedAt IS NULL")
+    suspend fun updateDetails(id: String, merchant: String?, description: String?, notes: String?, updatedAt: Long): Int
+
     /** Derived balance: opening balance plus the sum of live journal legs. */
     @Query(
         """
