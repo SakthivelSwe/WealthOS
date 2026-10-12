@@ -123,28 +123,28 @@ jobs:
           TAG="${{ steps.version_step.outputs.tag }}"
           SHORT_SHA="${GITHUB_SHA::7}"
           BUILD_NUM="${GITHUB_RUN_NUMBER}"
-
           RELEASE_TITLE="WealthOS ${TAG} (Build #${BUILD_NUM})"
-          RELEASE_NOTES="### WealthOS Automated Build #${BUILD_NUM}
-Built automatically from commit \`${SHORT_SHA}\` on $(date -u +'%Y-%m-%d %H:%M UTC').
 
-#### Downloads:
-- **[PrivateMoneyOS-latest.apk](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/PrivateMoneyOS-latest.apk)** (Always the latest APK built from main)
-- **PrivateMoneyOS-${TAG}.apk**
-
-Verify SHA-256 checksum in \`.sha256\` before installing."
+          echo "### WealthOS Automated Build #${BUILD_NUM}" > "$RUNNER_TEMP/notes.md"
+          echo "Built automatically from commit \`${SHORT_SHA}\` on $(date -u +'%Y-%m-%d %H:%M UTC')." >> "$RUNNER_TEMP/notes.md"
+          echo "" >> "$RUNNER_TEMP/notes.md"
+          echo "#### Downloads:" >> "$RUNNER_TEMP/notes.md"
+          echo "- **PrivateMoneyOS-latest.apk** (Always the latest APK built from main)" >> "$RUNNER_TEMP/notes.md"
+          echo "- **PrivateMoneyOS-${TAG}.apk**" >> "$RUNNER_TEMP/notes.md"
+          echo "" >> "$RUNNER_TEMP/notes.md"
+          echo "Verify SHA-256 checksum in .sha256 before installing." >> "$RUNNER_TEMP/notes.md"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists. Updating APK assets and title..."
             gh release upload "$TAG" dist/* --clobber
-            gh release edit "$TAG" --title "$RELEASE_TITLE" --latest --notes "$RELEASE_NOTES"
+            gh release edit "$TAG" --title "$RELEASE_TITLE" --latest --notes-file "$RUNNER_TEMP/notes.md"
           else
             echo "Creating new release $TAG..."
             gh release create "$TAG" dist/* \
               --target "${GITHUB_SHA}" \
               --title "$RELEASE_TITLE" \
               --latest \
-              --notes "$RELEASE_NOTES"
+              --notes-file "$RUNNER_TEMP/notes.md"
           fi
 
       - name: Clean Keystore
