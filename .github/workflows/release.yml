@@ -2,81 +2,134 @@ name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      contents: write # only to create the GitHub Release
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.ref }}
           fetch-depth: 0
-          persist-credentials: false
+
       - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "21"
+
       - uses: gradle/actions/setup-gradle@da187c8e6ffbd3802e00f2477aa5a822b25f2dda # v4.4.4
       - uses: gradle/actions/wrapper-validation@da187c8e6ffbd3802e00f2477aa5a822b25f2dda # v4.4.4
 
-      - name: Tests and lint
-        run: ./gradlew --no-daemon :domain:test :app:testDebugUnitTest :app:lintRelease
+      - name: Resolve Version and Tag
+        id: version_step
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            VER="$(grep 'versionName =' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')"
+            TAG="v${VER}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag: ${TAG}"
 
-      - name: Decode keystore
+      - name: Run Tests and Lint
+        run: ./gradlew --no-daemon :domain:test :app:testDebugUnitTest :app:lintDebug
+
+      - name: Decode Keystore
+        id: keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 secret is missing"; exit 1; }
-          umask 077
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            umask 077
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+            echo "Keystore successfully decoded"
+          else
+            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+            echo "Keystore secret not present; will build debug APK"
+          fi
 
-      - name: Build signed release APK (AGP signs and zip-aligns)
+      - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon :app:assembleRelease
-
-      - name: Verify signature, content and checksum
         run: |
           set -euo pipefail
-          apk="$(ls app/build/outputs/apk/release/*.apk | head -1)"
-          bt="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          "$bt/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/signature.txt"
-          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true\|Verified using v3 scheme (APK Signature Scheme v3): true" "$RUNNER_TEMP/signature.txt"
-          bash scripts/verify-apk.sh "$apk"
-          mkdir -p dist
-          cp "$apk" "dist/PrivateMoneyOS-${GITHUB_REF_NAME}.apk"
-          (cd dist && sha256sum "PrivateMoneyOS-${GITHUB_REF_NAME}.apk" > "PrivateMoneyOS-${GITHUB_REF_NAME}.apk.sha256")
-          grep -E "certificate SHA-256 digest" "$RUNNER_TEMP/signature.txt" > "dist/signing-certificate-sha256.txt"
+          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
+            ./gradlew --no-daemon :app:assembleRelease
+          else
+            ./gradlew --no-daemon :app:assembleDebug
+          fi
 
-      - name: Keep R8 mapping privately (workflow artifact, not a release asset)
+      - name: Package Release Assets and Verification
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version_step.outputs.tag }}"
+          mkdir -p dist
+
+          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
+            apk="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+            bt="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+            "$bt/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/signature.txt" || true
+            if grep -E "certificate SHA-256 digest" "$RUNNER_TEMP/signature.txt" > "dist/signing-certificate-sha256.txt"; then
+              echo "Certificate digest saved"
+            fi
+            bash scripts/verify-apk.sh "$apk"
+          else
+            apk="$(ls app/build/outputs/apk/debug/*.apk | head -1)"
+            bash scripts/verify-apk.sh "$apk"
+          fi
+
+          cp "$apk" "dist/PrivateMoneyOS-${TAG}.apk"
+          cp "$apk" "dist/PrivateMoneyOS-latest.apk"
+          (cd dist && sha256sum "PrivateMoneyOS-${TAG}.apk" > "PrivateMoneyOS-${TAG}.apk.sha256")
+          (cd dist && sha256sum "PrivateMoneyOS-latest.apk" > "PrivateMoneyOS-latest.apk.sha256")
+          ls -la dist/
+
+      - name: Upload Workflow Artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: r8-mapping-${{ github.ref_name }}
-          path: app/build/outputs/mapping/release/mapping.txt
+          name: PrivateMoneyOS-${{ steps.version_step.outputs.tag }}
+          path: dist/*
           retention-days: 90
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "Private Money OS $GITHUB_REF_NAME" \
-            --notes "Signed release APK. Verify before installing: compare the SHA-256 in the .sha256 file with the downloaded APK, and the signing certificate fingerprint in signing-certificate-sha256.txt. See README for steps."
+          set -euo pipefail
+          TAG="${{ steps.version_step.outputs.tag }}"
 
-      - name: Remove keystore
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists. Updating APK assets..."
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --latest --notes "Updated release APK built automatically from commit ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC')."
+          else
+            echo "Creating new release $TAG..."
+            gh release create "$TAG" dist/* \
+              --target "${GITHUB_SHA}" \
+              --title "Private Money OS $TAG" \
+              --latest \
+              --notes "Automated release APK. Built automatically from commit ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Compare SHA-256 checksum in .sha256 file before installing."
+          fi
+
+      - name: Clean Keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/release.jks"

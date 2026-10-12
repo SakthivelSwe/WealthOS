@@ -11,15 +11,17 @@ All third-party actions are pinned to commit SHAs (tag in a trailing comment). W
 6. `scripts/verify-apk.sh`: fails on secret-shaped strings, `debuggable`, cleartext, `allowBackup`, more than one exported component, or any forbidden permission.
 7. Test and lint reports uploaded as artifacts.
 
-## release.yml (tag `v*`)
-Checks out the tag, scans for secrets, runs tests and release lint, decodes the keystore into `$RUNNER_TEMP` only, builds the signed R8-minified release APK (Gradle reads the keystore from environment variables; AGP signs and zip-aligns), runs `apksigner verify`, runs the APK content checks, writes the SHA-256 file and signing certificate digest, uploads the R8 mapping as a private 90-day workflow artifact, creates the release with `gh`, and always deletes the keystore.
+## release.yml (every push to main and tags `v*`)
+Triggered automatically on every push to `main` as well as release tags `v*`.
+Checks out code, scans for secrets with Gitleaks, runs domain tests and Android lint, builds the APK (signed release APK if keystore secrets exist, or debug APK), verifies the APK against credential and manifest security checks, generates SHA-256 checksums, uploads the APK to GitHub Actions artifacts, and automatically publishes/updates the latest GitHub Release using GitHub CLI (`gh release`).
 
-### Secrets to add (Settings > Secrets and variables > Actions)
-`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`. Only these four; no Gemini or Supabase secret is needed by CI.
+### Secrets (Settings > Secrets and variables > Actions)
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`.
 
-### Cut a release
-```
-git tag v0.1.0 && git push origin v0.1.0
+### Automatic Release
+Every push to `main` builds and updates the release APK automatically. You can also manually trigger a release from GitHub Actions or cut a versioned tag:
+```bash
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
 ## Not yet in CI (tracked in PROJECT_STATUS.md)
