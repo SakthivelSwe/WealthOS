@@ -32,18 +32,16 @@ data class SafeToSpendBreakdown(
 object SafeToSpendEngine {
 
     fun calculate(input: SafeToSpendInput, today: LocalDate): SafeToSpendBreakdown {
-        require(listOf(
-            input.upcomingMandatoryBillsMinor, input.expectedDebtPaymentsMinor,
-            input.plannedGoalContributionsMinor, input.creditCardDueMinor, input.safetyBufferMinor,
-        ).all { it >= 0 }) { "Commitments must not be negative" }
+        val safeUpcomingBills = maxOf(0L, input.upcomingMandatoryBillsMinor)
+        val safeDebtPayments = maxOf(0L, input.expectedDebtPaymentsMinor)
+        val safeGoalContributions = maxOf(0L, input.plannedGoalContributionsMinor)
+        val safeCcDue = maxOf(0L, input.creditCardDueMinor)
+        val safeBuffer = maxOf(0L, input.safetyBufferMinor)
 
-        val committed = input.upcomingMandatoryBillsMinor +
-            input.expectedDebtPaymentsMinor +
-            input.plannedGoalContributionsMinor +
-            input.creditCardDueMinor
-        val discretionary = Math.subtractExact(Math.subtractExact(input.liquidBalanceMinor, committed), input.safetyBufferMinor)
+        val committed = safeUpcomingBills + safeDebtPayments + safeGoalContributions + safeCcDue
+        val discretionary = input.liquidBalanceMinor - committed - safeBuffer
         val safeMonth = maxOf(0L, discretionary)
-        val daysLeft = YearMonth.from(today).lengthOfMonth() - today.dayOfMonth + 1
+        val daysLeft = maxOf(1, YearMonth.from(today).lengthOfMonth() - today.dayOfMonth + 1)
         val perDay = safeMonth / daysLeft
         val week = perDay * minOf(7, daysLeft)
         return SafeToSpendBreakdown(

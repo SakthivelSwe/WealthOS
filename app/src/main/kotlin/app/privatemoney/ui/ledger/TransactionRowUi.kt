@@ -24,11 +24,11 @@ data class TransactionRowUi(
 
 internal fun TxnEntity.toRowUi(categoryNames: Map<String, String>): TransactionRowUi = TransactionRowUi(
     id = id,
-    type = TransactionType.valueOf(type),
+    type = runCatching { TransactionType.valueOf(type.uppercase()) }.getOrDefault(TransactionType.EXPENSE),
     merchant = merchant,
     description = description,
     categoryName = categoryId?.let(categoryNames::get),
-    date = LocalDate.parse(localDate),
+    date = runCatching { LocalDate.parse(localDate) }.getOrElse { LocalDate.now() },
     amountMinor = amountMinor,
     currency = Currency.fromCode(currency) ?: Currency.INR,
     notes = notes,

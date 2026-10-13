@@ -15,6 +15,7 @@ object DatabaseFactory {
         val factory = SupportOpenHelperFactory(passphrase, null, false, 0)
         val db = Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, DB_NAME)
             .openHelperFactory(factory)
+            .fallbackToDestructiveMigrationOnDowngrade()
             .build()
         passphrase.fill(0)
         return db

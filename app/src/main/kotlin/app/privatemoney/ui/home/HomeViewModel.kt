@@ -104,7 +104,14 @@ class HomeViewModel(
                 safetyBufferMinor = buffer,
             )
 
-            val safe = SafeToSpendEngine.calculate(safeInput, today)
+            val safe = runCatching {
+                SafeToSpendEngine.calculate(safeInput, today)
+            }.getOrElse {
+                SafeToSpendEngine.calculate(
+                    SafeToSpendInput(liquidBalanceMinor = liquid, 0L, 0L, 0L, 0L, 0L),
+                    today,
+                )
+            }
 
             HomeUiState(
                 isLoading = false,

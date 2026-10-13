@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -12,6 +14,12 @@ android {
     namespace = "app.privatemoney"
     compileSdk = 37
 
+    val rawAnonKey = System.getenv("SUPABASE_ANON_KEY") ?: ""
+    val b64AnonKey = if (rawAnonKey.isNotBlank()) {
+        Base64.getEncoder().encodeToString(rawAnonKey.toByteArray(Charsets.UTF_8))
+    } else ""
+    val supabaseUrl = System.getenv("SUPABASE_URL") ?: "https://zahzagnindkkttdpmqii.supabase.co"
+
     defaultConfig {
         applicationId = "app.privatemoney.os"
         minSdk = 31
@@ -19,6 +27,8 @@ android {
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 3
         versionName = System.getenv("VERSION_NAME") ?: "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SUPABASE_ANON_KEY_B64", "\"${b64AnonKey}\"")
+        buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl}\"")
     }
 
     // Release signing comes only from environment variables set by the release workflow.
@@ -47,6 +57,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

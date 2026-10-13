@@ -61,12 +61,36 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_BLOCK_SCREENSHOTS, value).apply()
 
     var supabaseUrl: String
-        get() = prefs.getString(KEY_SUPABASE_URL, DEFAULT_SUPABASE_URL) ?: DEFAULT_SUPABASE_URL
+        get() {
+            val saved = prefs.getString(KEY_SUPABASE_URL, "") ?: ""
+            if (saved.isNotBlank()) return saved
+            return runCatching { app.privatemoney.BuildConfig.SUPABASE_URL.ifBlank { DEFAULT_SUPABASE_URL } }
+                .getOrDefault(DEFAULT_SUPABASE_URL)
+        }
         set(value) = prefs.edit().putString(KEY_SUPABASE_URL, value.trim()).apply()
 
     var supabaseAnonKey: String
-        get() = prefs.getString(KEY_SUPABASE_ANON_KEY, "") ?: ""
+        get() {
+            val saved = prefs.getString(KEY_SUPABASE_ANON_KEY, "") ?: ""
+            if (saved.isNotBlank()) return saved
+            return runCatching {
+                val b64 = app.privatemoney.BuildConfig.SUPABASE_ANON_KEY_B64
+                if (b64.isNotBlank()) {
+                    String(android.util.Base64.decode(b64, android.util.Base64.DEFAULT), Charsets.UTF_8).trim()
+                } else ""
+            }.getOrDefault("")
+        }
         set(value) = prefs.edit().putString(KEY_SUPABASE_ANON_KEY, value.trim()).apply()
+
+    var autoVaultKey: String
+        get() {
+            val saved = prefs.getString(KEY_AUTO_VAULT_KEY, null)
+            if (!saved.isNullOrBlank()) return saved
+            val generated = "wos_vault_" + java.util.UUID.randomUUID().toString().replace("-", "")
+            prefs.edit().putString(KEY_AUTO_VAULT_KEY, generated).apply()
+            return generated
+        }
+        set(value) = prefs.edit().putString(KEY_AUTO_VAULT_KEY, value).apply()
 
     var lastBackupTimestamp: Long
         get() = prefs.getLong(KEY_LAST_BACKUP_TIME, 0L)
@@ -130,6 +154,7 @@ class AppSettings(context: Context) {
         private const val KEY_BLOCK_SCREENSHOTS = "block_screenshots"
         private const val KEY_SUPABASE_URL = "supabase_url"
         private const val KEY_SUPABASE_ANON_KEY = "supabase_anon_key"
+        private const val KEY_AUTO_VAULT_KEY = "auto_vault_key"
         private const val KEY_LAST_BACKUP_TIME = "last_backup_time"
         private const val KEY_LAST_BACKUP_STATUS = "last_backup_status"
         private const val KEY_LAST_BACKUP_ERROR = "last_backup_error"

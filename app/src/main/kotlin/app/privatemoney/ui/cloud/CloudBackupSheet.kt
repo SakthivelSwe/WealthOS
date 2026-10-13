@@ -81,7 +81,7 @@ fun CloudBackupSheet(
     val finance = LocalFinanceColors.current
     val cloudService = remember { CloudSyncService(context, app.database, app.settings) }
 
-    var userPin by remember { mutableStateOf("0000") }
+    var userPin by remember { mutableStateOf("") }
     var isOperating by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var isError by remember { mutableStateOf(false) }
@@ -156,7 +156,7 @@ fun CloudBackupSheet(
             if (showConfig) {
                 GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Supabase Cloud Credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text("Cloud Backup Advanced Settings", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                         OutlinedTextField(
                             value = customUrl,
                             onValueChange = { customUrl = it },
@@ -174,17 +174,27 @@ fun CloudBackupSheet(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        OutlinedTextField(
+                            value = userPin,
+                            onValueChange = { userPin = it },
+                            label = { Text("Custom Vault PIN (Optional, auto-managed)") },
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         Button(
                             onClick = {
                                 app.settings.supabaseUrl = customUrl
                                 app.settings.supabaseAnonKey = customAnonKey
                                 showConfig = false
-                                Toast.makeText(context, "Supabase credentials updated!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Settings updated!", Toast.LENGTH_SHORT).show()
                             },
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("Save Credentials")
+                            Text("Save Settings")
                         }
                     }
                 }
@@ -288,22 +298,10 @@ fun CloudBackupSheet(
                 return@Column
             }
 
-            // Vault PIN Input
-            OutlinedTextField(
-                value = userPin,
-                onValueChange = { userPin = it },
-                label = { Text("Vault Encryption Passphrase / PIN") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            // Primary Actions
+            // Primary Actions - 1-Tap Automatic Backup (No PIN or key required)
             if (isOperating) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -312,84 +310,83 @@ fun CloudBackupSheet(
                     Text(statusMessage ?: "Processing...", style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = {
-                            isOperating = true
-                            statusMessage = "Creating encrypted backup and syncing..."
-                            scope.launch(Dispatchers.IO) {
-                                try {
-                                    cloudService.backupToCloud(userPin)
-                                    withContext(Dispatchers.Main) {
-                                        isOperating = false
-                                        isError = false
-                                        statusMessage = "Encrypted cloud backup completed successfully!"
-                                        Toast.makeText(context, "Backup synced successfully to Supabase!", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        isOperating = false
-                                        isError = true
-                                        statusMessage = e.message
-                                    }
-                                }
-                            }
-                        },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                    ) {
-                        Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Cloud Backup", fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            filePickerLauncher.launch("*/*")
-                        },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                    ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Restore", fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                // Export to file
-                OutlinedButton(
+                Button(
                     onClick = {
                         isOperating = true
+                        statusMessage = "Securing and creating automatic backup..."
                         scope.launch(Dispatchers.IO) {
                             try {
-                                val envelope = cloudService.createBackupEnvelope(userPin)
-                                val file = File(context.cacheDir, "wealthos_backup_${System.currentTimeMillis()}.wosenc")
-                                file.writeBytes(envelope)
-                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/octet-stream"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                }
+                                cloudService.backupToCloud(userPin)
                                 withContext(Dispatchers.Main) {
                                     isOperating = false
-                                    context.startActivity(Intent.createChooser(shareIntent, "Save or Export WealthOS Encrypted Backup"))
+                                    isError = false
+                                    statusMessage = "Automatic backup completed and secured!"
+                                    Toast.makeText(context, "Automatic backup completed successfully!", Toast.LENGTH_SHORT).show()
                                 }
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
                                     isOperating = false
                                     isError = true
-                                    statusMessage = "Export failed: ${e.message}"
+                                    statusMessage = e.message
                                 }
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Export Encrypted Backup File (.wosenc)")
+                    Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("⚡ 1-Tap Automatic Backup", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            filePickerLauncher.launch("*/*")
+                        },
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Restore Backup", fontWeight = FontWeight.SemiBold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            isOperating = true
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    val envelope = cloudService.createBackupEnvelope(userPin)
+                                    val file = File(context.cacheDir, "wealthos_backup_${System.currentTimeMillis()}.wosenc")
+                                    file.writeBytes(envelope)
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/octet-stream"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    }
+                                    withContext(Dispatchers.Main) {
+                                        isOperating = false
+                                        context.startActivity(Intent.createChooser(shareIntent, "Save or Export WealthOS Encrypted Backup"))
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        isOperating = false
+                                        isError = true
+                                        statusMessage = "Export failed: ${e.message}"
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Export File", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 

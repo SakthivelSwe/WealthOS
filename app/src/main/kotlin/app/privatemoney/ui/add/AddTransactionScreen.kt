@@ -37,14 +37,25 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -155,6 +166,13 @@ fun AddTransactionScreen(
                 )
             }
         }
+
+        // Quick Date Selector (Today, Yesterday, Specific Date)
+        DateSelectorRow(
+            selectedDateStr = state.customDate,
+            accentColor = typeColor,
+            onSelectDate = { viewModel.setCustomDate(it) },
+        )
 
         // Scrollable Options Form
         Column(
@@ -433,5 +451,147 @@ private fun RowScope.KeyCell(
                 style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
             )
         }
+    }
+}
+
+@Composable
+private fun DateSelectorRow(
+    selectedDateStr: String?,
+    accentColor: Color,
+    onSelectDate: (String?) -> Unit,
+) {
+    val finance = LocalFinanceColors.current
+    val today = remember { LocalDate.now() }
+    val yesterday = remember { today.minusDays(1) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val activeDate = remember(selectedDateStr) {
+        if (selectedDateStr != null) {
+            runCatching { LocalDate.parse(selectedDateStr) }.getOrDefault(today)
+        } else today
+    }
+
+    val isToday = selectedDateStr == null || activeDate == today
+    val isYesterday = selectedDateStr != null && activeDate == yesterday
+    val isCustom = selectedDateStr != null && !isToday && !isYesterday
+
+    val customLabel = remember(activeDate, isCustom) {
+        if (isCustom) {
+            activeDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+        } else {
+            "Specific Date 📅"
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DateChip(
+            label = "Today",
+            selected = isToday,
+            accentColor = accentColor,
+            onClick = { onSelectDate(null) },
+        )
+
+        DateChip(
+            label = "Yesterday",
+            selected = isYesterday,
+            accentColor = accentColor,
+            onClick = { onSelectDate(yesterday.toString()) },
+        )
+
+        DateChip(
+            label = if (isCustom) "📅 $customLabel" else "Specific Date 📅",
+            selected = isCustom,
+            accentColor = accentColor,
+            onClick = { showDatePicker = true },
+        )
+    }
+
+    if (showDatePicker) {
+        TransactionDatePickerDialog(
+            initialDate = activeDate,
+            accentColor = accentColor,
+            onDateSelected = { picked ->
+                if (picked == today) {
+                    onSelectDate(null)
+                } else {
+                    onSelectDate(picked.toString())
+                }
+            },
+            onDismiss = { showDatePicker = false },
+        )
+    }
+}
+
+@Composable
+private fun DateChip(
+    label: String,
+    selected: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit,
+) {
+    val finance = LocalFinanceColors.current
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) accentColor.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .border(
+                width = 1.dp,
+                color = if (selected) accentColor else finance.glassBorder,
+                shape = RoundedCornerShape(16.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            color = if (selected) accentColor else finance.muted,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TransactionDatePickerDialog(
+    initialDate: LocalDate,
+    accentColor: Color,
+    onDateSelected: (LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val initialMillis = remember(initialDate) {
+        initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                        onDateSelected(picked)
+                    }
+                    onDismiss()
+                },
+            ) {
+                Text("Select", fontWeight = FontWeight.Bold, color = accentColor)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    ) {
+        DatePicker(state = datePickerState)
     }
 }

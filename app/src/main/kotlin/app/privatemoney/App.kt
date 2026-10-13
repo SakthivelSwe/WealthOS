@@ -26,7 +26,7 @@ import java.time.LocalTime
 import java.util.concurrent.TimeUnit
 
 /** Manual dependency graph: clean, fast, lightweight. */
-class App : Application() {
+class App : Application(), androidx.work.Configuration.Provider {
     val settings: AppSettings by lazy { AppSettings(this) }
     val lock: AppLock by lazy { AppLock(settings) }
     val keyProvider: DatabaseKeyProvider by lazy { DatabaseKeyProvider(this) }
@@ -36,6 +36,11 @@ class App : Application() {
     val categories: CategoryRepository by lazy { CategoryRepository(database) }
     val planning: PlanningRepository by lazy { PlanningRepository(database) }
     val notifications: NotificationRepository by lazy { NotificationRepository(database) }
+
+    override val workManagerConfiguration: androidx.work.Configuration
+        get() = androidx.work.Configuration.Builder()
+            .setMinimumLoggingLevel(android.util.Log.INFO)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
@@ -52,33 +57,37 @@ class App : Application() {
     }
 
     private fun scheduleWorkers() {
-        val workManager = WorkManager.getInstance(this)
+        try {
+            val workManager = WorkManager.getInstance(this)
 
-        // 1. Recurring Bills Worker
-        val recurringRequest = PeriodicWorkRequestBuilder<RecurringWorker>(1, TimeUnit.DAYS).build()
-        workManager.enqueueUniquePeriodicWork(
-            "recurring_txn_worker",
-            ExistingPeriodicWorkPolicy.KEEP,
-            recurringRequest,
-        )
+            // 1. Recurring Bills Worker
+            val recurringRequest = PeriodicWorkRequestBuilder<RecurringWorker>(1, TimeUnit.DAYS).build()
+            workManager.enqueueUniquePeriodicWork(
+                "recurring_txn_worker",
+                ExistingPeriodicWorkPolicy.KEEP,
+                recurringRequest,
+            )
 
-        // 2. Daily Check-in Evening Worker (target 8:30 PM)
-        val now = LocalDateTime.now()
-        val targetTime = LocalTime.of(settings.dailyReminderHour, settings.dailyReminderMinute)
-        var targetDateTime = now.with(targetTime)
-        if (now.isAfter(targetDateTime)) {
-            targetDateTime = targetDateTime.plusDays(1)
+            // 2. Daily Check-in Evening Worker (target 8:30 PM)
+            val now = LocalDateTime.now()
+            val targetTime = LocalTime.of(settings.dailyReminderHour, settings.dailyReminderMinute)
+            var targetDateTime = now.with(targetTime)
+            if (now.isAfter(targetDateTime)) {
+                targetDateTime = targetDateTime.plusDays(1)
+            }
+            val initialDelay = Duration.between(now, targetDateTime).toMillis()
+
+            val checkInRequest = PeriodicWorkRequestBuilder<DailyCheckInWorker>(1, TimeUnit.DAYS)
+                .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                .build()
+
+            workManager.enqueueUniquePeriodicWork(
+                "daily_checkin_worker",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                checkInRequest,
+            )
+        } catch (e: Throwable) {
+            android.util.Log.e("WealthOS", "Failed to schedule background workers", e)
         }
-        val initialDelay = Duration.between(now, targetDateTime).toMillis()
-
-        val checkInRequest = PeriodicWorkRequestBuilder<DailyCheckInWorker>(1, TimeUnit.DAYS)
-            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
-            .build()
-
-        workManager.enqueueUniquePeriodicWork(
-            "daily_checkin_worker",
-            ExistingPeriodicWorkPolicy.UPDATE,
-            checkInRequest,
-        )
     }
 }
