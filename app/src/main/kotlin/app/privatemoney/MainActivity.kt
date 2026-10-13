@@ -1,15 +1,21 @@
 package app.privatemoney
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import app.privatemoney.notification.NightlyReminderScheduler
 import app.privatemoney.notification.NotificationHub
 import app.privatemoney.security.BiometricAuth
 import app.privatemoney.ui.PmosRoot
@@ -19,11 +25,30 @@ class MainActivity : FragmentActivity() {
     private var prompting = false
     private var pendingAction by mutableStateOf<String?>(null)
 
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            NightlyReminderScheduler.scheduleNightlyAlarms(this)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         updateSecureFlag()
         handleNotificationAction(intent)
+
+        // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Arm exact 9:00 PM and 10:00 PM nightly reminders
+        NightlyReminderScheduler.scheduleNightlyAlarms(this)
+
         setContent {
             val locked by app.lock.locked.collectAsState()
             PmosRoot(

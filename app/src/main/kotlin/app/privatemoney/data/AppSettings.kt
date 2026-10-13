@@ -109,23 +109,23 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_DAILY_REMINDER_ENABLED, value).apply()
 
     var dailyReminderHour: Int
-        get() = prefs.getInt(KEY_DAILY_REMINDER_HOUR, 20)
+        get() = prefs.getInt(KEY_DAILY_REMINDER_HOUR, 21)
         set(value) = prefs.edit().putInt(KEY_DAILY_REMINDER_HOUR, value).apply()
 
     var dailyReminderMinute: Int
-        get() = prefs.getInt(KEY_DAILY_REMINDER_MINUTE, 30)
+        get() = prefs.getInt(KEY_DAILY_REMINDER_MINUTE, 0)
         set(value) = prefs.edit().putInt(KEY_DAILY_REMINDER_MINUTE, value).apply()
 
     var remindOnlyWhenNoTxnLogged: Boolean
-        get() = prefs.getBoolean(KEY_REMIND_ONLY_NO_TXN, true)
+        get() = prefs.getBoolean(KEY_REMIND_ONLY_NO_TXN, false)
         set(value) = prefs.edit().putBoolean(KEY_REMIND_ONLY_NO_TXN, value).apply()
 
     var quietHoursEnabled: Boolean
-        get() = prefs.getBoolean(KEY_QUIET_HOURS_ENABLED, true)
+        get() = prefs.getBoolean(KEY_QUIET_HOURS_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_QUIET_HOURS_ENABLED, value).apply()
 
     var quietHoursStartHour: Int
-        get() = prefs.getInt(KEY_QUIET_START_HOUR, 22)
+        get() = prefs.getInt(KEY_QUIET_START_HOUR, 23)
         set(value) = prefs.edit().putInt(KEY_QUIET_START_HOUR, value).apply()
 
     var quietHoursEndHour: Int

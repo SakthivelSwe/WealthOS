@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Deprecated, and unnecessary on Android 12+. Added transitively by the biometric library. -->
     <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
@@ -30,6 +34,28 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- BroadcastReceiver for Exact 9:00 PM and 10:00 PM Nightly Notifications -->
+        <receiver
+            android:name=".notification.NightlyReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.privatemoney.action.NIGHTLY_9PM" />
+                <action android:name="app.privatemoney.action.NIGHTLY_10PM" />
+            </intent-filter>
+        </receiver>
+
+        <!-- BroadcastReceiver to re-arm alarms upon phone reboot or app update -->
+        <receiver
+            android:name=".notification.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

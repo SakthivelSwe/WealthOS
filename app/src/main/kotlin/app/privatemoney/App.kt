@@ -45,6 +45,7 @@ class App : Application(), androidx.work.Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         NotificationHub.initChannels(this)
+        app.privatemoney.notification.NightlyReminderScheduler.scheduleNightlyAlarms(this)
         scheduleWorkers()
 
         // Background data health repair & initialization

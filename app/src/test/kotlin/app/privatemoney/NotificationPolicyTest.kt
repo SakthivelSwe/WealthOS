@@ -66,4 +66,25 @@ class NotificationPolicyTest {
         )
         assertEquals(actions.size, actions.toSet().size)
     }
+
+    @Test
+    fun nightly9PmAnd10PmAreNotBlockedByDefaultQuietHours() {
+        // Default quiet hours: 23:00 (11 PM) to 07:00 (7 AM)
+        val defaultQuietStart = 23
+        val defaultQuietEnd = 7
+
+        assertFalse("9:00 PM (21:00) must not be in quiet hours", isQuietHour(21, defaultQuietStart, defaultQuietEnd))
+        assertFalse("10:00 PM (22:00) must not be in quiet hours", isQuietHour(22, defaultQuietStart, defaultQuietEnd))
+        assertTrue("11:00 PM (23:00) should be in quiet hours", isQuietHour(23, defaultQuietStart, defaultQuietEnd))
+        assertTrue("Midnight (00:00) should be in quiet hours", isQuietHour(0, defaultQuietStart, defaultQuietEnd))
+    }
+
+    @Test
+    fun nightlyActionConstantsAreDistinct() {
+        val actions = listOf(
+            app.privatemoney.notification.NightlyReminderScheduler.ACTION_NIGHTLY_9PM,
+            app.privatemoney.notification.NightlyReminderScheduler.ACTION_NIGHTLY_10PM,
+        )
+        assertEquals(actions.size, actions.toSet().size)
+    }
 }

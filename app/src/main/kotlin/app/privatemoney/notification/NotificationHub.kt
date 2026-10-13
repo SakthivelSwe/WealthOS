@@ -37,8 +37,10 @@ object NotificationHub {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
             val channels = listOf(
-                NotificationChannel(CHANNEL_DAILY_CHECKIN, "Daily Money Check-in", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "Evening reminders to log expenses and stay financially mindful"
+                NotificationChannel(CHANNEL_DAILY_CHECKIN, "Daily Money Check-in", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Evening reminders (9:00 PM & 10:00 PM) to log expenses and stay financially mindful"
+                    enableVibration(true)
+                    enableLights(true)
                 },
                 NotificationChannel(CHANNEL_BILLS, "Bills & Payments", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Upcoming subscription, EMI, and credit card due dates"
@@ -64,7 +66,7 @@ object NotificationHub {
     fun isQuietHours(settings: AppSettings): Boolean {
         if (!settings.quietHoursEnabled) return false
         val nowHour = LocalTime.now().hour
-        val start = settings.quietHoursStartHour // e.g. 22 (10 PM)
+        val start = settings.quietHoursStartHour // e.g. 23 (11 PM)
         val end = settings.quietHoursEndHour     // e.g. 7 (7 AM)
 
         return if (start > end) {
@@ -76,6 +78,11 @@ object NotificationHub {
 
     fun sendDailyCheckIn(context: Context, settings: AppSettings) {
         if (isQuietHours(settings)) return
+        sendNightly9PmCheckIn(context)
+    }
+
+    /** Nightly Check-in fired precisely at 9:00 PM. */
+    fun sendNightly9PmCheckIn(context: Context) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             return
         }
@@ -109,18 +116,59 @@ object NotificationHub {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_DAILY_CHECKIN)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Your daily money check-in")
-            .setContentText("Have you recorded today's expenses? Take a minute to keep your tracker up to date.")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Keep your financial clarity intact. Record what you spent today or review unlogged days."))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentTitle("Evening Money Check-in (9:00 PM) 🌙")
+            .setContentText("Log today's cash, UPI & card expenses before you unwind.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Keep your financial clarity intact. Take 30 seconds to record what you spent today or review unlogged days."))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .setContentIntent(reviewPendingIntent)
             .addAction(android.R.drawable.ic_input_add, "Add Expense", addPendingIntent)
-            .addAction(android.R.drawable.ic_menu_agenda, "Review Today", reviewPendingIntent)
+            .addAction(android.R.drawable.ic_menu_agenda, "Review Ledger", reviewPendingIntent)
             .addAction(android.R.drawable.ic_menu_recent_history, "Catch Up", catchUpPendingIntent)
             .build()
 
-        NotificationManagerCompat.from(context).notify(2001, notification)
+        NotificationManagerCompat.from(context).notify(2090, notification)
+    }
+
+    /** Nightly Financial Wrap-up fired precisely at 10:00 PM. */
+    fun sendNightly10PmWrapUp(context: Context) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val addIntent = Intent(context, MainActivity::class.java).apply {
+            putExtra(EXTRA_ACTION, ACTION_ADD_EXPENSE)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val addPendingIntent = PendingIntent.getActivity(
+            context, 105, addIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val reviewIntent = Intent(context, MainActivity::class.java).apply {
+            putExtra(EXTRA_ACTION, ACTION_REVIEW_DAY)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val reviewPendingIntent = PendingIntent.getActivity(
+            context, 106, reviewIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_DAILY_CHECKIN)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Nightly Wealth Wrap-up (10:00 PM) 🔒")
+            .setContentText("Did you record all spends today? Lock in your daily peace of mind.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Review your daily pacing and ensure all cash & bank accounts are balanced before heading to sleep."))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setAutoCancel(true)
+            .setContentIntent(reviewPendingIntent)
+            .addAction(android.R.drawable.ic_input_add, "Add Expense", addPendingIntent)
+            .addAction(android.R.drawable.ic_menu_agenda, "Review Day", reviewPendingIntent)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(2100, notification)
     }
 
     fun sendBackupAlert(context: Context, errorMsg: String) {
