@@ -38,10 +38,25 @@ class AccountRepository(private val db: AppDatabase, private val clock: () -> Lo
         return id
     }
 
+    fun observeActiveWithBalances(): Flow<List<app.privatemoney.data.local.AccountWithBalance>> =
+        db.accountDao().observeActiveWithBalances()
+
+    suspend fun updateDetails(id: String, name: String, type: AccountType): Boolean {
+        require(name.isNotBlank() && name.length <= MAX_NAME) { "Invalid name" }
+        return db.accountDao().updateDetails(id, name.trim(), type.name, clock()) > 0
+    }
+
+    suspend fun updateOpeningBalance(id: String, newOpeningBalanceMinor: Long): Boolean =
+        db.accountDao().updateOpeningBalance(id, newOpeningBalanceMinor, clock()) > 0
+
+    suspend fun archive(id: String): Boolean =
+        db.accountDao().archive(id, clock()) > 0
+
     private companion object {
         const val MAX_NAME = 60
     }
 }
+
 
 class CategoryRepository(private val db: AppDatabase) {
 
@@ -69,3 +84,39 @@ class CategoryRepository(private val db: AppDatabase) {
         }
     }
 }
+
+class NotificationRepository(private val db: AppDatabase, private val clock: () -> Long = System::currentTimeMillis) {
+    fun observeAll(): Flow<List<app.privatemoney.data.local.AppNotificationEntity>> = db.notificationDao().observeAll()
+    fun observeUnread(): Flow<List<app.privatemoney.data.local.AppNotificationEntity>> = db.notificationDao().observeUnread()
+    fun observeByCategory(category: String): Flow<List<app.privatemoney.data.local.AppNotificationEntity>> = db.notificationDao().observeByCategory(category)
+    fun observeUnreadCount(): Flow<Int> = db.notificationDao().observeUnreadCount()
+
+    suspend fun postNotification(
+        title: String,
+        message: String,
+        category: String,
+        actionType: String? = null,
+        payload: String? = null,
+    ): String {
+        val id = "notif_" + UUID.randomUUID().toString().replace("-", "")
+        db.notificationDao().insert(
+            app.privatemoney.data.local.AppNotificationEntity(
+                id = id,
+                title = title,
+                message = message,
+                category = category,
+                actionType = actionType,
+                payload = payload,
+                read = false,
+                createdAt = clock(),
+            )
+        )
+        return id
+    }
+
+    suspend fun markAsRead(id: String) = db.notificationDao().markAsRead(id)
+    suspend fun markAllAsRead() = db.notificationDao().markAllAsRead()
+    suspend fun delete(id: String) = db.notificationDao().delete(id)
+    suspend fun clearAll() = db.notificationDao().clearAll()
+}
+

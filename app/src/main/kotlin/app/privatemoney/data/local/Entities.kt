@@ -137,3 +137,23 @@ data class RecurringTxnEntity(
     val createdAt: Long,
     val updatedAt: Long,
 )
+
+@Entity(
+    tableName = "app_notification",
+    indices = [
+        Index("createdAt"),
+        Index("category"),
+        Index("read"),
+    ],
+)
+data class AppNotificationEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val message: String,
+    val category: String, // "CHECK_IN", "BILL", "BUDGET", "GOAL", "BACKUP", "SECURITY"
+    val actionType: String? = null, // "ADD_EXPENSE", "REVIEW_DAY", "VIEW_BILL", "VIEW_BUDGET", "RETRY_BACKUP", etc.
+    val payload: String? = null,
+    val read: Boolean = false,
+    val createdAt: Long,
+)
+

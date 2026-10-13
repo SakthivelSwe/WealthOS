@@ -77,6 +77,9 @@ import app.privatemoney.ui.theme.MoneyStyles
 import java.time.LocalDate
 import java.time.LocalTime
 
+import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.Notifications
+
 @Composable
 fun HomeRoute(
     viewModel: HomeViewModel,
@@ -84,6 +87,8 @@ fun HomeRoute(
     onOpenPlans: (() -> Unit)? = null,
     onOpenInsights: (() -> Unit)? = null,
     onOpenAccounts: (() -> Unit)? = null,
+    onOpenNotifications: (() -> Unit)? = null,
+    onOpenCatchUp: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     HomeScreen(
@@ -92,6 +97,8 @@ fun HomeRoute(
         onOpenPlans = onOpenPlans,
         onOpenInsights = onOpenInsights,
         onOpenAccounts = onOpenAccounts,
+        onOpenNotifications = onOpenNotifications,
+        onOpenCatchUp = onOpenCatchUp,
     )
 }
 
@@ -103,6 +110,8 @@ fun HomeScreen(
     onOpenPlans: (() -> Unit)? = null,
     onOpenInsights: (() -> Unit)? = null,
     onOpenAccounts: (() -> Unit)? = null,
+    onOpenNotifications: (() -> Unit)? = null,
+    onOpenCatchUp: (() -> Unit)? = null,
 ) {
     var showSafeSheet by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<TransactionType?>(null) }
@@ -118,7 +127,7 @@ fun HomeScreen(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         // Header Greeting & Security Tag
@@ -142,26 +151,100 @@ fun HomeScreen(
                     )
                 }
 
-                // Security Shield Badge
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(finance.primaryGlow)
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = "Encrypted Vault",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(15.dp),
-                    )
-                    Text(
-                        text = "ENCRYPTED",
-                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 0.8.sp),
-                    )
+                    if (onOpenNotifications != null) {
+                        IconButton(
+                            onClick = onOpenNotifications,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Notification Center",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+
+                    // Security Shield Badge
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(finance.primaryGlow)
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = "Encrypted Vault",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = "ENCRYPTED",
+                            style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, letterSpacing = 0.8.sp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // Daily Financial Check-in Banner
+        if (onOpenCatchUp != null) {
+            item {
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenCatchUp),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(finance.primaryGlow),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EventRepeat,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Daily Financial Check-in",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = "Review unlogged days or check today's status",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = finance.muted,
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = finance.muted,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }

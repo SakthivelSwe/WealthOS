@@ -71,12 +71,22 @@ import app.privatemoney.ui.theme.LocalFinanceColors
 import app.privatemoney.ui.theme.MoneyStyles
 
 @Composable
-fun AddTransactionScreen(viewModel: AddViewModel, currency: Currency, onClose: () -> Unit) {
+fun AddTransactionScreen(
+    viewModel: AddViewModel,
+    currency: Currency,
+    initialDate: String? = null,
+    onClose: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val finance = LocalFinanceColors.current
 
-    LaunchedEffect(Unit) { viewModel.reset() }
+    LaunchedEffect(initialDate) {
+        viewModel.reset()
+        if (initialDate != null) {
+            viewModel.setCustomDate(initialDate)
+        }
+    }
     LaunchedEffect(state.saved) {
         if (state.saved) {
             haptic.performHapticFeedback(HapticFeedbackType.Confirm)

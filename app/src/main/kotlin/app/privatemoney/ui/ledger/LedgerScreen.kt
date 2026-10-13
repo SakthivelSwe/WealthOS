@@ -201,7 +201,7 @@ fun LedgerRoute(viewModel: LedgerViewModel) {
             }
         } else {
             LazyColumn(
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 100.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 140.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(

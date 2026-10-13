@@ -76,6 +76,8 @@ dependencies {
     implementation(libs.supabase.storage)
     implementation(libs.ktor.client.android)
     implementation(libs.generativeai)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.kotlin.test)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)

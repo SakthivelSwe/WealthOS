@@ -4,9 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -29,93 +27,56 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.privatemoney.domain.imports.CsvFormat
-import app.privatemoney.domain.imports.FileSniffer
-import app.privatemoney.domain.imports.ImportRejectedException
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.privatemoney.domain.imports.Likelihood
+import app.privatemoney.domain.ledger.TransactionType
+import app.privatemoney.domain.model.Currency
+import app.privatemoney.ui.MoneyFormat
 import app.privatemoney.ui.components.GlassCard
 import app.privatemoney.ui.components.Hairline
+import app.privatemoney.ui.components.MoneyText
+import app.privatemoney.ui.components.MoneyTint
 import app.privatemoney.ui.components.SectionLabel
 import app.privatemoney.ui.theme.LocalFinanceColors
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-    var isSuccess by remember { mutableStateOf(false) }
+fun ImportScreen(
+    viewModel: ImportViewModel,
+    currency: Currency,
+    onBack: () -> Unit,
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val finance = LocalFinanceColors.current
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        if (uri == null) {
-            statusMessage = "No file selected."
-            isSuccess = false
-            return@rememberLauncherForActivityResult
-        }
-
-        statusMessage = "Analyzing file headers & signatures..."
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                context.contentResolver.openInputStream(uri)?.use { stream ->
-                    val bytes = stream.readBytes()
-                    CsvFormat.requireSize(bytes.size.toLong())
-
-                    val head = bytes.sliceArray(0 until minOf(100, bytes.size))
-                    val detected = FileSniffer.sniff(head)
-
-                    statusMessage = when (detected) {
-                        app.privatemoney.domain.imports.DetectedFormat.ZIP_XLSX -> {
-                            isSuccess = true
-                            "✓ XLSX Spreadsheet detected. Statement ready for transaction import."
-                        }
-                        app.privatemoney.domain.imports.DetectedFormat.PDF -> {
-                            isSuccess = true
-                            "✓ Bank Statement PDF detected. Secure AI text extraction initiated."
-                        }
-                        app.privatemoney.domain.imports.DetectedFormat.TEXT -> {
-                            val text = String(bytes, Charsets.UTF_8)
-                            val rows = CsvFormat.parse(text)
-                            isSuccess = true
-                            "✓ CSV detected. Successfully validated ${rows.size} transaction entries."
-                        }
-                        else -> {
-                            isSuccess = false
-                            "Unsupported file format: $detected"
-                        }
-                    }
-                }
-            } catch (e: ImportRejectedException) {
-                isSuccess = false
-                statusMessage = "Import safety check rejected: ${e.reason}"
-            } catch (e: Exception) {
-                isSuccess = false
-                statusMessage = "Error reading file: ${e.message}"
-            }
+        if (uri != null) {
+            viewModel.analyzeFile(uri)
         }
     }
 
@@ -137,86 +98,228 @@ fun ImportScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                "Upload bank or card statements to automatically import transactions. Guarded against malicious files and zip-bombs on-device.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = finance.muted,
-                lineHeight = 22.sp,
-            )
-
-            SectionLabel("SUPPORTED STATEMENT FORMATS")
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FormatBadge("CSV", Icons.Default.Description, Modifier.weight(1f))
-                FormatBadge("Excel (XLSX)", Icons.Default.TableChart, Modifier.weight(1f))
-                FormatBadge("Bank PDF", Icons.Default.PictureAsPdf, Modifier.weight(1f))
-            }
-
-            // Upload Box
-            GlassCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { launcher.launch("*/*") },
+            // Target Account Selector
+            SectionLabel("DESTINATION ACCOUNT")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(54.dp)
-                            .clip(CircleShape)
-                            .background(finance.primaryGlow),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudUpload,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp),
-                        )
-                    }
-
-                    Text("Tap to Browse Statement", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("Select .csv, .xlsx, or .pdf from your storage", style = MaterialTheme.typography.bodySmall, color = finance.muted)
-
-                    Button(
-                        onClick = { launcher.launch("*/*") },
-                        shape = RoundedCornerShape(14.dp),
-                    ) {
-                        Text("Select File")
-                    }
+                state.accounts.forEach { acct ->
+                    val selected = acct.id == state.selectedAccountId
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.selectAccount(acct.id) },
+                        label = { Text(acct.name, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) },
+                        shape = RoundedCornerShape(12.dp),
+                    )
                 }
             }
 
-            statusMessage?.let { msg ->
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    borderColor = if (isSuccess) finance.positive else finance.negative,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            // If an import summary is ready, display completion view
+            state.importSummary?.let { summary ->
+                GlassCard(modifier = Modifier.fillMaxWidth(), borderColor = finance.positive) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Icon(
-                            imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Description,
-                            contentDescription = null,
-                            tint = if (isSuccess) finance.positive else finance.negative,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = finance.positive, modifier = Modifier.size(24.dp))
+                            Text("Import Completed Successfully", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = finance.positive)
+                        }
+                        Text("• Valid transactions extracted: ${summary.totalFound}", style = MaterialTheme.typography.bodyMedium)
+                        Text("• Safely imported to ledger: ${summary.importedCount}", style = MaterialTheme.typography.bodyMedium, color = finance.positive, fontWeight = FontWeight.SemiBold)
+                        if (summary.skippedDuplicates > 0) {
+                            Text("• Skipped duplicate transactions: ${summary.skippedDuplicates}", style = MaterialTheme.typography.bodyMedium, color = finance.muted)
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = onBack,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                        ) {
+                            Text("View Transactions in Ledger", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                return@Column
+            }
+
+            // If no preview rows, display file upload picker
+            if (state.previewRows.isEmpty()) {
+                SectionLabel("SUPPORTED STATEMENT FORMATS")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FormatBadge("CSV", Icons.Default.Description, Modifier.weight(1f))
+                    FormatBadge("Excel (XLSX)", Icons.Default.TableChart, Modifier.weight(1f))
+                    FormatBadge("Bank PDF", Icons.Default.PictureAsPdf, Modifier.weight(1f))
+                }
+
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { launcher.launch("*/*") },
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(54.dp)
+                                .clip(CircleShape)
+                                .background(finance.primaryGlow),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudUpload,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+
+                        Text("Tap to Select Statement", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Select .csv or bank statement from your device", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+
+                        if (state.isAnalyzing) {
+                            CircularProgressIndicator(modifier = Modifier.size(28.dp))
+                            Text("Parsing and scoring against ledger...", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                        } else {
+                            Button(
+                                onClick = { launcher.launch("*/*") },
+                                shape = RoundedCornerShape(14.dp),
+                            ) {
+                                Text("Choose File")
+                            }
+                        }
+                    }
+                }
+
+                state.statusMessage?.let { msg ->
+                    Text(msg, style = MaterialTheme.typography.bodySmall, color = if (state.isSuccess) finance.positive else MaterialTheme.colorScheme.error)
+                }
+            } else {
+                // Preview & Review Step
+                val selectedCount = state.previewRows.count { it.isSelected }
+                val duplicateCount = state.previewRows.count { it.duplicateLikelihood == Likelihood.LIKELY }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
                         Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isSuccess) finance.positive else MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Medium,
+                            "$selectedCount of ${state.previewRows.size} Selected",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
                         )
+                        if (duplicateCount > 0) {
+                            Text(
+                                "⚠️ $duplicateCount suspected duplicates auto-unselected",
+                                style = TextStyle(fontSize = 11.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.SemiBold),
+                            )
+                        }
+                    }
+
+                    Row {
+                        OutlinedButton(
+                            onClick = { viewModel.selectAll(selectedCount < state.previewRows.size) },
+                            shape = RoundedCornerShape(10.dp),
+                        ) {
+                            Text(if (selectedCount < state.previewRows.size) "Select All" else "Deselect", fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.previewRows, key = { it.row.id }) { item ->
+                        val row = item.row
+                        val isDuplicate = item.duplicateLikelihood == Likelihood.LIKELY
+                        val isPossible = item.duplicateLikelihood == Likelihood.POSSIBLE
+
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            borderColor = if (isDuplicate) Color(0xFFFBBF24).copy(alpha = 0.6f) else finance.glassBorder,
+                            onClick = { viewModel.toggleRowSelection(row.id) },
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = item.isSelected,
+                                    onCheckedChange = { viewModel.toggleRowSelection(row.id) },
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        row.description,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(row.date.toString(), style = TextStyle(fontSize = 11.sp, color = finance.muted))
+                                        if (isDuplicate) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color(0x33FBBF24))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            ) {
+                                                Text("Likely Duplicate", style = TextStyle(fontSize = 9.sp, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold))
+                                            }
+                                        } else if (isPossible) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(Color(0x2238BDF8))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                            ) {
+                                                Text("Possible Match", style = TextStyle(fontSize = 9.sp, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold))
+                                            }
+                                        }
+                                    }
+                                }
+
+                                MoneyText(
+                                    minor = row.amountMinor,
+                                    currency = currency,
+                                    tint = if (row.type == TransactionType.INCOME) MoneyTint.POSITIVE else MoneyTint.NEGATIVE,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = { viewModel.executeImport() },
+                    enabled = selectedCount > 0 && !state.isSaving,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    if (state.isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Importing Transactions...")
+                    } else {
+                        Text("Confirm Import ($selectedCount Transactions)", fontWeight = FontWeight.Bold)
                     }
                 }
             }

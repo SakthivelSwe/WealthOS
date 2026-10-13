@@ -18,6 +18,11 @@ data class MonthlyTotalRow(val month: String, val type: String, val total: Long)
 /** Top spending categories. */
 data class CategorySpendRow(val categoryId: String?, val total: Long)
 
+data class AccountWithBalance(
+    @androidx.room.Embedded val account: AccountEntity,
+    val currentBalanceMinor: Long,
+)
+
 @Dao
 interface AccountDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -26,9 +31,37 @@ interface AccountDao {
     @Query("SELECT * FROM account WHERE archived = 0 ORDER BY name")
     fun observeActive(): Flow<List<AccountEntity>>
 
+    @Query(
+        """
+        SELECT a.*, (a.openingBalanceMinor + COALESCE(
+            (SELECT SUM(j.amountMinor) FROM journal_entry j
+             JOIN txn t ON t.id = j.txnId
+             WHERE j.accountId = a.id AND t.deletedAt IS NULL), 0)) AS currentBalanceMinor
+        FROM account a WHERE a.archived = 0 ORDER BY a.name
+        """
+    )
+    fun observeActiveWithBalances(): Flow<List<AccountWithBalance>>
+
     @Query("SELECT * FROM account WHERE id = :id")
     suspend fun get(id: String): AccountEntity?
+
+    @Query("UPDATE account SET name = :name, type = :type, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateDetails(id: String, name: String, type: String, updatedAt: Long): Int
+
+    @Query("UPDATE account SET openingBalanceMinor = :openingMinor, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateOpeningBalance(id: String, openingMinor: Long, updatedAt: Long): Int
+
+    @Query("UPDATE account SET archived = 1, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun archive(id: String, updatedAt: Long): Int
+
+    @Query("SELECT * FROM account")
+    suspend fun getAllForBackup(): List<AccountEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreAccounts(accounts: List<AccountEntity>): List<Long>
 }
+
+
 
 @Dao
 interface CategoryDao {
@@ -40,7 +73,11 @@ interface CategoryDao {
 
     @Query("SELECT * FROM category WHERE archived = 0 ORDER BY sortOrder")
     fun observeActive(): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM category")
+    suspend fun getAllForBackup(): List<CategoryEntity>
 }
+
 
 @Dao
 interface LedgerDao {
@@ -148,6 +185,33 @@ interface LedgerDao {
         """,
     )
     fun observeTopCategories(fromDate: String, toDate: String, limit: Int): Flow<List<CategorySpendRow>>
+
+    @Query(
+        """
+        UPDATE txn 
+        SET needWant = (SELECT needWant FROM category WHERE category.id = txn.categoryId)
+        WHERE needWant IS NULL AND categoryId IS NOT NULL
+        """
+    )
+    suspend fun backfillNeedWant(): Int
+
+    @Query("SELECT * FROM txn WHERE deletedAt IS NULL AND localDate = :date LIMIT 1")
+    suspend fun hasTransactionOnDate(date: String): TxnEntity?
+
+    @Query("SELECT DISTINCT localDate FROM txn WHERE deletedAt IS NULL AND localDate >= :fromDate ORDER BY localDate ASC")
+    suspend fun getDatesWithTransactions(fromDate: String): List<String>
+
+    @Query("SELECT * FROM txn WHERE deletedAt IS NULL")
+    suspend fun getAllForBackup(): List<TxnEntity>
+
+    @Query("SELECT * FROM journal_entry")
+    suspend fun getAllEntriesForBackup(): List<JournalEntryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreTxns(txns: List<TxnEntity>): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreEntries(entries: List<JournalEntryEntity>): List<Long>
 }
 
 @Dao
@@ -157,6 +221,12 @@ interface GoalDao {
 
     @Query("SELECT * FROM goal WHERE archived = 0 ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<GoalEntity>>
+
+    @Query("SELECT * FROM goal")
+    suspend fun getAllForBackup(): List<GoalEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreGoals(goals: List<GoalEntity>): List<Long>
 }
 
 @Dao
@@ -166,6 +236,12 @@ interface DebtDao {
 
     @Query("SELECT * FROM debt WHERE archived = 0 ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<DebtEntity>>
+
+    @Query("SELECT * FROM debt")
+    suspend fun getAllForBackup(): List<DebtEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreDebts(debts: List<DebtEntity>): List<Long>
 }
 
 @Dao
@@ -175,6 +251,12 @@ interface ChitFundDao {
 
     @Query("SELECT * FROM chit_fund WHERE active = 1 ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<ChitFundEntity>>
+
+    @Query("SELECT * FROM chit_fund")
+    suspend fun getAllForBackup(): List<ChitFundEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreChitFunds(chitFunds: List<ChitFundEntity>): List<Long>
 }
 
 @Dao
@@ -184,16 +266,55 @@ interface RecurringTxnDao {
 
     @Query("SELECT * FROM recurring_txn WHERE active = 1 ORDER BY nextRunDate ASC")
     fun observeActive(): Flow<List<RecurringTxnEntity>>
+
+    @Query("SELECT * FROM recurring_txn")
+    suspend fun getAllForBackup(): List<RecurringTxnEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun restoreRecurringTxns(txns: List<RecurringTxnEntity>): List<Long>
+}
+
+
+@Dao
+interface NotificationDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(notification: AppNotificationEntity)
+
+    @Query("SELECT * FROM app_notification ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<AppNotificationEntity>>
+
+    @Query("SELECT * FROM app_notification WHERE read = 0 ORDER BY createdAt DESC")
+    fun observeUnread(): Flow<List<AppNotificationEntity>>
+
+    @Query("SELECT * FROM app_notification WHERE category = :category ORDER BY createdAt DESC")
+    fun observeByCategory(category: String): Flow<List<AppNotificationEntity>>
+
+    @Query("SELECT COUNT(*) FROM app_notification WHERE read = 0")
+    fun observeUnreadCount(): Flow<Int>
+
+    @Query("UPDATE app_notification SET read = 1 WHERE id = :id")
+    suspend fun markAsRead(id: String)
+
+    @Query("UPDATE app_notification SET read = 1 WHERE read = 0")
+    suspend fun markAllAsRead()
+
+    @Query("DELETE FROM app_notification WHERE id = :id")
+    suspend fun delete(id: String)
+
+    @Query("DELETE FROM app_notification")
+    suspend fun clearAll()
 }
 
 @Database(
     entities = [
         AccountEntity::class, CategoryEntity::class, TxnEntity::class, JournalEntryEntity::class,
-        GoalEntity::class, DebtEntity::class, ChitFundEntity::class, RecurringTxnEntity::class
+        GoalEntity::class, DebtEntity::class, ChitFundEntity::class, RecurringTxnEntity::class,
+        AppNotificationEntity::class,
     ],
-    version = 2,
+    version = 3,
     autoMigrations = [
-        androidx.room.AutoMigration(from = 1, to = 2)
+        androidx.room.AutoMigration(from = 1, to = 2),
+        androidx.room.AutoMigration(from = 2, to = 3),
     ],
     exportSchema = true,
 )
@@ -205,4 +326,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun debtDao(): DebtDao
     abstract fun chitFundDao(): ChitFundDao
     abstract fun recurringTxnDao(): RecurringTxnDao
+    abstract fun notificationDao(): NotificationDao
 }
+

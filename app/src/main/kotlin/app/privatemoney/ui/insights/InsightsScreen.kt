@@ -64,7 +64,7 @@ fun InsightsRoute(viewModel: InsightsViewModel) {
     val totalMonthExpense = state.topCategories.sumOf { it.amountMinor }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 100.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 140.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         // Header

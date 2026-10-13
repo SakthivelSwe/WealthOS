@@ -43,6 +43,7 @@ data class AddUiState(
     val merchant: String = "",
     val note: String = "",
     val error: AddError? = null,
+    val customDate: String? = null,
     val saving: Boolean = false,
     val saved: Boolean = false,
 )
@@ -110,7 +111,18 @@ class AddViewModel(
     fun setCategory(id: String) = _state.update { it.copy(categoryId = id, error = null) }
     fun setAccount(id: String) = _state.update { it.copy(accountId = id, error = null) }
     fun setToAccount(id: String) = _state.update { it.copy(toAccountId = id, error = null) }
-    fun setMerchant(value: String) = _state.update { it.copy(merchant = value.take(MAX_MERCHANT)) }
+    fun setCustomDate(date: String?) = _state.update { it.copy(customDate = date) }
+
+    fun setMerchant(value: String) {
+        val trimmed = value.take(MAX_MERCHANT)
+        _state.update { s ->
+            val suggested = if (s.categoryId == null && s.type == TransactionType.EXPENSE) {
+                suggestCategory(trimmed, allCategories)
+            } else null
+            s.copy(merchant = trimmed, categoryId = suggested ?: s.categoryId)
+        }
+    }
+
     fun setNote(value: String) = _state.update { it.copy(note = value.take(MAX_NOTE)) }
 
     fun save() {
@@ -132,7 +144,12 @@ class AddViewModel(
             return
         }
         _state.update { it.copy(saving = true, error = null) }
-        val now = LocalDate.now(zone) to LocalTime.now(zone).truncatedTo(ChronoUnit.MINUTES)
+        val dateStr = s.customDate ?: LocalDate.now(zone).toString()
+        val timeStr = LocalTime.now(zone).truncatedTo(ChronoUnit.MINUTES).toString()
+        val catNeedWant = if (s.type == TransactionType.EXPENSE) {
+            allCategories.find { it.id == s.categoryId }?.needWant
+        } else null
+
         viewModelScope.launch {
             try {
                 ledger.record(
@@ -146,10 +163,11 @@ class AddViewModel(
                         toAccountId = if (s.type == TransactionType.TRANSFER) s.toAccountId else null,
                     ),
                     TransactionDetails(
-                        localDate = now.first.toString(),
-                        localTime = now.second.toString(),
+                        localDate = dateStr,
+                        localTime = timeStr,
                         merchant = s.merchant.trim().ifEmpty { null },
                         notes = s.note.trim().ifEmpty { null },
+                        needWant = catNeedWant,
                     ),
                 )
                 settings.lastAccountId = s.accountId
@@ -162,6 +180,30 @@ class AddViewModel(
             }
         }
     }
+
+    private fun suggestCategory(merchant: String, categories: List<CategoryEntity>): String? {
+        val lower = merchant.lowercase()
+        return when {
+            listOf("swiggy", "zomato", "blinkit", "zepto", "food", "grocery", "restaurant", "cafe", "coffee", "mart", "supermarket").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_food" }?.id
+            listOf("uber", "ola", "rapido", "metro", "fuel", "petrol", "diesel", "shell", "hp", "fastag").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_transport" }?.id
+            listOf("amazon", "flipkart", "myntra", "shopping", "clothes", "zara", "nike").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_shopping" }?.id
+            listOf("rent", "electricity", "water", "airtel", "jio", "wifi", "broadband", "bill", "recharge").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_bills" }?.id
+            listOf("doctor", "hospital", "pharmacy", "medicine", "apollo", "medplus", "clinic").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_health" }?.id
+            listOf("netflix", "prime", "spotify", "hotstar", "movie", "cinema", "pvr", "game").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_entertainment" }?.id
+            listOf("flight", "hotel", "travel", "irctc", "makemytrip", "airbnb", "train").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_travel" }?.id
+            listOf("sip", "mutual fund", "zerodha", "groww", "stocks").any { lower.contains(it) } ->
+                categories.find { it.id == "cat_investment" }?.id
+            else -> null
+        }
+    }
+
 
     private companion object {
         const val MAX_MERCHANT = 80

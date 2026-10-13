@@ -112,16 +112,24 @@ import app.privatemoney.ui.theme.PmosTheme
 import app.privatemoney.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.runtime.LaunchedEffect
+import app.privatemoney.notification.NotificationHub
+import app.privatemoney.ui.cloud.CloudBackupSheet
+import app.privatemoney.ui.imports.ImportViewModel
+import app.privatemoney.ui.notifications.CatchUpSheet
+import app.privatemoney.ui.notifications.NotificationCenterSheet
 
 fun appViewModelFactory(app: App): ViewModelProvider.Factory = viewModelFactory {
-    initializer { HomeViewModel(app.ledger, app.categories, app.settings) }
+    initializer { HomeViewModel(app.ledger, app.categories, app.settings, app.planning, app.accounts) }
     initializer { LedgerViewModel(app.ledger, app.categories) }
     initializer { AddViewModel(app.ledger, app.accounts, app.categories, app.settings) }
     initializer { OnboardingViewModel(app.accounts, app.categories, app.settings, app.lock) }
     initializer { PlansViewModel(app.ledger, app.settings, app.planning) }
     initializer { AccountsViewModel(app.accounts) }
     initializer { InsightsViewModel(app.ledger, app.categories, app.settings) }
+    initializer { ImportViewModel(app) }
 }
 
 private enum class Tab(val label: Int, val icon: ImageVector) {
@@ -138,6 +146,8 @@ fun PmosRoot(
     locked: Boolean,
     onUnlock: () -> Unit,
     onSecureFlagChange: () -> Unit = {},
+    initialAction: String? = null,
+    onActionConsumed: () -> Unit = {},
 ) {
     val factory = remember(app) { appViewModelFactory(app) }
     var onboarded by remember { mutableStateOf(app.settings.onboarded) }
@@ -165,6 +175,8 @@ fun PmosRoot(
                         app.settings.maskAmounts = isMasked
                     },
                     onSecureFlagChange = onSecureFlagChange,
+                    initialAction = initialAction,
+                    onActionConsumed = onActionConsumed,
                 )
             }
         }
@@ -236,20 +248,57 @@ private fun MainShell(
     isMasked: Boolean,
     onToggleMask: () -> Unit,
     onSecureFlagChange: () -> Unit = {},
+    initialAction: String? = null,
+    onActionConsumed: () -> Unit = {},
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var adding by rememberSaveable { mutableStateOf(false) }
+    var addInitialDate by rememberSaveable { mutableStateOf<String?>(null) }
     var managingAccounts by rememberSaveable { mutableStateOf(false) }
     var importing by rememberSaveable { mutableStateOf(false) }
+    var showBackupSheet by rememberSaveable { mutableStateOf(false) }
+    var showNotificationCenter by rememberSaveable { mutableStateOf(false) }
+    var showCatchUpSheet by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(initialAction) {
+        when (initialAction) {
+            NotificationHub.ACTION_ADD_EXPENSE -> {
+                adding = true
+                onActionConsumed()
+            }
+            NotificationHub.ACTION_REVIEW_DAY, NotificationHub.ACTION_CATCH_UP -> {
+                showCatchUpSheet = true
+                onActionConsumed()
+            }
+            NotificationHub.ACTION_VIEW_PLANS -> {
+                tab = Tab.PLANS
+                onActionConsumed()
+            }
+            NotificationHub.ACTION_VIEW_BACKUP -> {
+                showBackupSheet = true
+                onActionConsumed()
+            }
+            else -> Unit
+        }
+    }
 
     BackHandler(enabled = adding || managingAccounts || importing) {
         adding = false
+        addInitialDate = null
         managingAccounts = false
         importing = false
     }
 
     if (adding) {
-        AddTransactionScreen(viewModel(factory = factory), app.settings.currency, onClose = { adding = false })
+        AddTransactionScreen(
+            viewModel = viewModel(factory = factory),
+            currency = app.settings.currency,
+            initialDate = addInitialDate,
+            onClose = {
+                adding = false
+                addInitialDate = null
+            },
+        )
         return
     }
 
@@ -259,7 +308,11 @@ private fun MainShell(
     }
 
     if (importing) {
-        ImportScreen(onBack = { importing = false })
+        ImportScreen(
+            viewModel = viewModel(factory = factory),
+            currency = app.settings.currency,
+            onBack = { importing = false },
+        )
         return
     }
 
@@ -269,7 +322,9 @@ private fun MainShell(
             ModernFloatingNav(selected = tab, onSelect = { tab = it })
         },
         floatingActionButton = {
-            ModernRadiantFab(onClick = { adding = true })
+            if (tab != Tab.MORE) {
+                ModernRadiantFab(onClick = { adding = true })
+            }
         },
     ) { padding ->
         Box(
@@ -285,6 +340,8 @@ private fun MainShell(
                     onOpenPlans = { tab = Tab.PLANS },
                     onOpenInsights = { tab = Tab.INSIGHTS },
                     onOpenAccounts = { managingAccounts = true },
+                    onOpenNotifications = { showNotificationCenter = true },
+                    onOpenCatchUp = { showCatchUpSheet = true },
                 )
                 Tab.LEDGER -> LedgerRoute(viewModel(factory = factory))
                 Tab.PLANS -> PlansRoute(viewModel(factory = factory))
@@ -297,10 +354,43 @@ private fun MainShell(
                     onToggleMask = onToggleMask,
                     onManageAccounts = { managingAccounts = true },
                     onImport = { importing = true },
+                    onOpenBackup = { showBackupSheet = true },
+                    onOpenNotifications = { showNotificationCenter = true },
+                    onOpenCatchUp = { showCatchUpSheet = true },
                     onSecureFlagChange = onSecureFlagChange,
                 )
             }
         }
+    }
+
+    if (showBackupSheet) {
+        CloudBackupSheet(app = app, onDismiss = { showBackupSheet = false })
+    }
+    if (showNotificationCenter) {
+        NotificationCenterSheet(
+            repository = app.notifications,
+            onDismiss = { showNotificationCenter = false },
+            onActionClick = { action, _ ->
+                showNotificationCenter = false
+                when (action) {
+                    NotificationHub.ACTION_ADD_EXPENSE -> adding = true
+                    NotificationHub.ACTION_REVIEW_DAY, NotificationHub.ACTION_CATCH_UP -> showCatchUpSheet = true
+                    NotificationHub.ACTION_VIEW_PLANS -> tab = Tab.PLANS
+                    NotificationHub.ACTION_VIEW_BACKUP -> showBackupSheet = true
+                }
+            },
+        )
+    }
+    if (showCatchUpSheet) {
+        CatchUpSheet(
+            app = app,
+            onDismiss = { showCatchUpSheet = false },
+            onAddExpenseForDate = { dateStr ->
+                showCatchUpSheet = false
+                addInitialDate = dateStr
+                adding = true
+            },
+        )
     }
 }
 
@@ -398,6 +488,9 @@ private fun MoreHubScreen(
     onToggleMask: () -> Unit,
     onManageAccounts: () -> Unit,
     onImport: () -> Unit,
+    onOpenBackup: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onOpenCatchUp: () -> Unit,
     onSecureFlagChange: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -513,24 +606,27 @@ private fun MoreHubScreen(
 
                 SettingsActionRow(
                     icon = Icons.Default.CloudSync,
-                    title = "Cloud Backup & Sync",
-                    subtitle = "Encrypted off-device backup to your private Supabase",
-                    onClick = {
-                        Toast.makeText(context, "Initiating encrypted cloud sync...", Toast.LENGTH_SHORT).show()
-                        coroutineScope.launch(Dispatchers.IO) {
-                            try {
-                                val db = app.database
-                                CloudSyncService(context, db).backupDatabase("0000")
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "Encrypted backup successfully synced!", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show()
-                                }
-                            }
-                        }
-                    },
+                    title = "Cloud Backup & Health",
+                    subtitle = "PBKDF2 encrypted off-device backup and Supabase sync",
+                    onClick = onOpenBackup,
+                )
+
+                Hairline()
+
+                SettingsActionRow(
+                    icon = Icons.Default.Notifications,
+                    title = "Notification Center",
+                    subtitle = "Activity inbox, bill reminders, and preferences",
+                    onClick = onOpenNotifications,
+                )
+
+                Hairline()
+
+                SettingsActionRow(
+                    icon = Icons.Default.EventRepeat,
+                    title = "Missed-Entry Catch Up",
+                    subtitle = "Review and log unrecorded expenses from past days",
+                    onClick = onOpenCatchUp,
                 )
             }
         }
@@ -624,7 +720,7 @@ private fun MoreHubScreen(
             }
         }
 
-        Spacer(Modifier.height(80.dp))
+        Spacer(Modifier.height(140.dp))
     }
 }
 

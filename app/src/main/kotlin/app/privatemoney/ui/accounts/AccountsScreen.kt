@@ -68,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.privatemoney.data.local.AccountEntity
 import app.privatemoney.domain.model.AccountType
 import app.privatemoney.domain.model.Currency
+import app.privatemoney.domain.model.Money
 import app.privatemoney.ui.MoneyFormat
 import app.privatemoney.ui.components.EmptyState
 import app.privatemoney.ui.components.GlassCard
@@ -84,7 +85,7 @@ private val AccountEntity.isLiability: Boolean
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () -> Unit) {
-    val accounts by viewModel.activeAccounts.collectAsStateWithLifecycle()
+    val accountsWithBalances by viewModel.accountsWithBalances.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
     val finance = LocalFinanceColors.current
 
@@ -106,7 +107,7 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
                 title = {
                     Column {
                         Text("Accounts & Wallets", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("${accounts.size} active vaults", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                        Text("${accountsWithBalances.size} active vaults", style = MaterialTheme.typography.bodySmall, color = finance.muted)
                     }
                 },
                 navigationIcon = {
@@ -129,11 +130,11 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        val totalAssets = accounts.filter { !it.isLiability }.sumOf { it.openingBalanceMinor }
-        val totalLiabilities = accounts.filter { it.isLiability }.sumOf { it.openingBalanceMinor }
+        val totalAssets = accountsWithBalances.filter { !it.account.isLiability }.sumOf { maxOf(0L, it.currentBalanceMinor) }
+        val totalLiabilities = accountsWithBalances.filter { it.account.isLiability }.sumOf { kotlin.math.abs(minOf(0L, it.currentBalanceMinor)) }
 
         LazyColumn(
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 100.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 140.dp),
             modifier = Modifier.padding(padding),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -147,10 +148,10 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
             }
 
             item {
-                SectionLabel("YOUR ACCOUNTS (${accounts.size})")
+                SectionLabel("YOUR ACCOUNTS (${accountsWithBalances.size})")
             }
 
-            if (accounts.isEmpty()) {
+            if (accountsWithBalances.isEmpty()) {
                 item {
                     GlassCard(modifier = Modifier.fillMaxWidth()) {
                         EmptyState(
@@ -161,17 +162,20 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
                     }
                 }
             } else {
-                items(accounts, key = { it.id }) { account ->
-                    AccountWalletCard(account = account, currency = currency)
+                items(accountsWithBalances, key = { it.account.id }) { item ->
+                    AccountWalletCard(item = item, currency = currency)
                 }
             }
         }
     }
 }
 
+
 /** Virtual Wallet Card aesthetic for accounts. */
 @Composable
-private fun AccountWalletCard(account: AccountEntity, currency: Currency) {
+private fun AccountWalletCard(item: app.privatemoney.data.local.AccountWithBalance, currency: Currency) {
+    val account = item.account
+    val currentBalance = item.currentBalanceMinor
     val finance = LocalFinanceColors.current
     val acctType = runCatching { AccountType.valueOf(account.type) }.getOrDefault(AccountType.BANK)
 
@@ -236,17 +240,24 @@ private fun AccountWalletCard(account: AccountEntity, currency: Currency) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Opening Balance", style = TextStyle(fontSize = 12.sp, color = Color(0x99FFFFFF)))
+                Column {
+                    Text("Current Balance", style = TextStyle(fontSize = 11.sp, color = Color(0xB3FFFFFF), fontWeight = FontWeight.Medium))
+                    Text(
+                        "Opening: ${MoneyFormat.format(account.openingBalanceMinor, currency)}",
+                        style = TextStyle(fontSize = 10.sp, color = Color(0x80FFFFFF)),
+                    )
+                }
                 MoneyText(
-                    minor = account.openingBalanceMinor,
+                    minor = currentBalance,
                     currency = currency,
                     style = MoneyStyles.large,
-                    tint = if (account.isLiability) MoneyTint.NEGATIVE else MoneyTint.POSITIVE,
+                    tint = if (account.isLiability) (if (currentBalance < 0) MoneyTint.NEGATIVE else MoneyTint.POSITIVE) else (if (currentBalance >= 0) MoneyTint.POSITIVE else MoneyTint.NEGATIVE),
                 )
             }
         }
     }
 }
+
 
 /** Portfolio summary showing Assets vs Liabilities. */
 @Composable
@@ -361,9 +372,9 @@ private fun AddAccountScreen(
 
             Button(
                 onClick = {
-                    val balanceMinor = (balanceStr.toDoubleOrNull() ?: 0.0) * 100
+                    val balanceMinor = runCatching { Money.parse(balanceStr.ifBlank { "0" }, currency).amountMinor }.getOrDefault(0L)
                     if (name.isNotBlank()) {
-                        onSave(name, type, balanceMinor.toLong())
+                        onSave(name, type, balanceMinor)
                     }
                 },
                 enabled = name.isNotBlank(),
