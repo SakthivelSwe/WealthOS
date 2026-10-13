@@ -222,6 +222,12 @@ interface GoalDao {
     @Query("SELECT * FROM goal WHERE archived = 0 ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<GoalEntity>>
 
+    @Query("SELECT * FROM goal WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): GoalEntity?
+
+    @Query("UPDATE goal SET currentAmountMinor = currentAmountMinor + :amountMinor, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun addContribution(id: String, amountMinor: Long, updatedAt: Long)
+
     @Query("SELECT * FROM goal")
     suspend fun getAllForBackup(): List<GoalEntity>
 
@@ -251,6 +257,12 @@ interface ChitFundDao {
 
     @Query("SELECT * FROM chit_fund WHERE active = 1 ORDER BY createdAt DESC")
     fun observeActive(): Flow<List<ChitFundEntity>>
+
+    @Query("SELECT * FROM chit_fund WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): ChitFundEntity?
+
+    @Query("UPDATE chit_fund SET active = :active, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateStatus(id: String, active: Boolean, updatedAt: Long)
 
     @Query("SELECT * FROM chit_fund")
     suspend fun getAllForBackup(): List<ChitFundEntity>

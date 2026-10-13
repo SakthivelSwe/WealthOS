@@ -135,4 +135,18 @@ class PlansViewModel(
             planning.createRecurringTxn(type, amountMinor, currency, accountId, categoryId, desc, freq, nextRun)
         }
     }
+
+    fun contributeToGoal(id: String, amountMinor: Long) {
+        viewModelScope.launch {
+            planning.contributeToGoal(id, amountMinor)
+            forceRefresh.update { it + 1 }
+        }
+    }
+
+    fun toggleChitFundStatus(id: String, active: Boolean) {
+        viewModelScope.launch {
+            planning.updateChitFundStatus(id, active)
+            forceRefresh.update { it + 1 }
+        }
+    }
 }

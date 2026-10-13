@@ -37,7 +37,13 @@ class PlanningRepository(private val db: AppDatabase, private val clock: () -> L
         db.goalDao().insert(entity)
     }
 
-    // --- Debts ---
+    suspend fun contributeToGoal(id: String, amountMinor: Long) {
+        db.goalDao().addContribution(id, amountMinor, clock())
+    }
+
+    suspend fun updateChitFundStatus(id: String, active: Boolean) {
+        db.chitFundDao().updateStatus(id, active, clock())
+    }
     fun observeDebts(): Flow<List<DebtEntity>> = db.debtDao().observeActive()
 
     suspend fun createDebt(

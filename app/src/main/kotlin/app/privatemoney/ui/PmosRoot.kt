@@ -128,7 +128,7 @@ fun appViewModelFactory(app: App): ViewModelProvider.Factory = viewModelFactory 
     initializer { OnboardingViewModel(app.accounts, app.categories, app.settings, app.lock) }
     initializer { PlansViewModel(app.ledger, app.settings, app.planning) }
     initializer { AccountsViewModel(app.accounts) }
-    initializer { InsightsViewModel(app.ledger, app.categories, app.settings) }
+    initializer { InsightsViewModel(app.ledger, app.categories, app.planning, app.settings) }
     initializer { ImportViewModel(app) }
 }
 

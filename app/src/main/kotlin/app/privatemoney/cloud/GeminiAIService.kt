@@ -71,4 +71,53 @@ class GeminiAIService {
         val result = response.text?.trim() ?: "unknown"
         if (result == "unknown") null else result
     }
+
+    /**
+     * Synthesizes actionable financial advice and over-expense diagnostics
+     * grounded in timeless principles from global financial literature.
+     */
+    suspend fun generateFinancialAdvice(
+        currencySymbol: String,
+        weeklySpend: Long,
+        lastWeekSpend: Long,
+        topCategory: String,
+        topCategorySpend: Long,
+        totalMonthlyExpense: Long,
+        basisIncome: Long,
+    ): String = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext getFallbackAdvice(currencySymbol, weeklySpend, topCategory)
+        }
+
+        try {
+            val prompt = """
+                You are an elite, compassionate personal finance advisor grounded in the wisdom of timeless financial books:
+                - "The Psychology of Money" (Morgan Housel)
+                - "The Richest Man in Babylon" (George S. Clason)
+                - "I Will Teach You to Be Rich" (Ramit Sethi)
+                - "All Your Worth" (Elizabeth Warren)
+
+                Analyze the user's spending data:
+                - Spent this week: $currencySymbol${weeklySpend / 100.0}
+                - Spent last week: $currencySymbol${lastWeekSpend / 100.0}
+                - Top Category: $topCategory ($currencySymbol${topCategorySpend / 100.0})
+                - Total Monthly Spend: $currencySymbol${totalMonthlyExpense / 100.0}
+                - Monthly Income Basis: $currencySymbol${basisIncome / 100.0}
+
+                Output exactly 2 concise, highly encouraging and practical bullet points:
+                1. Spending Pace & Over-Expense Assessment (calculate if pacing is too fast and recommend daily discretionary ceiling).
+                2. One timeless quote and rule from one of the books directly tailored to their numbers.
+                Do not include generic fluff. Format in markdown bullet points.
+            """.trimIndent()
+
+            val response = categorizationModel.generateContent(prompt)
+            response.text?.trim() ?: getFallbackAdvice(currencySymbol, weeklySpend, topCategory)
+        } catch (_: Exception) {
+            getFallbackAdvice(currencySymbol, weeklySpend, topCategory)
+        }
+    }
+
+    fun getFallbackAdvice(currencySymbol: String, weeklySpend: Long, topCategory: String): String {
+        return "• **Pacing Diagnostic**: Your primary outflow this cycle is **$topCategory**. Keep daily discretionary spending controlled to preserve monthly peace of mind.\n• **The Psychology of Money**: \"Spending money to show people how much money you have is the fastest way to have less money.\" Pay yourself first before lifestyle inflation."
+    }
 }

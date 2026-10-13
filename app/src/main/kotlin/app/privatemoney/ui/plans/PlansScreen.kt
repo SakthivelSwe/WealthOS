@@ -309,12 +309,28 @@ private fun PlansScreen(
             }
 
             // Goals Section
-            if (uiState.goals.isNotEmpty()) {
-                item {
-                    SectionLabel("FINANCIAL GOALS (${uiState.goals.size})")
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    SectionLabel("SAVINGS GOALS (${uiState.goals.size})")
+                    Text(
+                        text = "+ NEW GOAL",
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF38BDF8)),
+                        modifier = Modifier.clickable { showAddGoal = true },
+                    )
                 }
+            }
+
+            if (uiState.goals.isNotEmpty()) {
                 items(uiState.goals.size) { i ->
-                    GoalCard(goal = uiState.goals[i], currency = uiState.currency)
+                    GoalCard(
+                        goal = uiState.goals[i],
+                        currency = uiState.currency,
+                        onContribute = { amount -> viewModel.contributeToGoal(uiState.goals[i].id, amount) },
+                    )
                 }
             }
 
@@ -329,12 +345,37 @@ private fun PlansScreen(
             }
 
             // Chit Funds Section
-            if (uiState.chitFunds.isNotEmpty()) {
-                item {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
                     SectionLabel("CHIT FUNDS (${uiState.chitFunds.size})")
+                    Text(
+                        text = "+ NEW CHIT",
+                        style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B)),
+                        modifier = Modifier.clickable { showAddChitFund = true },
+                    )
                 }
+            }
+
+            // Chit Funds Explainer Banner matching Screenshot 4
+            item {
+                ChitFundExplainerBanner()
+            }
+
+            if (uiState.chitFunds.isNotEmpty()) {
                 items(uiState.chitFunds.size) { i ->
-                    ChitFundCard(fund = uiState.chitFunds[i], currency = uiState.currency)
+                    ChitFundCard(
+                        fund = uiState.chitFunds[i],
+                        currency = uiState.currency,
+                        onToggleStatus = { active -> viewModel.toggleChitFundStatus(uiState.chitFunds[i].id, active) },
+                    )
+                }
+            } else {
+                item {
+                    ChitFundEmptyCard(onAddChit = { showAddChitFund = true })
                 }
             }
 
@@ -351,16 +392,16 @@ private fun PlansScreen(
     }
 
     if (showAddGoal) {
-        AddGoalDialog(onDismiss = { showAddGoal = false }, onSave = viewModel::createGoal)
+        AddGoalDialog(currency = uiState.currency, onDismiss = { showAddGoal = false }, onSave = viewModel::createGoal)
     }
     if (showAddDebt) {
-        AddDebtDialog(onDismiss = { showAddDebt = false }, onSave = viewModel::createDebt)
+        AddDebtDialog(currency = uiState.currency, onDismiss = { showAddDebt = false }, onSave = viewModel::createDebt)
     }
     if (showAddChitFund) {
-        AddChitFundDialog(onDismiss = { showAddChitFund = false }, onSave = viewModel::createChitFund)
+        AddChitFundDialog(currency = uiState.currency, onDismiss = { showAddChitFund = false }, onSave = viewModel::createChitFund)
     }
     if (showAddRecurring) {
-        AddRecurringTxnDialog(onDismiss = { showAddRecurring = false }, onSave = viewModel::createRecurringTxn)
+        AddRecurringTxnDialog(currency = uiState.currency, onDismiss = { showAddRecurring = false }, onSave = viewModel::createRecurringTxn)
     }
 }
 
@@ -488,44 +529,118 @@ private fun LaneCard(lane: LaneStatus, currency: Currency) {
 }
 
 @Composable
-private fun GoalCard(goal: GoalEntity, currency: Currency) {
+private fun GoalCard(
+    goal: GoalEntity,
+    currency: Currency,
+    onContribute: (Long) -> Unit,
+) {
     val finance = LocalFinanceColors.current
     val pct = if (goal.targetAmountMinor > 0) {
         (goal.currentAmountMinor.toDouble() / goal.targetAmountMinor.toDouble()).coerceIn(0.0, 1.0)
     } else 0.0
+    val pctInt = (pct * 100).toInt()
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.TrackChanges, contentDescription = null, tint = finance.positive, modifier = Modifier.size(18.dp))
-                    Text(goal.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                // Circular Progress Badge matching Screenshot 3
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x2210B981))
+                        .border(2.dp, Color(0xFF10B981).copy(alpha = 0.6f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "$pctInt%",
+                        style = TextStyle(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981),
+                        ),
+                    )
                 }
-                Text("${(pct * 100).toInt()}%", style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = finance.positive))
+
+                // Title and Amounts
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = goal.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                    Text(
+                        text = "${MoneyFormat.format(goal.currentAmountMinor, currency)} / ${MoneyFormat.format(goal.targetAmountMinor, currency)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF38BDF8),
+                    )
+                    Text(
+                        text = "Due: ${goal.targetDate}",
+                        style = TextStyle(fontSize = 11.sp, color = finance.muted),
+                    )
+                }
             }
 
+            // Linear Progress Track
             LinearProgressModern(
                 progress = pct.toFloat(),
-                brush = Brush.horizontalGradient(listOf(Color(0xFF00E599), Color(0xFF38BDF8))),
-                height = 6.dp,
+                brush = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF38BDF8))),
+                height = 5.dp,
             )
 
+            // Quick Deposit Chips: +₹500, +₹1K, +₹5K matching Screenshot 3
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Target Date: ${goal.targetDate}", style = MaterialTheme.typography.bodySmall, color = finance.muted)
                 Text(
-                    "${MoneyFormat.format(goal.currentAmountMinor, currency)} / ${MoneyFormat.format(goal.targetAmountMinor, currency)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
+                    text = "Quick Save:",
+                    style = TextStyle(fontSize = 11.sp, color = finance.muted, fontWeight = FontWeight.Medium),
+                )
+                val sym = MoneyFormat.symbol(currency)
+                QuickDepositChip(
+                    label = "+${sym}500",
+                    onClick = { onContribute(50_000L) },
+                )
+                QuickDepositChip(
+                    label = "+${sym}1K",
+                    onClick = { onContribute(100_000L) },
+                )
+                QuickDepositChip(
+                    label = "+${sym}5K",
+                    onClick = { onContribute(500_000L) },
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun QuickDepositChip(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0x2238BDF8))
+            .border(1.dp, Color(0x4438BDF8), RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF38BDF8),
+            ),
+        )
     }
 }
 
@@ -554,24 +669,156 @@ private fun DebtCard(debt: DebtEntity, currency: Currency) {
 }
 
 @Composable
-private fun ChitFundCard(fund: ChitFundEntity, currency: Currency) {
+private fun ChitFundExplainerBanner() {
     val finance = LocalFinanceColors.current
+    GlassCard(modifier = Modifier.fillMaxWidth(), borderColor = Color(0x66F59E0B)) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x33F59E0B)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Savings, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(20.dp))
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "CHIT FUND (CHEETU)",
+                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B), letterSpacing = 1.sp),
+                )
+                Text(
+                    text = "Tamil traditional rotating savings scheme",
+                    style = TextStyle(fontSize = 11.sp, color = finance.muted),
+                )
+                Text(
+                    text = "A group of members contribute monthly. Total amount = members × monthly. Each month one member wins the prize (auction price = total - discount). Jewel Chit = prize is gold grams instead of cash.",
+                    style = TextStyle(fontSize = 11.sp, color = Color(0xFFE2E8F0), lineHeight = 15.sp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChitFundEmptyCard(onAddChit: () -> Unit) {
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0x33F59E0B)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Default.Savings, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(24.dp))
+            }
+            Text("No chit funds tracked yet.", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Add your Shriram / Kapil / local chit fund to track installments",
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalFinanceColors.current.muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChitFundCard(
+    fund: ChitFundEntity,
+    currency: Currency,
+    onToggleStatus: (Boolean) -> Unit,
+) {
+    val finance = LocalFinanceColors.current
+    val isJewel = fund.name.contains("Jewel", ignoreCase = true) || fund.name.contains("Gold", ignoreCase = true)
+    val poolMinor = fund.totalMonths * fund.monthlyContributionMinor
+
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        borderColor = if (isJewel) Color(0x66F59E0B) else Color(0x5538BDF8),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Savings, contentDescription = null, tint = finance.info, modifier = Modifier.size(18.dp))
-                    Text(fund.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Icon(
+                        imageVector = Icons.Default.Savings,
+                        contentDescription = null,
+                        tint = if (isJewel) Color(0xFFF59E0B) else Color(0xFF38BDF8),
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(fund.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
-                Text("${fund.totalMonths} Mos", style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, color = finance.info))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isJewel) Color(0x22F59E0B) else Color(0x2238BDF8))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text(
+                        text = if (isJewel) "💎 Jewel Chit" else "💰 Cash Chit",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isJewel) Color(0xFFF59E0B) else Color(0xFF38BDF8),
+                    )
+                }
             }
+
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Monthly Contribution", style = MaterialTheme.typography.bodySmall, color = finance.muted)
-                MoneyText(fund.monthlyContributionMinor, currency, style = MoneyStyles.row)
+                Column {
+                    Text("Monthly Installment", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                    Text(
+                        "${MoneyFormat.format(fund.monthlyContributionMinor, currency)} / mo",
+                        style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White),
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("Total Prize Pool (${fund.totalMonths} Mos)", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                    Text(
+                        MoneyFormat.format(poolMinor, currency),
+                        style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isJewel) Color(0xFFF59E0B) else finance.positive),
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Started: ${fund.startMonth}",
+                    style = TextStyle(fontSize = 11.sp, color = finance.muted),
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (fund.active) Color(0x2210B981) else Color(0x22888888))
+                        .clickable { onToggleStatus(!fund.active) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = if (fund.active) "ACTIVE" else "COMPLETED",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (fund.active) finance.positive else finance.muted,
+                    )
+                }
             }
         }
     }

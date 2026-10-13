@@ -240,7 +240,23 @@ fun CloudBackupSheet(
                     }
 
                     if (lastError != null) {
-                        Text("Notice: $lastError", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        val isSuccessNotice = lastStatus == "SUCCESS"
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSuccessNotice) finance.info else MaterialTheme.colorScheme.error),
+                            )
+                            Text(
+                                text = lastError,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isSuccessNotice) finance.muted else MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
