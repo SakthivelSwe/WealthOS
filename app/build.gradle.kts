@@ -59,6 +59,11 @@ android {
         compose = true
         buildConfig = true
     }
+
+    lint {
+        abortOnError = true
+        disable += setOf("InvalidFragmentVersionForActivityResult")
+    }
 }
 
 dependencies {
@@ -76,6 +81,7 @@ dependencies {
     implementation(libs.sqlcipher.android)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)

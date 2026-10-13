@@ -10,6 +10,7 @@ sqlcipher = "4.19.0"
 ksp = "2.3.12"
 lifecycle = "2.11.0"
 biometric = "1.1.0"
+fragment = "1.8.6"
 paging = "3.3.0"
 workManager = "2.10.0"
 supabase = "2.6.1"
@@ -17,6 +18,7 @@ ktor = "2.3.12"
 generativeai = "0.9.0"
 
 [libraries]
+androidx-fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
 androidx-paging-runtime = { module = "androidx.paging:paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { module = "androidx.paging:paging-compose", version.ref = "paging" }
 androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }

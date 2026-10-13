@@ -8,11 +8,11 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import app.privatemoney.notification.NightlyReminderScheduler
@@ -25,12 +25,8 @@ class MainActivity : FragmentActivity() {
     private var prompting = false
     private var pendingAction by mutableStateOf<String?>(null)
 
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            NightlyReminderScheduler.scheduleNightlyAlarms(this)
-        }
+    companion object {
+        private const val REQUEST_CODE_NOTIFICATIONS = 1001
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,7 +38,11 @@ class MainActivity : FragmentActivity() {
         // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    REQUEST_CODE_NOTIFICATIONS,
+                )
             }
         }
 
@@ -65,6 +65,17 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleNotificationAction(intent)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CODE_NOTIFICATIONS && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            NightlyReminderScheduler.scheduleNightlyAlarms(this)
+        }
     }
 
     private fun handleNotificationAction(intent: Intent?) {

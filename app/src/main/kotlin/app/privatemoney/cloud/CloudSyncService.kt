@@ -353,8 +353,8 @@ class CloudSyncService(
                     id = o.getString("id"),
                     name = o.getString("name"),
                     type = o.getString("type"),
-                    institution = o.optString("institution", null),
-                    lastFour = o.optString("lastFour", null),
+                    institution = o.optNullableString("institution"),
+                    lastFour = o.optNullableString("lastFour"),
                     openingBalanceMinor = o.getLong("openingBalanceMinor"),
                     currency = o.getString("currency"),
                     includeInNetWorth = o.optBoolean("includeInNetWorth", true),
@@ -378,13 +378,13 @@ class CloudSyncService(
                     localDate = o.getString("localDate"),
                     localTime = o.optString("localTime", "00:00"),
                     accountId = o.getString("accountId"),
-                    toAccountId = o.optString("toAccountId", null),
-                    categoryId = o.optString("categoryId", null),
-                    merchant = o.optString("merchant", null),
-                    description = o.optString("description", null),
-                    notes = o.optString("notes", null),
-                    paymentMethod = o.optString("paymentMethod", null),
-                    needWant = o.optString("needWant", null),
+                    toAccountId = o.optNullableString("toAccountId"),
+                    categoryId = o.optNullableString("categoryId"),
+                    merchant = o.optNullableString("merchant"),
+                    description = o.optNullableString("description"),
+                    notes = o.optNullableString("notes"),
+                    paymentMethod = o.optNullableString("paymentMethod"),
+                    needWant = o.optNullableString("needWant"),
                     imported = o.optBoolean("imported", false),
                     source = o.optString("source", "RESTORE"),
                     createdAt = o.getLong("createdAt"),
@@ -400,8 +400,8 @@ class CloudSyncService(
             journalEntities.add(
                 JournalEntryEntity(
                     txnId = o.getString("txnId"),
-                    accountId = o.optString("accountId", null),
-                    categoryId = o.optString("categoryId", null),
+                    accountId = o.optNullableString("accountId"),
+                    categoryId = o.optNullableString("categoryId"),
                     amountMinor = o.getLong("amountMinor"),
                 )
             )
@@ -473,8 +473,8 @@ class CloudSyncService(
                     amountMinor = o.getLong("amountMinor"),
                     currency = o.getString("currency"),
                     accountId = o.getString("accountId"),
-                    categoryId = o.optString("categoryId", null),
-                    description = o.optString("description", null),
+                    categoryId = o.optNullableString("categoryId"),
+                    description = o.optNullableString("description"),
                     frequency = o.getString("frequency"),
                     nextRunDate = o.getString("nextRunDate"),
                     active = o.optBoolean("active", true),
@@ -588,6 +588,12 @@ class CloudSyncService(
 
     private fun sha256(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private fun JSONObject.optNullableString(name: String): String? =
+        if (has(name) && !isNull(name)) {
+            val v = optString(name)
+            if (v == "null") null else v
+        } else null
 
     companion object {
         const val SUPABASE_URL = "https://zahzagnindkkttdpmqii.supabase.co"

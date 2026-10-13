@@ -383,13 +383,14 @@ fun HomeScreen(
         }
     }
 
-    if (showSafeSheet && state.safe != null) {
+    val currentSafe = state.safe
+    if (showSafeSheet && currentSafe != null) {
         ModalBottomSheet(
             onDismissRequest = { showSafeSheet = false },
             containerColor = MaterialTheme.colorScheme.surface,
         ) {
             SafeToSpendSheetContent(
-                safe = state.safe!!,
+                safe = currentSafe,
                 currency = state.currency,
                 onClose = { showSafeSheet = false },
             )
