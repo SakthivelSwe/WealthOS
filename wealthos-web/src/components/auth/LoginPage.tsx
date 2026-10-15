@@ -25,7 +25,9 @@ export function LoginPage() {
       return;
     }
     if (result.isDemoFallback) {
-      setInfoMsg('Dev test mode active: Enter OTP 123456 to verify.');
+      setInfoMsg('⚠️ Dev mode: SMS provider not configured. Use OTP 123456 to sign in. In production, real SMS will be sent.');
+    } else {
+      setInfoMsg('✅ OTP sent to your phone via SMS. Check messages.');
     }
     setStep('otp');
   };

@@ -3,17 +3,22 @@ import { useData } from '../../hooks/useData';
 import { useAuth } from '../../hooks/useAuth';
 import { formatMoney, parseMoney, CURRENCIES, type ThemeMode, type UserSettings } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { User, Shield, Palette, Database, Download, Upload, LogOut, Eye, EyeOff, Phone, Save, Check, RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
+import { User, Shield, Palette, Database, Download, Upload, LogOut, Eye, EyeOff, Phone, Save, Check, RefreshCw, CheckCircle2, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
 import { SUPABASE_URL_VALUE } from '../../lib/supabase';
 
 export function SettingsPage() {
   const { settings, updateSettings, accounts, transactions, goals, debts, chitFunds, recurringTxns, importAllData, refresh } = useData();
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAllUserData } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
   const [saved, setSaved] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Delete account state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Profile state
   const [userName, setUserName] = useState(settings?.user_name || 'WealthOS User');
@@ -110,12 +115,28 @@ export function SettingsPage() {
     setTimeout(() => setIsRefreshing(false), 800);
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      setDeleteError('Please type DELETE to confirm.');
+      return;
+    }
+    setIsDeleting(true);
+    setDeleteError('');
+    const { error } = await deleteAllUserData();
+    if (error) {
+      setDeleteError(error.message);
+      setIsDeleting(false);
+    }
+    // On success, useAuth clears session and app redirects to login
+  };
+
   const sections = [
     { id: 'profile', label: 'Identity & Currency', icon: User },
     { id: 'budget', label: '50/30/20 Budgeting', icon: Database },
     { id: 'privacy', label: 'Appearance & Masking', icon: Shield },
     { id: 'data', label: 'Cloud Sync & Backups', icon: Download },
     { id: 'account', label: 'Session Management', icon: Phone },
+    { id: 'danger', label: 'Danger Zone', icon: Trash2 },
   ];
 
   const totalPct = needsPct + wantsPct + savingsPct;
@@ -414,6 +435,104 @@ export function SettingsPage() {
                 >
                   <LogOut size={16} /> Disconnect & Sign Out
                 </button>
+              </div>
+            </div>
+          )}
+          {/* Danger Zone */}
+          {activeSection === 'danger' && (
+            <div>
+              <div className="cyber-header">
+                <div className="cyber-title-group">
+                  <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
+                    <Trash2 size={18} />
+                  </div>
+                  <div>
+                    <div className="cyber-title">Danger Zone</div>
+                    <div className="cyber-subtitle">Permanent account and data deletion — irreversible</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {/* Warning Banner */}
+                <div style={{ padding: 16, background: 'var(--neon-rose-glow)', border: '1px solid rgba(244, 63, 94, 0.4)', borderRadius: 'var(--radius-lg)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <AlertTriangle size={20} style={{ color: 'var(--neon-rose)', flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--neon-rose)', marginBottom: 4 }}>This will permanently delete your account</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                      All your transactions, accounts, goals, debts, chit funds, settings, and profile data will be erased from Supabase cloud storage and all local caches. <strong style={{ color: '#fff' }}>This cannot be undone.</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Data Summary */}
+                <div style={{ padding: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', fontSize: '0.82rem' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 10 }}>Data to be permanently deleted:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {[
+                      { label: 'Accounts', val: accounts.length },
+                      { label: 'Transactions', val: transactions.filter(t => !t.deleted_at).length },
+                      { label: 'Goals', val: goals.length },
+                      { label: 'Debts', val: debts.length },
+                    ].map(item => (
+                      <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{item.label}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--neon-rose)' }}>{item.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {!showDeleteConfirm ? (
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    style={{ width: '100%' }}
+                  >
+                    <Trash2 size={16} /> Request Permanent Account Deletion
+                  </button>
+                ) : (
+                  <div style={{ padding: 18, background: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: 'var(--radius-lg)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--neon-rose)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <AlertTriangle size={16} /> Final Confirmation Required
+                    </div>
+                    <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                      Type <strong style={{ color: '#fff', fontFamily: 'var(--font-mono)' }}>DELETE</strong> below to confirm permanent deletion of your WealthOS account and all associated data.
+                    </p>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <input
+                        type="text"
+                        placeholder="Type DELETE to confirm"
+                        value={deleteConfirmText}
+                        onChange={e => setDeleteConfirmText(e.target.value)}
+                        style={{ borderColor: 'rgba(244, 63, 94, 0.5)', color: 'var(--neon-rose)' }}
+                      />
+                    </div>
+                    {deleteError && (
+                      <div style={{ fontSize: '0.82rem', color: 'var(--neon-rose)', background: 'var(--neon-rose-glow)', padding: '8px 12px', borderRadius: 8 }}>
+                        {deleteError}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); setDeleteError(''); }}
+                        style={{ flex: 1 }}
+                        disabled={isDeleting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting || deleteConfirmText !== 'DELETE'}
+                        style={{ flex: 1 }}
+                      >
+                        {isDeleting ? 'Deleting...' : <><Trash2 size={16} /> Permanently Delete</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

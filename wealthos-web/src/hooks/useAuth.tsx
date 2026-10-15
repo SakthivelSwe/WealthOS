@@ -6,10 +6,12 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isDemoFallback: boolean;
   signInWithOtp: (phone: string) => Promise<{ error: Error | null; isDemoFallback?: boolean }>;
   verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
   loginAsDemo: () => void;
   signOut: () => Promise<void>;
+  deleteAllUserData: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [demoPendingPhone, setDemoPendingPhone] = useState<string | null>(null);
+  const [isDemoFallback, setIsDemoFallback] = useState(false);
 
   useEffect(() => {
     // 1. Check local demo session first
@@ -66,37 +69,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.auth.signInWithOtp({ phone });
       if (error) {
-        // If Supabase SMS provider is not active or credentials not set, fallback to dev OTP
-        console.warn('Supabase OTP notice:', error.message, 'Enabling local dev OTP fallback.');
-        setDemoPendingPhone(phone);
-        return { error: null, isDemoFallback: true };
+        // Supabase SMS provider not configured – use dev/demo OTP fallback
+        const isProviderError = error.message?.toLowerCase().includes('sms') ||
+          error.message?.toLowerCase().includes('provider') ||
+          error.message?.toLowerCase().includes('not enabled') ||
+          error.message?.toLowerCase().includes('phone') ||
+          error.status === 422;
+        if (isProviderError) {
+          console.warn('[WealthOS] SMS provider not configured. Using dev OTP fallback.');
+          setDemoPendingPhone(phone);
+          setIsDemoFallback(true);
+          return { error: null, isDemoFallback: true };
+        }
+        return { error: new Error(error.message) };
       }
-      return { error: null };
+      setIsDemoFallback(false);
+      return { error: null, isDemoFallback: false };
     } catch (err: any) {
+      console.warn('[WealthOS] Network error sending OTP. Using dev fallback.');
       setDemoPendingPhone(phone);
+      setIsDemoFallback(true);
       return { error: null, isDemoFallback: true };
     }
   }, []);
 
   const verifyOtp = useCallback(async (phone: string, token: string) => {
-    // 1. Try authenticating directly with Supabase first
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-      if (!error && data?.session) {
-        localStorage.removeItem(DEMO_SESSION_KEY);
-        setSession(data.session);
-        setDemoPendingPhone(null);
-        return { error: null };
+    // 1. Try Supabase real SMS OTP first (production path)
+    if (!isDemoFallback) {
+      try {
+        const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+        if (!error && data?.session) {
+          localStorage.removeItem(DEMO_SESSION_KEY);
+          setSession(data.session);
+          setDemoPendingPhone(null);
+          return { error: null };
+        }
+        if (error) {
+          return { error: new Error(error.message || 'Invalid OTP. Please check the code sent to your phone.') };
+        }
+      } catch (err: any) {
+        return { error: new Error('Network error verifying OTP. Please try again.') };
       }
-      if (error) {
-        console.warn('Supabase verifyOtp notice:', error.message);
-      }
-    } catch (err: any) {
-      console.warn('Supabase auth network notice:', err.message);
     }
 
-    // 2. Fallback to local dev test OTP if token is 123456 or demo mode was triggered
-    if (demoPendingPhone === phone || token === '123456') {
+    // 2. Dev/demo fallback – only when SMS provider isn't configured
+    if (isDemoFallback && demoPendingPhone === phone) {
+      if (token !== '123456') {
+        return { error: new Error('Dev OTP is 123456 (SMS provider not configured)') };
+      }
       const rawDigits = phone.replace(/\D/g, '').slice(-12).padStart(12, '0');
       const demoUuid = `00000000-0000-4000-8000-${rawDigits}`;
 
@@ -120,11 +140,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoUser));
       setSession(mockSession);
       setDemoPendingPhone(null);
+      setIsDemoFallback(false);
       return { error: null };
     }
 
-    return { error: new Error('Invalid verification code. Please check code or use dev OTP 123456.') };
-  }, [demoPendingPhone]);
+    return { error: new Error('Unable to verify OTP. Please request a new code.') };
+  }, [isDemoFallback, demoPendingPhone]);
 
   const loginAsDemo = useCallback(() => {
     const demoUser: User = {
@@ -152,17 +173,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (_) {}
     localStorage.removeItem(DEMO_SESSION_KEY);
     setSession(null);
+    setIsDemoFallback(false);
   }, []);
+
+  const deleteAllUserData = useCallback(async () => {
+    if (!session?.user?.id) return { error: new Error('Not authenticated') };
+    const userId = session.user.id;
+    try {
+      // Delete all user data from Supabase in dependency order
+      const tables = [
+        'user_notifications',
+        'user_journal_entries',
+        'user_transactions',
+        'user_budgets',
+        'user_recurring_transactions',
+        'user_chit_funds',
+        'user_debts',
+        'user_goals',
+        'user_accounts',
+        'user_categories',
+        'user_settings',
+      ];
+      for (const table of tables) {
+        try {
+          await supabase.from(table).delete().eq('user_id', userId);
+        } catch (e) {
+          console.warn(`Could not delete from ${table}:`, e);
+        }
+      }
+      // Delete auth user if using real Supabase auth
+      try {
+        await supabase.auth.admin?.deleteUser(userId);
+      } catch (_) {}
+    } catch (e: any) {
+      // Even if cloud deletion fails, clear local data
+      console.warn('Cloud deletion error:', e);
+    }
+    // Always clear all local storage
+    const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('wealthos'));
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    setSession(null);
+    setIsDemoFallback(false);
+    return { error: null };
+  }, [session]);
 
   return (
     <AuthContext.Provider value={{
       session,
       user: session?.user ?? null,
       loading,
+      isDemoFallback,
       signInWithOtp,
       verifyOtp,
       loginAsDemo,
       signOut,
+      deleteAllUserData,
     }}>
       {children}
     </AuthContext.Provider>

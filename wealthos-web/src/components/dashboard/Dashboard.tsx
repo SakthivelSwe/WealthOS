@@ -74,21 +74,27 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
     .filter(t => t.type === 'INCOME' && !t.deleted_at && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
     .reduce((s, t) => s + t.amount_minor, 0);
 
-  // 50/30/20 breakdown
+  // 50/30/20 breakdown — compare against take-home income (falls back to settings income)
+  const basisIncome = settings?.basis_income_minor || 0;
+  const incomeBase = monthlyIncome > 0 ? monthlyIncome : basisIncome;
+
   const needsSpend = transactions
     .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.need_want === 'NEED' && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
     .reduce((s, t) => s + t.amount_minor, 0);
   const wantsSpend = transactions
     .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.need_want === 'WANT' && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
     .reduce((s, t) => s + t.amount_minor, 0);
+  // Savings = tagged SAVING type (SIPs, investments, goal transfers)
   const savingsSpend = transactions
     .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.need_want === 'SAVING' && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
     .reduce((s, t) => s + t.amount_minor, 0);
 
-  // Safe-to-spend
+  // Safe-to-spend: this month's income minus this month's total expenses
+  // (not liquid balance, which accumulates historical months)
+  const monthNetSurplus = monthlyIncome - monthlyExpense;
+  const safeToSpend = monthNetSurplus > 0 ? monthNetSurplus : 0;
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysRemaining = daysInMonth - now.getDate() + 1;
-  const safeToSpend = liquidBalance - monthlyExpense > 0 ? liquidBalance - monthlyExpense : 0;
   const dailyBudget = daysRemaining > 0 ? Math.floor(safeToSpend / daysRemaining) : 0;
 
   // 6-month historical area trend
@@ -213,7 +219,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               <div className="cyber-card" style={{ height: '100%' }}>
                 <div className="cyber-card-glow" style={{ background: 'var(--neon-purple)' }} />
                 <div className="stat-label">
-                  <span>50/30/20 Rule Balance</span>
+                  <span>50/30/20 vs Income</span>
                   <div className="cyber-icon-badge" style={{ background: 'var(--neon-purple-glow)', color: 'var(--neon-purple)' }}>
                     <PieIcon size={18} />
                   </div>
@@ -221,20 +227,29 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                      <span>Needs: {monthlyExpense > 0 ? Math.round((needsSpend / monthlyExpense) * 100) : 0}%</span>
-                      <span>Target: 50%</span>
+                      <span>Needs: {incomeBase > 0 ? Math.round((needsSpend / incomeBase) * 100) : 0}%</span>
+                      <span style={{ color: (incomeBase > 0 && needsSpend / incomeBase > 0.55) ? 'var(--neon-rose)' : 'inherit' }}>Target: {settings?.needs_pct ?? 50}%</span>
                     </div>
                     <div className="cyber-progress-track" style={{ height: 6, marginTop: 3 }}>
-                      <div className="cyber-progress-fill" style={{ width: `${monthlyExpense > 0 ? Math.min(100, (needsSpend / monthlyExpense) * 100) : 0}%`, background: 'var(--neon-cyan)' }} />
+                      <div className="cyber-progress-fill" style={{ width: `${incomeBase > 0 ? Math.min(100, (needsSpend / incomeBase) * 100) : 0}%`, background: 'var(--neon-cyan)' }} />
                     </div>
                   </div>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                      <span>Wants: {monthlyExpense > 0 ? Math.round((wantsSpend / monthlyExpense) * 100) : 0}%</span>
-                      <span>Target: 30%</span>
+                      <span>Wants: {incomeBase > 0 ? Math.round((wantsSpend / incomeBase) * 100) : 0}%</span>
+                      <span style={{ color: (incomeBase > 0 && wantsSpend / incomeBase > 0.35) ? 'var(--neon-rose)' : 'inherit' }}>Target: {settings?.wants_pct ?? 30}%</span>
                     </div>
                     <div className="cyber-progress-track" style={{ height: 6, marginTop: 3 }}>
-                      <div className="cyber-progress-fill" style={{ width: `${monthlyExpense > 0 ? Math.min(100, (wantsSpend / monthlyExpense) * 100) : 0}%`, background: 'var(--neon-purple)' }} />
+                      <div className="cyber-progress-fill" style={{ width: `${incomeBase > 0 ? Math.min(100, (wantsSpend / incomeBase) * 100) : 0}%`, background: 'var(--neon-purple)' }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                      <span>Savings: {incomeBase > 0 ? Math.round((savingsSpend / incomeBase) * 100) : 0}%</span>
+                      <span>Target: {settings?.savings_pct ?? 20}%</span>
+                    </div>
+                    <div className="cyber-progress-track" style={{ height: 6, marginTop: 3 }}>
+                      <div className="cyber-progress-fill" style={{ width: `${incomeBase > 0 ? Math.min(100, (savingsSpend / incomeBase) * 100) : 0}%`, background: 'var(--neon-emerald)' }} />
                     </div>
                   </div>
                 </div>

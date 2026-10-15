@@ -91,17 +91,19 @@ export function InsightsPage() {
     return weeks;
   }, [periodTxns, now]);
 
-  // Need / Want / Saving breakdown
+  // Need / Want / Saving breakdown — percentages are of income, not outflows
   const nwsBreakdown = useMemo(() => {
     const needs = periodTxns.filter(t => t.type === 'EXPENSE' && t.need_want === 'NEED').reduce((s, t) => s + t.amount_minor, 0);
     const wants = periodTxns.filter(t => t.type === 'EXPENSE' && t.need_want === 'WANT').reduce((s, t) => s + t.amount_minor, 0);
+    // Savings/Investments tagged as SAVING type (SIPs, FDs, RDs, goal transfers)
     const savings = periodTxns.filter(t => t.type === 'EXPENSE' && t.need_want === 'SAVING').reduce((s, t) => s + t.amount_minor, 0);
+    const base = totalIncome > 0 ? totalIncome : (needs + wants + savings);
     return [
-      { name: 'Needs', value: needs / 100, color: 'var(--neon-cyan)' },
-      { name: 'Wants', value: wants / 100, color: 'var(--neon-purple)' },
-      { name: 'Savings', value: savings / 100, color: 'var(--neon-emerald)' },
+      { name: 'Needs', value: needs / 100, pctOfIncome: base > 0 ? ((needs / base) * 100).toFixed(1) : '0', color: 'var(--neon-cyan)' },
+      { name: 'Wants', value: wants / 100, pctOfIncome: base > 0 ? ((wants / base) * 100).toFixed(1) : '0', color: 'var(--neon-purple)' },
+      { name: 'Savings/SIPs', value: savings / 100, pctOfIncome: base > 0 ? ((savings / base) * 100).toFixed(1) : '0', color: 'var(--neon-emerald)' },
     ].filter(item => item.value > 0);
-  }, [periodTxns]);
+  }, [periodTxns, totalIncome]);
 
   const runAiAnalysis = async (customPrompt?: string) => {
     const promptToUse = customPrompt || aiQuestion;
