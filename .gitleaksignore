@@ -1,0 +1,3 @@
+# Gitleaks ignore list for false positives
+# Ignored placeholder client JWT in historical commit
+617fcd9bc437a2737b81f773af8d8db9d08a2bb0:wealthos-web/src/lib/supabase.ts:jwt:6

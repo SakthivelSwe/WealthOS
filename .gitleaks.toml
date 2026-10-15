@@ -1,0 +1,14 @@
+title = "WealthOS Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for mock and public client tokens"
+paths = [
+  '''wealthos-web/src/lib/mockData\.ts''',
+  '''wealthos-web/src/lib/supabase\.ts''',
+]
+commits = [
+  "617fcd9bc437a2737b81f773af8d8db9d08a2bb0",
+]
