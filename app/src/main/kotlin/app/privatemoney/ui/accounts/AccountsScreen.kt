@@ -111,7 +111,7 @@ fun AccountsRoute(viewModel: AccountsViewModel, currency: Currency, onClose: () 
                 title = {
                     Column {
                         Text("Accounts & Wallets", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("${accountsWithBalances.size} active vaults", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                        Text("${accountsWithBalances.size} active accounts", style = MaterialTheme.typography.bodySmall, color = finance.muted)
                     }
                 },
                 navigationIcon = {
@@ -457,7 +457,7 @@ private fun AddAccountScreen(
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Text("Create Account Vault", fontWeight = FontWeight.Bold)
+                Text("Create Account", fontWeight = FontWeight.Bold)
             }
         }
     }

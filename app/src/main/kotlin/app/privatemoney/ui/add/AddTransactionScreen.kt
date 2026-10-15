@@ -217,19 +217,21 @@ fun AddTransactionScreen(
                 )
             }
 
-            OutlinedTextField(
-                value = state.merchant,
-                onValueChange = viewModel::setMerchant,
-                label = { Text(stringResource(R.string.merchant_optional)) },
-                leadingIcon = { Icon(Icons.Default.Store, contentDescription = null, tint = finance.muted, modifier = Modifier.size(18.dp)) },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = typeColor,
-                    unfocusedBorderColor = finance.glassBorder,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (state.type != TransactionType.TRANSFER) {
+                OutlinedTextField(
+                    value = state.merchant,
+                    onValueChange = viewModel::setMerchant,
+                    label = { Text(stringResource(R.string.merchant_optional)) },
+                    leadingIcon = { Icon(Icons.Default.Store, contentDescription = null, tint = finance.muted, modifier = Modifier.size(18.dp)) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = typeColor,
+                        unfocusedBorderColor = finance.glassBorder,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             OutlinedTextField(
                 value = state.note,

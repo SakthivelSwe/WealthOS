@@ -396,7 +396,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               <Clock size={18} />
             </div>
             <div>
-              <div className="cyber-title">Real-Time Transaction Stream</div>
+              <div className="cyber-title">Recent Transactions</div>
               <div className="cyber-subtitle">Instant synchronization with your Android device</div>
             </div>
           </div>

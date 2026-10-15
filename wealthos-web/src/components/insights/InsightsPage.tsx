@@ -345,9 +345,9 @@ Question: ${promptToUse}`;
               </div>
               <div>
                 <div className="cyber-title">
-                  Neural Financial Intelligence
+                  AI Money Coach
                 </div>
-                <div className="cyber-subtitle">Autonomous portfolio reasoning & wealth acceleration suggestions</div>
+                <div className="cyber-subtitle">Read-only financial analysis & wealth optimization insights</div>
               </div>
             </div>
           </div>

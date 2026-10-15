@@ -364,7 +364,7 @@ export function PlansPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-rose)' }} />
               <div className="stat-label">
-                <span>Debt Exposure</span>
+                <span>Outstanding Debt</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
                   <CreditCard size={18} />
                 </div>
