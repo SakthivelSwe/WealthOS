@@ -126,13 +126,21 @@ class InsightsViewModel(
     private var cachedTopCatSpend: Long = 0L
     private var cachedMonthlySpend: Long = 0L
 
+    private data class MonthlySpendData(
+        val monthlyRows: List<MonthlyTotalRow>,
+        val topCatRows: List<CategorySpendRow>,
+        val cats: List<CategoryEntity>,
+        val monthExpense: Long,
+    )
+
     val uiState: StateFlow<InsightsUiState> = combine(
         combine(
             ledger.observeMonthlyTotals(startTrend),
             ledger.observeTopCategories(startMonth, endMonth, 6),
             categories.observeActive(),
-        ) { monthlyRows, topCatRows, cats ->
-            Triple(monthlyRows, topCatRows, cats)
+            ledger.observeTotal(TransactionType.EXPENSE, startMonth, endMonth),
+        ) { monthlyRows, topCatRows, cats, monthExpense ->
+            MonthlySpendData(monthlyRows, topCatRows, cats, monthExpense)
         },
         combine(
             ledger.observeTotal(TransactionType.EXPENSE, thisWeekStart, thisWeekEnd),
@@ -149,10 +157,10 @@ class InsightsViewModel(
         combine(_aiAdvice, _isAiLoading) { advice, loading ->
             Pair(advice, loading)
         },
-    ) { (monthlyRows, topCatRows, cats), (spentThisWeek, spentLastWeek), (goals, debts), (aiAdvice, isAiLoading) ->
-        val catMap = cats.associateBy { it.id }
+    ) { spendData, (spentThisWeek, spentLastWeek), (goals, debts), (aiAdvice, isAiLoading) ->
+        val catMap = spendData.cats.associateBy { it.id }
 
-        val topCategories = topCatRows.map { row ->
+        val topCategories = spendData.topCatRows.map { row ->
             val cat = catMap[row.categoryId]
             InsightCategoryUi(
                 name = cat?.name ?: "Unknown",
@@ -161,7 +169,7 @@ class InsightsViewModel(
             )
         }
 
-        val totalMonthExpense = topCategories.sumOf { it.amountMinor }
+        val totalMonthExpense = spendData.monthExpense
         val daysElapsed = today.dayOfWeek.value.coerceIn(1, 7)
         val dailyAvg = spentThisWeek / daysElapsed
         val topCat = topCategories.firstOrNull()
@@ -184,7 +192,7 @@ class InsightsViewModel(
             (dailyAvg * 7 > spentLastWeek * 1.15 && spentLastWeek > 0)
 
         val trendMap = mutableMapOf<String, InsightMonthTrendUi>()
-        monthlyRows.forEach { row ->
+        spendData.monthlyRows.forEach { row ->
             val existing = trendMap[row.month] ?: InsightMonthTrendUi(row.month, 0L, 0L)
             trendMap[row.month] = if (row.type == "INCOME") {
                 existing.copy(income = row.total)

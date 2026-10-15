@@ -30,6 +30,7 @@ data class PlansUiState(
     val currency: Currency,
     val isConfigured: Boolean,
     val lanes: List<LaneStatus> = emptyList(),
+    val unclassifiedSpendMinor: Long = 0L,
     val goals: List<GoalEntity> = emptyList(),
     val debts: List<DebtEntity> = emptyList(),
     val chitFunds: List<ChitFundEntity> = emptyList(),
@@ -75,6 +76,7 @@ class PlansViewModel(
         val spentByLane = rows.mapNotNull { row -> 
             Lane.fromName(row.needWant)?.let { it to row.total }
         }.toMap()
+        val unclassifiedSpend = rows.filter { Lane.fromName(it.needWant) == null }.sumOf { it.total }
 
         val today = clock()
         val yearMonth = YearMonth.from(today)
@@ -97,6 +99,7 @@ class PlansViewModel(
             currency = settings.currency,
             isConfigured = income > 0,
             lanes = lanes,
+            unclassifiedSpendMinor = unclassifiedSpend,
             goals = pData.goals,
             debts = pData.debts,
             chitFunds = pData.chitFunds,

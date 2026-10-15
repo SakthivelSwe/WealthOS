@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.room.withTransaction
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.privatemoney.App
@@ -48,8 +49,9 @@ class RecurringWorker(
                 db.categoryDao().observeActive().first().find { it.id == catId }
             }
 
+            val deterministicTxnId = "txn_recur_${recurring.id}_${recurring.nextRunDate.replace("-", "")}"
             val draft = TransactionDraft(
-                id = "txn_recur_" + UUID.randomUUID().toString().replace("-", ""),
+                id = deterministicTxnId,
                 type = type,
                 amountMinor = recurring.amountMinor,
                 currency = Currency.fromCode(recurring.currency) ?: Currency.INR,
@@ -68,22 +70,27 @@ class RecurringWorker(
             )
 
             try {
-                ledger.record(draft, details)
+                db.withTransaction {
+                    ledger.record(draft, details)
 
-                val currentRunDate = LocalDate.parse(recurring.nextRunDate)
-                val nextRunDate = when (recurring.frequency) {
-                    "WEEKLY" -> currentRunDate.plusWeeks(1)
-                    "MONTHLY" -> currentRunDate.plusMonths(1)
-                    "YEARLY" -> currentRunDate.plusYears(1)
-                    else -> currentRunDate.plusMonths(1)
-                }.toString()
+                    val currentRunDate = LocalDate.parse(recurring.nextRunDate)
+                    val nextRunDate = when (recurring.frequency.uppercase()) {
+                        "DAILY" -> currentRunDate.plusDays(1)
+                        "WEEKLY" -> currentRunDate.plusWeeks(1)
+                        "BIWEEKLY" -> currentRunDate.plusWeeks(2)
+                        "MONTHLY" -> currentRunDate.plusMonths(1)
+                        "QUARTERLY" -> currentRunDate.plusMonths(3)
+                        "YEARLY" -> currentRunDate.plusYears(1)
+                        else -> currentRunDate.plusMonths(1)
+                    }.toString()
 
-                db.recurringTxnDao().insert(
-                    recurring.copy(
-                        nextRunDate = nextRunDate,
-                        updatedAt = System.currentTimeMillis(),
+                    db.recurringTxnDao().insert(
+                        recurring.copy(
+                            nextRunDate = nextRunDate,
+                            updatedAt = System.currentTimeMillis(),
+                        )
                     )
-                )
+                }
                 processedCount++
             } catch (e: Exception) {
                 e.printStackTrace()

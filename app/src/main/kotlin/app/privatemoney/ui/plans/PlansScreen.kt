@@ -308,6 +308,32 @@ private fun PlansScreen(
                 LaneCard(lane = uiState.lanes[index], currency = uiState.currency)
             }
 
+            if (uiState.unclassifiedSpendMinor > 0) {
+                item {
+                    GlassCard {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text("⚠️ Unclassified Outflows", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFFFBBF24))
+                                Spacer(Modifier.height(4.dp))
+                                Text("Expenses missing Need / Want tags excluded from 50/30/20 comparison.", fontSize = 12.sp, color = finance.muted)
+                            }
+                            MoneyText(
+                                minor = uiState.unclassifiedSpendMinor,
+                                currency = uiState.currency,
+                                style = MoneyStyles.row,
+                                tint = MoneyTint.NEGATIVE,
+                            )
+                        }
+                    }
+                }
+            }
+
             // Goals Section
             item {
                 Row(

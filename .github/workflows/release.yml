@@ -62,28 +62,22 @@ jobs:
             umask 077
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
             echo "Keystore successfully decoded"
           else
-            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
-            echo "Keystore secret not present; will build debug APK"
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is not configured. Production releases cannot be published without a valid release keystore."
+            exit 1
           fi
 
-      - name: Build APK
+      - name: Build Release APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VERSION_CODE: ${{ github.run_number }}
         run: |
           set -euo pipefail
-          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
-            ./gradlew --no-daemon :app:assembleRelease
-          else
-            ./gradlew --no-daemon :app:assembleDebug
-          fi
+          ./gradlew --no-daemon :app:assembleRelease
 
       - name: Package Release Assets and Verification
         run: |
@@ -91,18 +85,13 @@ jobs:
           TAG="${{ steps.version_step.outputs.tag }}"
           mkdir -p dist
 
-          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
-            apk="$(ls app/build/outputs/apk/release/*.apk | head -1)"
-            bt="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-            "$bt/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/signature.txt" || true
-            if grep -E "certificate SHA-256 digest" "$RUNNER_TEMP/signature.txt" > "dist/signing-certificate-sha256.txt"; then
-              echo "Certificate digest saved"
-            fi
-            bash scripts/verify-apk.sh "$apk"
-          else
-            apk="$(ls app/build/outputs/apk/debug/*.apk | head -1)"
-            bash scripts/verify-apk.sh "$apk"
+          apk="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          bt="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$bt/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/signature.txt"
+          if grep -E "certificate SHA-256 digest" "$RUNNER_TEMP/signature.txt" > "dist/signing-certificate-sha256.txt"; then
+            echo "Certificate digest saved"
           fi
+          bash scripts/verify-apk.sh "$apk"
 
           cp "$apk" "dist/PrivateMoneyOS-${TAG}.apk"
           cp "$apk" "dist/PrivateMoneyOS-latest.apk"

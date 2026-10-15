@@ -204,7 +204,7 @@ interface LedgerDao {
     @Query("SELECT * FROM txn WHERE deletedAt IS NULL")
     suspend fun getAllForBackup(): List<TxnEntity>
 
-    @Query("SELECT * FROM journal_entry")
+    @Query("SELECT j.* FROM journal_entry j JOIN txn t ON t.id = j.txnId WHERE t.deletedAt IS NULL")
     suspend fun getAllEntriesForBackup(): List<JournalEntryEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)

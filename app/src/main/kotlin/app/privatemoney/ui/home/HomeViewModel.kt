@@ -84,14 +84,19 @@ class HomeViewModel(
 
             val names = cats.associate { it.id to it.name }
 
+            val userCurrency = currency.code
             val currentMonthPrefix = today.toString().take(7)
             val upcomingBills = recurringList
-                .filter { it.active && it.type == "EXPENSE" && it.nextRunDate.startsWith(currentMonthPrefix) }
+                .filter { it.active && it.type == "EXPENSE" && it.currency == userCurrency && it.nextRunDate.startsWith(currentMonthPrefix) }
                 .sumOf { it.amountMinor }
-            val debtPayments = debtsList.filter { !it.archived }.sumOf { it.expectedMonthlyPaymentMinor }
-            val goalContributions = goalsList.filter { !it.archived }.sumOf { it.plannedMonthlyContributionMinor }
+            val debtPayments = debtsList
+                .filter { !it.archived && it.currency == userCurrency }
+                .sumOf { it.expectedMonthlyPaymentMinor }
+            val goalContributions = goalsList
+                .filter { !it.archived && it.currency == userCurrency }
+                .sumOf { it.plannedMonthlyContributionMinor }
             val ccOutstanding = acctBalances
-                .filter { it.account.type == "CREDIT_CARD" && it.currentBalanceMinor < 0 }
+                .filter { it.account.type == "CREDIT_CARD" && it.account.currency == userCurrency && it.currentBalanceMinor < 0 }
                 .sumOf { kotlin.math.abs(it.currentBalanceMinor) }
             val buffer = if (income > 0) (income * 0.05).toLong() else 0L
 
@@ -106,12 +111,7 @@ class HomeViewModel(
 
             val safe = runCatching {
                 SafeToSpendEngine.calculate(safeInput, today)
-            }.getOrElse {
-                SafeToSpendEngine.calculate(
-                    SafeToSpendInput(liquidBalanceMinor = liquid, 0L, 0L, 0L, 0L, 0L),
-                    today,
-                )
-            }
+            }.getOrNull()
 
             HomeUiState(
                 isLoading = false,

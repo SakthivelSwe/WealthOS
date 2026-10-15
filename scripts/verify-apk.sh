@@ -31,8 +31,8 @@ aapt2="$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/aapt2 2>
 if [ -n "$aapt2" ]; then
   manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
   if echo "$manifest" | grep -Eq 'debuggable.*=true'; then
-    if [[ "$apk" != *"debug"* ]]; then
-      echo "FAIL: debuggable is true"; fail=1;
+    if [ "${2:-}" != "--allow-debug" ]; then
+      echo "FAIL: debuggable is true (production APKs must not be debuggable)"; fail=1;
     fi
   fi
   if echo "$manifest" | grep -Eq 'usesCleartextTraffic.*=true'; then echo "FAIL: cleartext traffic enabled"; fail=1; fi

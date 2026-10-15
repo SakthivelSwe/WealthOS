@@ -58,6 +58,7 @@ class CloudSyncService(
     suspend fun createBackupEnvelope(userPin: String = ""): ByteArray = withContext(Dispatchers.IO) {
         val effectivePin = if (userPin.isBlank()) settings.autoVaultKey else userPin
         val accounts = db.accountDao().getAllForBackup()
+        val categories = db.categoryDao().getAllForBackup()
         val txns = db.ledgerDao().getAllForBackup()
         val entries = db.ledgerDao().getAllEntriesForBackup()
         val goals = db.goalDao().getAllForBackup()
@@ -81,6 +82,21 @@ class CloudSyncService(
                         put("archived", a.archived)
                         put("createdAt", a.createdAt)
                         put("updatedAt", a.updatedAt)
+                    })
+                }
+            })
+            put("categories", JSONArray().apply {
+                categories.forEach { c ->
+                    put(JSONObject().apply {
+                        put("id", c.id)
+                        put("parentId", c.parentId ?: JSONObject.NULL)
+                        put("name", c.name)
+                        put("kind", c.kind)
+                        put("needWant", c.needWant ?: JSONObject.NULL)
+                        put("icon", c.icon)
+                        put("color", c.color)
+                        put("archived", c.archived)
+                        put("sortOrder", c.sortOrder)
                     })
                 }
             })
@@ -275,7 +291,7 @@ class CloudSyncService(
                     else -> "Cloud upload notice: ${e.message}. Saved to local vault."
                 }
                 settings.lastBackupTimestamp = metadata.timestamp
-                settings.lastBackupStatus = "SUCCESS"
+                settings.lastBackupStatus = "LOCAL_ONLY"
                 settings.lastBackupError = userMsg
                 return@withContext metadata
             }
@@ -337,6 +353,7 @@ class CloudSyncService(
     suspend fun executeRestore(envelope: ByteArray, userPin: String = ""): RestorePreview = withContext(Dispatchers.IO) {
         val (metadata, decryptedJson) = decryptEnvelope(envelope, userPin)
 
+        val categoriesArray = decryptedJson.optJSONArray("categories") ?: JSONArray()
         val accountsArray = decryptedJson.optJSONArray("accounts") ?: JSONArray()
         val txnsArray = decryptedJson.optJSONArray("txns") ?: JSONArray()
         val entriesArray = decryptedJson.optJSONArray("journal_entries") ?: JSONArray()
@@ -344,6 +361,24 @@ class CloudSyncService(
         val debtsArray = decryptedJson.optJSONArray("debts") ?: JSONArray()
         val chitsArray = decryptedJson.optJSONArray("chits") ?: JSONArray()
         val recurringArray = decryptedJson.optJSONArray("recurring") ?: JSONArray()
+
+        val categoryEntities = mutableListOf<CategoryEntity>()
+        for (i in 0 until categoriesArray.length()) {
+            val o = categoriesArray.getJSONObject(i)
+            categoryEntities.add(
+                CategoryEntity(
+                    id = o.getString("id"),
+                    parentId = o.optNullableString("parentId"),
+                    name = o.getString("name"),
+                    kind = o.getString("kind"),
+                    needWant = o.optNullableString("needWant"),
+                    icon = o.optString("icon", "category"),
+                    color = o.optLong("color", 0xFF8E8E96),
+                    archived = o.optBoolean("archived", false),
+                    sortOrder = o.optInt("sortOrder", 0),
+                )
+            )
+        }
 
         val accountEntities = mutableListOf<AccountEntity>()
         for (i in 0 until accountsArray.length()) {
@@ -488,10 +523,17 @@ class CloudSyncService(
         val toSkip = txnEntities.count { existingTxns.contains(it.id) }
         val toRestore = txnEntities.size - toSkip
 
+        val newTxns = txnEntities.filterNot { existingTxns.contains(it.id) }
+        val newTxnIds = newTxns.map { it.id }.toSet()
+        val journalEntitiesToInsert = journalEntities.filter { newTxnIds.contains(it.txnId) }
+
         db.withTransaction {
+            if (categoryEntities.isNotEmpty()) {
+                db.categoryDao().insertAll(categoryEntities)
+            }
             db.accountDao().restoreAccounts(accountEntities)
-            db.ledgerDao().restoreTxns(txnEntities)
-            db.ledgerDao().restoreEntries(journalEntities)
+            db.ledgerDao().restoreTxns(newTxns)
+            db.ledgerDao().restoreEntries(journalEntitiesToInsert)
             db.goalDao().restoreGoals(goalEntities)
             db.debtDao().restoreDebts(debtEntities)
             db.chitFundDao().restoreChitFunds(chitEntities)
