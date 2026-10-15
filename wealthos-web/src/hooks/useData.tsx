@@ -225,13 +225,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     fetchAll();
 
     try {
-      const channel = supabase.channel('db-changes')
+      const channel = supabase.channel(`user-sync-${userId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_transactions', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_accounts', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_goals', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_debts', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_settings', filter: `user_id=eq.${userId}` }, () => fetchAll())
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Supabase Realtime] Channel status:', status);
+        });
 
       return () => { supabase.removeChannel(channel); };
     } catch (e) {

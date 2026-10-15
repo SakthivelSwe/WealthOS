@@ -79,10 +79,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const verifyOtp = useCallback(async (phone: string, token: string) => {
-    // If we're using dev/demo fallback
+    // 1. Try authenticating directly with Supabase first
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+      if (!error && data?.session) {
+        localStorage.removeItem(DEMO_SESSION_KEY);
+        setSession(data.session);
+        setDemoPendingPhone(null);
+        return { error: null };
+      }
+      if (error) {
+        console.warn('Supabase verifyOtp notice:', error.message);
+      }
+    } catch (err: any) {
+      console.warn('Supabase auth network notice:', err.message);
+    }
+
+    // 2. Fallback to local dev test OTP if token is 123456 or demo mode was triggered
     if (demoPendingPhone === phone || token === '123456') {
+      const rawDigits = phone.replace(/\D/g, '').slice(-12).padStart(12, '0');
+      const demoUuid = `00000000-0000-4000-8000-${rawDigits}`;
+
       const demoUser: User = {
-        id: 'usr_' + phone.replace(/\D/g, '').slice(-8),
+        id: demoUuid,
         app_metadata: { provider: 'phone' },
         user_metadata: { phone },
         aud: 'authenticated',
@@ -104,37 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null };
     }
 
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
-      if (error) {
-        // Allow 123456 as master test token in development
-        if (token === '123456') {
-          const demoUser: User = {
-            id: 'usr_' + phone.replace(/\D/g, '').slice(-8),
-            app_metadata: { provider: 'phone' },
-            user_metadata: { phone },
-            aud: 'authenticated',
-            created_at: new Date().toISOString(),
-            phone,
-          } as unknown as User;
-          localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoUser));
-          setSession({ user: demoUser } as unknown as Session);
-          return { error: null };
-        }
-        return { error: new Error(error.message) };
-      }
-      if (data.session) {
-        setSession(data.session);
-      }
-      return { error: null };
-    } catch (err: any) {
-      return { error: new Error(err.message || 'Verification failed') };
-    }
+    return { error: new Error('Invalid verification code. Please check code or use dev OTP 123456.') };
   }, [demoPendingPhone]);
 
   const loginAsDemo = useCallback(() => {
     const demoUser: User = {
-      id: 'usr_demo_user',
+      id: '00000000-0000-4000-8000-000000000001',
       app_metadata: { provider: 'phone' },
       user_metadata: { phone: '+919876543210', name: 'Demo User' },
       aud: 'authenticated',
