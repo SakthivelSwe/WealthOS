@@ -17,9 +17,14 @@ plugins {
 }
 
 flyway {
-    url = (project.findProperty("flyway.url") as? String)
+    val rawFlywayUrl = (project.findProperty("flyway.url") as? String)
         ?: System.getenv("SUPABASE_DB_URL")
         ?: "jdbc:postgresql://db.zahzagnindkkttdpmqii.supabase.co:5432/postgres"
+    url = when {
+        rawFlywayUrl.startsWith("postgres://") -> rawFlywayUrl.replaceFirst("postgres://", "jdbc:postgresql://")
+        rawFlywayUrl.startsWith("postgresql://") -> rawFlywayUrl.replaceFirst("postgresql://", "jdbc:postgresql://")
+        else -> rawFlywayUrl
+    }
     user = (project.findProperty("flyway.user") as? String)
         ?: System.getenv("SUPABASE_DB_USER")
         ?: "postgres"
