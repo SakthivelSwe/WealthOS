@@ -15,7 +15,14 @@ class AccountRepository(private val db: AppDatabase, private val clock: () -> Lo
     fun observeActive(): Flow<List<AccountEntity>> = db.accountDao().observeActive()
 
     /** Creates an account. The opening balance is stored as-is; later changes flow only through the journal. */
-    suspend fun create(name: String, type: AccountType, openingBalanceMinor: Long, currency: Currency): String {
+    suspend fun create(
+        name: String,
+        type: AccountType,
+        openingBalanceMinor: Long,
+        currency: Currency,
+        institution: String? = null,
+        lastFour: String? = null,
+    ): String {
         require(name.isNotBlank() && name.length <= MAX_NAME) { "Invalid name" }
         val now = clock()
         val id = UUID.randomUUID().toString()
@@ -24,8 +31,8 @@ class AccountRepository(private val db: AppDatabase, private val clock: () -> Lo
                 id = id,
                 name = name.trim(),
                 type = type.name,
-                institution = null,
-                lastFour = null,
+                institution = institution?.trim(),
+                lastFour = lastFour?.trim(),
                 openingBalanceMinor = openingBalanceMinor,
                 currency = currency.code,
                 includeInNetWorth = true,

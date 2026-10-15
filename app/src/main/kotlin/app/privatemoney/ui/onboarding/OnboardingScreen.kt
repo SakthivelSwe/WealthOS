@@ -166,7 +166,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onDone: () -> Unit) {
                     value = name,
                     onValueChange = { name = it.take(60) },
                     label = { Text(stringResource(R.string.account_name)) },
-                    placeholder = { Text("e.g. HDFC Salary, Cash in Wallet") },
+                    placeholder = { Text("e.g. Axis Bank, HDFC Salary, Cash in Wallet") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),

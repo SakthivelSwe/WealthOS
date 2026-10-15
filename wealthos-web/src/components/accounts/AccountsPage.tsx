@@ -71,7 +71,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
 
           <div className="form-group">
             <label className="form-label">Account / Wallet Name *</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. HDFC Salary Account" autoFocus />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Axis Bank, HDFC Salary, Cash" autoFocus />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

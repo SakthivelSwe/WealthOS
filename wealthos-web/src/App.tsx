@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { DataProvider } from './hooks/useData';
 import { LoginPage } from './components/auth/LoginPage';
@@ -17,6 +17,7 @@ import { Search } from 'lucide-react';
 
 // ===== COMMAND PALETTE =====
 function CommandPalette({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const commands = [
@@ -45,7 +46,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
               if (e.key === 'ArrowDown') setSelected(s => Math.min(s + 1, commands.length - 1));
               if (e.key === 'ArrowUp') setSelected(s => Math.max(s - 1, 0));
               if (e.key === 'Enter' && commands[selected]) {
-                window.location.href = commands[selected].path;
+                navigate(commands[selected].path);
                 onClose();
               }
               if (e.key === 'Escape') onClose();
@@ -57,7 +58,7 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
             <div
               key={cmd.path + cmd.label}
               className={`command-item ${i === selected ? 'selected' : ''}`}
-              onClick={() => { window.location.href = cmd.path; onClose(); }}
+              onClick={() => { navigate(cmd.path); onClose(); }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Search size={14} style={{ color: 'var(--neon-cyan)' }} />

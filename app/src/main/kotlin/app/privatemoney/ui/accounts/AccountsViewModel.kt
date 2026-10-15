@@ -22,9 +22,16 @@ class AccountsViewModel(
     val accountsWithBalances: StateFlow<List<AccountWithBalance>> = accounts.observeActiveWithBalances()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addAccount(name: String, type: AccountType, openingBalanceMinor: Long, currency: Currency) {
+    fun addAccount(
+        name: String,
+        type: AccountType,
+        openingBalanceMinor: Long,
+        currency: Currency,
+        institution: String? = null,
+        lastFour: String? = null,
+    ) {
         viewModelScope.launch {
-            accounts.create(name, type, openingBalanceMinor, currency)
+            accounts.create(name, type, openingBalanceMinor, currency, institution, lastFour)
         }
     }
 
