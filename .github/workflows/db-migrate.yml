@@ -1,0 +1,32 @@
+name: Supabase Database Automated Migrations
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Run Flyway Database Migration
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL || 'jdbc:postgresql://db.zahzagnindkkttdpmqii.supabase.co:5432/postgres' }}
+          SUPABASE_DB_USER: ${{ secrets.SUPABASE_DB_USER || 'postgres' }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          ./gradlew flywayMigrate -Pflyway.password="$SUPABASE_DB_PASSWORD"

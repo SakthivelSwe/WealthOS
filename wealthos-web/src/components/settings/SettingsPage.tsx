@@ -123,7 +123,7 @@ export function SettingsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
             System Core & Sync
@@ -132,7 +132,7 @@ export function SettingsPage() {
             Manage neural preferences, Supabase cloud mirroring, and cryptographic backups
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button className="btn btn-secondary btn-sm" onClick={handleManualSync} disabled={isRefreshing}>
             <RefreshCw size={14} className={isRefreshing ? 'spinner' : ''} />
             {isRefreshing ? 'Syncing...' : 'Sync Cloud'}
@@ -143,7 +143,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 24 }}>
+      <div className="settings-grid-layout">
         {/* Nav Tabs */}
         <div>
           <div className="cyber-card" style={{ padding: 8 }}>
@@ -366,8 +366,8 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()} style={{ flex: '1 1 200px' }}>
                     <Upload size={16} /> Import Mobile / JSON Backup
                   </button>
                   <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} style={{ display: 'none' }} />

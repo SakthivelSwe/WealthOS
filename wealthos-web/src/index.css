@@ -536,7 +536,7 @@ html, body {
 }
 
 @media (max-width: 900px) {
-  .nav-links-track {
+  .nav-links-track, .nav-divider {
     display: none;
   }
   .hud-tool-btn .hud-kbd {
@@ -554,6 +554,37 @@ html, body {
   }
 }
 
+/* Medium screen: compact nav — hide brand text, keyboard shortcut labels */
+@media (max-width: 1100px) {
+  .brand-text-container { display: none; }
+  .hud-kbd { display: none; }
+  .nav-link-pill { padding: 8px 10px; font-size: 0.82rem; }
+}
+
+.responsive-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .responsive-grid-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.settings-grid-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+}
+@media (max-width: 800px) {
+  .settings-grid-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
 /* ============================================================
    Page Layout & Spatial Containers
    ============================================================ */
@@ -564,13 +595,16 @@ html, body {
   z-index: 1;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .app-main-canvas {
   width: 100%;
+  min-width: 0;
   padding: 16px 20px 80px 20px;
   animation: spatialReveal 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   flex: 1;
+  overflow-x: hidden;
 }
 
 @keyframes spatialReveal {
@@ -611,6 +645,28 @@ html, body {
   }
   .bento-grid {
     gap: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .bento-grid {
+    gap: 10px;
+  }
+  .cyber-card {
+    padding: 16px 14px;
+    border-radius: var(--radius-md);
+  }
+  .stat-value {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cyber-card {
+    padding: 12px 12px;
+  }
+  .stat-value {
+    font-size: 1.1rem;
   }
 }
 
@@ -804,12 +860,14 @@ html, body {
 }
 
 .btn-ghost {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
   color: var(--text-secondary);
 }
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
+  border-color: var(--glass-border-bright);
 }
 
 .btn-danger {

@@ -317,7 +317,7 @@ export function PlansPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
             Wealth Horizons & Commitments
@@ -415,7 +415,7 @@ export function PlansPage() {
       </div>
 
       {/* Cyber Tab Navigation */}
-      <div style={{ display: 'flex', gap: 6, background: 'rgba(255, 255, 255, 0.04)', padding: 5, borderRadius: 'var(--radius-pill)', border: '1px solid var(--glass-border)', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 6, background: 'rgba(255, 255, 255, 0.04)', padding: 5, borderRadius: 'var(--radius-pill)', border: '1px solid var(--glass-border)', width: 'fit-content', maxWidth: '100%', flexWrap: 'wrap' }}>
         {[
           { id: 'goals', label: '🎯 Financial Goals', count: goals.length },
           { id: 'debts', label: '💳 Debt & Loans', count: debts.length },
@@ -435,7 +435,7 @@ export function PlansPage() {
 
       {/* Goals Tab */}
       {activeTab === 'goals' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+        <div className="responsive-grid-cards">
           {goals.map(goal => {
             const pct = goal.target_amount_minor > 0 ? Math.min((goal.current_amount_minor / goal.target_amount_minor) * 100, 100) : 0;
             const remaining = goal.target_amount_minor - goal.current_amount_minor;
@@ -478,7 +478,7 @@ export function PlansPage() {
 
       {/* Debts Tab */}
       {activeTab === 'debts' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+        <div className="responsive-grid-cards">
           {debts.map(debt => (
             <Tilt3DCard key={debt.id}>
               <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-rose)' }}>
@@ -506,7 +506,7 @@ export function PlansPage() {
 
       {/* Chit Funds Tab */}
       {activeTab === 'chits' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+        <div className="responsive-grid-cards">
           {chitFunds.map(chit => (
             <Tilt3DCard key={chit.id}>
               <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-amber)' }}>
@@ -531,7 +531,7 @@ export function PlansPage() {
 
       {/* Recurring Tab */}
       {activeTab === 'recurring' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+        <div className="responsive-grid-cards">
           {recurringTxns.map(rec => (
             <Tilt3DCard key={rec.id}>
               <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-purple)' }}>

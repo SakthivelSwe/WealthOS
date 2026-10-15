@@ -202,7 +202,7 @@ export function AccountsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
             Vaults & Portfolios
@@ -286,7 +286,7 @@ export function AccountsPage() {
             <span className="badge badge-cyan">{accs.length}</span>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
+          <div className="responsive-grid-cards">
             {accs.map(acc => {
               const balanceMinor = acc.current_balance_minor || 0;
               const isPositive = balanceMinor >= 0;
@@ -317,11 +317,11 @@ export function AccountsPage() {
                             </span>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                           <button
                             type="button"
                             className="btn-ghost btn-sm"
-                            style={{ padding: 6, borderRadius: 'var(--radius-sm)' }}
+                            style={{ padding: 6, borderRadius: 'var(--radius-sm)', color: 'var(--neon-cyan)' }}
                             onClick={() => { setEditAccount(acc); setShowModal(true); }}
                           >
                             <Edit2 size={13} />
