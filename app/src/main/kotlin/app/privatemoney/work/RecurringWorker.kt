@@ -17,10 +17,11 @@ import app.privatemoney.data.TransactionDetails
 import app.privatemoney.domain.ledger.TransactionDraft
 import app.privatemoney.domain.ledger.TransactionType
 import app.privatemoney.domain.model.Currency
+import app.privatemoney.domain.planning.RecurrenceEngine
+import app.privatemoney.domain.planning.RecurrenceFrequency
 import app.privatemoney.notification.NotificationHub
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
-import java.util.UUID
 
 class RecurringWorker(
     appContext: Context,
@@ -31,58 +32,87 @@ class RecurringWorker(
         val app = applicationContext as App
         val db = app.database
         val ledger = app.ledger
+        val settings = app.settings
 
         val today = LocalDate.now()
         val todayStr = today.toString()
         val dueTxns = db.recurringTxnDao().observeActive().first().filter { it.nextRunDate <= todayStr }
 
-        var processedCount = 0
+        var autoPostedCount = 0
+        var reminderCount = 0
 
         for (recurring in dueTxns) {
-            val type = try {
-                TransactionType.valueOf(recurring.type)
-            } catch (e: Exception) {
-                TransactionType.EXPENSE
+            val freq = RecurrenceFrequency.fromString(recurring.frequency)
+            val currentRunDate = try {
+                LocalDate.parse(recurring.nextRunDate)
+            } catch (_: Exception) {
+                today
             }
+            val anchorDay = currentRunDate.dayOfMonth
 
-            val category = recurring.categoryId?.let { catId ->
-                db.categoryDao().observeActive().first().find { it.id == catId }
-            }
+            if (recurring.autoPost) {
+                // Auto-post mode: record deterministic bookkeeping in local ledger
+                val deterministicTxnId = RecurrenceEngine.occurrenceKey(recurring.id, currentRunDate)
+                val existing = ledger.get(deterministicTxnId)
 
-            val deterministicTxnId = "txn_recur_${recurring.id}_${recurring.nextRunDate.replace("-", "")}"
-            val draft = TransactionDraft(
-                id = deterministicTxnId,
-                type = type,
-                amountMinor = recurring.amountMinor,
-                currency = Currency.fromCode(recurring.currency) ?: Currency.INR,
-                accountId = recurring.accountId,
-                toAccountId = null,
-                categoryId = recurring.categoryId,
-            )
+                if (existing == null) {
+                    val type = try {
+                        TransactionType.valueOf(recurring.type)
+                    } catch (e: Exception) {
+                        TransactionType.EXPENSE
+                    }
 
-            val details = TransactionDetails(
-                localDate = todayStr,
-                localTime = "09:00:00",
-                description = recurring.description ?: "Scheduled Bill",
-                merchant = recurring.description,
-                source = "RECURRING_BILL",
-                needWant = category?.needWant,
-            )
+                    val category = recurring.categoryId?.let { catId ->
+                        db.categoryDao().observeActive().first().find { it.id == catId }
+                    }
 
-            try {
-                db.withTransaction {
-                    ledger.record(draft, details)
+                    val draft = TransactionDraft(
+                        id = deterministicTxnId,
+                        type = type,
+                        amountMinor = recurring.amountMinor,
+                        currency = Currency.fromCode(recurring.currency) ?: Currency.INR,
+                        accountId = recurring.accountId,
+                        toAccountId = null,
+                        categoryId = recurring.categoryId,
+                    )
 
-                    val currentRunDate = LocalDate.parse(recurring.nextRunDate)
-                    val nextRunDate = when (recurring.frequency.uppercase()) {
-                        "DAILY" -> currentRunDate.plusDays(1)
-                        "WEEKLY" -> currentRunDate.plusWeeks(1)
-                        "BIWEEKLY" -> currentRunDate.plusWeeks(2)
-                        "MONTHLY" -> currentRunDate.plusMonths(1)
-                        "QUARTERLY" -> currentRunDate.plusMonths(3)
-                        "YEARLY" -> currentRunDate.plusYears(1)
-                        else -> currentRunDate.plusMonths(1)
-                    }.toString()
+                    val details = TransactionDetails(
+                        localDate = currentRunDate.toString(),
+                        localTime = "09:00:00",
+                        description = recurring.description ?: "Scheduled Bill",
+                        merchant = recurring.description,
+                        source = "RECURRING_BILL",
+                        needWant = category?.needWant,
+                    )
+
+                    try {
+                        db.withTransaction {
+                            ledger.record(draft, details)
+
+                            val nextRunDate = RecurrenceEngine.nextOccurrenceDate(
+                                currentDate = currentRunDate,
+                                frequency = freq,
+                                anchorDayOfMonth = anchorDay,
+                            ).toString()
+
+                            db.recurringTxnDao().insert(
+                                recurring.copy(
+                                    nextRunDate = nextRunDate,
+                                    updatedAt = System.currentTimeMillis(),
+                                )
+                            )
+                        }
+                        autoPostedCount++
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                } else {
+                    // Already posted on a prior run or manual entry: advance nextRunDate to prevent getting stuck
+                    val nextRunDate = RecurrenceEngine.nextOccurrenceDate(
+                        currentDate = currentRunDate,
+                        frequency = freq,
+                        anchorDayOfMonth = anchorDay,
+                    ).toString()
 
                     db.recurringTxnDao().insert(
                         recurring.copy(
@@ -91,20 +121,51 @@ class RecurringWorker(
                         )
                     )
                 }
-                processedCount++
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } else {
+                // Reminder-only mode: do not automatically book transactions into the ledger
+                NotificationHub.sendBillDueReminder(
+                    context = applicationContext,
+                    title = "Scheduled Bill Due",
+                    description = recurring.description ?: "Scheduled Bill",
+                    amountMinor = recurring.amountMinor,
+                    currencyCode = recurring.currency,
+                    hideSensitive = settings.hideSensitiveNotificationDetails,
+                )
+
+                try {
+                    app.notifications.postNotification(
+                        title = "Bill Reminder Due",
+                        message = "${recurring.description ?: "Scheduled Bill"} is due today (${recurring.nextRunDate}).",
+                        category = "BILL",
+                        actionType = NotificationHub.ACTION_VIEW_PLANS,
+                    )
+                } catch (_: Exception) {}
+
+                // Advance nextRunDate to the next scheduled interval
+                val nextRunDate = RecurrenceEngine.nextOccurrenceDate(
+                    currentDate = currentRunDate,
+                    frequency = freq,
+                    anchorDayOfMonth = anchorDay,
+                ).toString()
+
+                db.recurringTxnDao().insert(
+                    recurring.copy(
+                        nextRunDate = nextRunDate,
+                        updatedAt = System.currentTimeMillis(),
+                    )
+                )
+                reminderCount++
             }
         }
 
-        if (processedCount > 0) {
-            sendNotification(processedCount)
+        if (autoPostedCount > 0) {
+            sendNotification(autoPostedCount)
             try {
                 app.notifications.postNotification(
                     title = "Scheduled Bills Recorded",
-                    message = "Recorded $processedCount due recurring bill(s).",
+                    message = "Auto-posted $autoPostedCount due recurring bill(s) to ledger.",
                     category = "BILL",
-                    actionType = "VIEW_PLANS",
+                    actionType = NotificationHub.ACTION_VIEW_PLANS,
                 )
             } catch (_: Exception) {}
         }
@@ -126,11 +187,20 @@ class RecurringWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val publicNotification = NotificationCompat.Builder(applicationContext, NotificationHub.CHANNEL_BILLS)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Scheduled Bills Processed")
+            .setContentText("Recorded due bill(s) in your ledger.")
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
         val notification = NotificationCompat.Builder(applicationContext, NotificationHub.CHANNEL_BILLS)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Scheduled Bills Processed")
             .setContentText("Successfully recorded $count due bill(s) in your ledger.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicNotification)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()

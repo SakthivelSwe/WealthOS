@@ -136,6 +136,7 @@ data class RecurringTxnEntity(
     val active: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "0") val autoPost: Boolean = false,
 )
 
 @Entity(

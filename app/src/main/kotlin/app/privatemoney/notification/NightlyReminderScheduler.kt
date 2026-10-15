@@ -88,34 +88,40 @@ object NightlyReminderScheduler {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        try {
-            // AlarmClockInfo guarantees high-priority wakeup in Doze Mode
-            alarmManager.setAlarmClock(
-                AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent),
-                pendingIntent,
-            )
-        } catch (_: SecurityException) {
+        val canExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
+        } else true
+
+        if (canExact) {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent,
-                    )
-                } else {
-                    alarmManager.setExact(
-                        AlarmManager.RTC_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent,
-                    )
-                }
-            } catch (_: Exception) {
+                // AlarmClockInfo guarantees high-priority wakeup in Doze Mode
+                alarmManager.setAlarmClock(
+                    AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent),
+                    pendingIntent,
+                )
+                return
+            } catch (_: SecurityException) {
+                // Exact alarm permission was revoked between check and call
+            }
+        }
+
+        // Inexact / battery-optimized fallback when exact alarm permission is unavailable
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent,
+                )
+            } else {
                 alarmManager.set(
                     AlarmManager.RTC_WAKEUP,
                     triggerAtMillis,
                     pendingIntent,
                 )
             }
+        } catch (e: Exception) {
+            Log.w("WealthOS", "Failed to schedule nightly alarm fallback", e)
         }
     }
 }

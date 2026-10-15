@@ -136,9 +136,14 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_LAST_REVIEW_DATE, "") ?: ""
         set(value) = prefs.edit().putString(KEY_LAST_REVIEW_DATE, value).apply()
 
+    var hideSensitiveNotificationDetails: Boolean
+        get() = prefs.getBoolean(KEY_HIDE_SENSITIVE_NOTIFICATIONS, true)
+        set(value) = prefs.edit().putBoolean(KEY_HIDE_SENSITIVE_NOTIFICATIONS, value).apply()
+
     companion object {
         const val DEFAULT_TIMEOUT_MS = 60_000L
         const val DEFAULT_SUPABASE_URL = "https://zahzagnindkkttdpmqii.supabase.co"
+        private const val KEY_HIDE_SENSITIVE_NOTIFICATIONS = "hide_sensitive_notifications"
         private const val KEY_ONBOARDED = "onboarded"
         private const val KEY_LOCK = "lock_enabled"
         private const val KEY_TIMEOUT = "lock_timeout_ms"

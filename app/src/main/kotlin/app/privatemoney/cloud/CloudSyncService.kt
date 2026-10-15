@@ -224,6 +224,7 @@ class CloudSyncService(
                         put("active", r.active)
                         put("createdAt", r.createdAt)
                         put("updatedAt", r.updatedAt)
+                        put("autoPost", r.autoPost)
                     })
                 }
             })
@@ -550,6 +551,7 @@ class CloudSyncService(
                     active = o.optBoolean("active", true),
                     createdAt = o.getLong("createdAt"),
                     updatedAt = o.getLong("updatedAt"),
+                    autoPost = o.optBoolean("autoPost", false),
                 )
             )
         }

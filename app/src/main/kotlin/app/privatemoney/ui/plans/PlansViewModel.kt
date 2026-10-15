@@ -142,9 +142,41 @@ class PlansViewModel(
         }
     }
 
-    fun createRecurringTxn(type: String, amountMinor: Long, currency: String, accountId: String, categoryId: String?, desc: String?, freq: String, nextRun: String) {
+    fun createRecurringTxn(
+        type: String,
+        amountMinor: Long,
+        currency: String,
+        accountId: String,
+        categoryId: String?,
+        desc: String?,
+        freq: String,
+        nextRun: String,
+        autoPost: Boolean = false,
+    ) {
         viewModelScope.launch {
-            planning.createRecurringTxn(type, amountMinor, currency, accountId, categoryId, desc, freq, nextRun)
+            planning.createRecurringTxn(type, amountMinor, currency, accountId, categoryId, desc, freq, nextRun, autoPost)
+            forceRefresh.update { it + 1 }
+        }
+    }
+
+    fun toggleRecurringActive(id: String, active: Boolean) {
+        viewModelScope.launch {
+            planning.setRecurringTxnActive(id, active)
+            forceRefresh.update { it + 1 }
+        }
+    }
+
+    fun skipRecurringOnce(id: String) {
+        viewModelScope.launch {
+            planning.skipRecurringTxnOnce(id)
+            forceRefresh.update { it + 1 }
+        }
+    }
+
+    fun cancelRecurring(id: String) {
+        viewModelScope.launch {
+            planning.deleteRecurringTxn(id)
+            forceRefresh.update { it + 1 }
         }
     }
 

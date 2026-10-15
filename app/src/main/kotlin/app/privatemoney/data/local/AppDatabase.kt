@@ -289,6 +289,18 @@ interface RecurringTxnDao {
     @Query("SELECT * FROM recurring_txn")
     suspend fun getAllForBackup(): List<RecurringTxnEntity>
 
+    @Query("SELECT * FROM recurring_txn WHERE id = :id")
+    suspend fun get(id: String): RecurringTxnEntity?
+
+    @Query("UPDATE recurring_txn SET active = :active, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setActive(id: String, active: Boolean, updatedAt: Long): Int
+
+    @Query("UPDATE recurring_txn SET nextRunDate = :nextRunDate, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateNextRunDate(id: String, nextRunDate: String, updatedAt: Long): Int
+
+    @Query("DELETE FROM recurring_txn WHERE id = :id")
+    suspend fun delete(id: String): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun restoreRecurringTxns(txns: List<RecurringTxnEntity>): List<Long>
 }
@@ -330,10 +342,11 @@ interface NotificationDao {
         GoalEntity::class, DebtEntity::class, ChitFundEntity::class, RecurringTxnEntity::class,
         AppNotificationEntity::class,
     ],
-    version = 3,
+    version = 4,
     autoMigrations = [
         androidx.room.AutoMigration(from = 1, to = 2),
         androidx.room.AutoMigration(from = 2, to = 3),
+        androidx.room.AutoMigration(from = 3, to = 4),
     ],
     exportSchema = true,
 )

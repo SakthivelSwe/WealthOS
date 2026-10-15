@@ -8,6 +8,10 @@ import app.privatemoney.data.local.RecurringTxnEntity
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
+import app.privatemoney.domain.planning.RecurrenceEngine
+import app.privatemoney.domain.planning.RecurrenceFrequency
+import java.time.LocalDate
+
 class PlanningRepository(private val db: AppDatabase, private val clock: () -> Long = System::currentTimeMillis) {
 
     // --- Goals ---
@@ -106,7 +110,8 @@ class PlanningRepository(private val db: AppDatabase, private val clock: () -> L
         categoryId: String?,
         description: String?,
         frequency: String,
-        nextRunDate: String
+        nextRunDate: String,
+        autoPost: Boolean = false,
     ) {
         val now = clock()
         val entity = RecurringTxnEntity(
@@ -122,7 +127,28 @@ class PlanningRepository(private val db: AppDatabase, private val clock: () -> L
             active = true,
             createdAt = now,
             updatedAt = now,
+            autoPost = autoPost,
         )
         db.recurringTxnDao().insert(entity)
+    }
+
+    suspend fun setRecurringTxnActive(id: String, active: Boolean) {
+        db.recurringTxnDao().setActive(id, active, clock())
+    }
+
+    suspend fun skipRecurringTxnOnce(id: String) {
+        val txn = db.recurringTxnDao().get(id) ?: return
+        val currentRunDate = try {
+            LocalDate.parse(txn.nextRunDate)
+        } catch (_: Exception) {
+            LocalDate.now()
+        }
+        val freq = RecurrenceFrequency.fromString(txn.frequency)
+        val nextDate = RecurrenceEngine.nextOccurrenceDate(currentRunDate, freq, currentRunDate.dayOfMonth)
+        db.recurringTxnDao().updateNextRunDate(id, nextDate.toString(), clock())
+    }
+
+    suspend fun deleteRecurringTxn(id: String) {
+        db.recurringTxnDao().delete(id)
     }
 }

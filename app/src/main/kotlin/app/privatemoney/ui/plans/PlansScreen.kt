@@ -37,7 +37,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -412,7 +414,14 @@ private fun PlansScreen(
                     SectionLabel("RECURRING SUBSCRIPTIONS (${uiState.recurringTxns.size})")
                 }
                 items(uiState.recurringTxns.size) { i ->
-                    RecurringTxnCard(txn = uiState.recurringTxns[i], currency = uiState.currency)
+                    val txn = uiState.recurringTxns[i]
+                    RecurringTxnCard(
+                        txn = txn,
+                        currency = uiState.currency,
+                        onToggleActive = { viewModel.toggleRecurringActive(txn.id, !txn.active) },
+                        onSkipOnce = { viewModel.skipRecurringOnce(txn.id) },
+                        onCancel = { viewModel.cancelRecurring(txn.id) },
+                    )
                 }
             }
         }
@@ -887,7 +896,13 @@ private fun ChitFundCard(
 }
 
 @Composable
-private fun RecurringTxnCard(txn: RecurringTxnEntity, currency: Currency) {
+private fun RecurringTxnCard(
+    txn: RecurringTxnEntity,
+    currency: Currency,
+    onToggleActive: () -> Unit = {},
+    onSkipOnce: () -> Unit = {},
+    onCancel: () -> Unit = {},
+) {
     val finance = LocalFinanceColors.current
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -899,12 +914,42 @@ private fun RecurringTxnCard(txn: RecurringTxnEntity, currency: Currency) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.CalendarToday, contentDescription = null, tint = finance.muted, modifier = Modifier.size(18.dp))
                     Text(txn.description ?: txn.type, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    if (!txn.active) {
+                        Text("(Paused)", style = MaterialTheme.typography.bodySmall, color = finance.negative)
+                    }
                 }
-                Text(txn.frequency, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = finance.muted))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (txn.autoPost) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+                    ) {
+                        Text(
+                            text = if (txn.autoPost) "AUTO-POST" else "REMINDER",
+                            style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    Text(txn.frequency, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Bold, color = finance.muted))
+                }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Next: ${txn.nextRunDate}", style = MaterialTheme.typography.bodySmall, color = finance.muted)
                 MoneyText(txn.amountMinor, currency, style = MoneyStyles.row)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onSkipOnce) {
+                    Text("Skip Once", style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = onToggleActive) {
+                    Text(if (txn.active) "Pause" else "Resume", style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = onCancel) {
+                    Text("Cancel", style = MaterialTheme.typography.bodySmall, color = finance.negative)
+                }
             }
         }
     }

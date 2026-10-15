@@ -384,7 +384,7 @@ fun AddChitFundDialog(
 fun AddRecurringTxnDialog(
     currency: Currency = Currency.INR,
     onDismiss: () -> Unit,
-    onSave: (type: String, amountMinor: Long, currency: String, accountId: String, categoryId: String?, desc: String?, freq: String, nextRun: String) -> Unit,
+    onSave: (type: String, amountMinor: Long, currency: String, accountId: String, categoryId: String?, desc: String?, freq: String, nextRun: String, autoPost: Boolean) -> Unit,
 ) {
     var type by remember { mutableStateOf("EXPENSE") }
     var amount by remember { mutableStateOf("") }
@@ -392,6 +392,7 @@ fun AddRecurringTxnDialog(
     var desc by remember { mutableStateOf("") }
     var freq by remember { mutableStateOf("MONTHLY") }
     var nextRun by remember { mutableStateOf(LocalDate.now().plusMonths(1).toString()) }
+    var autoPost by remember { mutableStateOf(false) }
     val sym = MoneyFormat.symbol(currency)
 
     Dialog(onDismissRequest = onDismiss) {
@@ -409,16 +410,35 @@ fun AddRecurringTxnDialog(
                 Text("Add Recurring Transaction", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("Description (e.g. Netflix, Rent)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = amount, onValueChange = { amount = it }, label = { Text("Amount ($sym)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = freq, onValueChange = { freq = it }, label = { Text("Frequency (MONTHLY / WEEKLY)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = freq, onValueChange = { freq = it }, label = { Text("Frequency (DAILY / WEEKLY / MONTHLY / YEARLY)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = nextRun, onValueChange = { nextRun = it }, label = { Text("Next Run Date (YYYY-MM-DD)") }, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth())
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Auto-post to Ledger", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = if (autoPost) "Transactions will be booked automatically. (Local bookkeeping only)" else "Reminder only. WealthOS will send a notification on due date.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = autoPost,
+                        onCheckedChange = { autoPost = it },
+                    )
+                }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(Modifier.width(8.dp))
                     Button(onClick = {
-                        val amt = (amount.toDoubleOrNull() ?: 0.0) * 100
+                        val amt = runCatching { app.privatemoney.domain.model.Money.parse(amount, currency).amountMinor }.getOrDefault(0L)
                         if (amt > 0) {
-                            onSave(type, amt.toLong(), currency.code, accountId, null, desc, freq, nextRun)
+                            onSave(type, amt, currency.code, accountId, null, desc, freq, nextRun, autoPost)
                             onDismiss()
                         }
                     }, shape = RoundedCornerShape(10.dp)) {

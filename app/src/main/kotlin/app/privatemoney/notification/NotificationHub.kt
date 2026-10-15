@@ -185,16 +185,79 @@ object NotificationHub {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val publicNotification = NotificationCompat.Builder(context, CHANNEL_BACKUP)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle("WealthOS Backup Notice")
+            .setContentText("Your local encrypted vault needs attention.")
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
         val notification = NotificationCompat.Builder(context, CHANNEL_BACKUP)
             .setSmallIcon(android.R.drawable.stat_notify_error)
             .setContentTitle("Encrypted backup needs attention")
             .setContentText(errorMsg)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicNotification)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_menu_rotate, "Open Settings", pendingIntent)
             .build()
 
         NotificationManagerCompat.from(context).notify(2002, notification)
+    }
+
+    /**
+     * Privacy-safe reminder for scheduled bills and recurring transactions.
+     * When hideSensitive is enabled, monetary values and accounts are withheld on lock screens.
+     */
+    fun sendBillDueReminder(
+        context: Context,
+        title: String,
+        description: String,
+        amountMinor: Long,
+        currencyCode: String,
+        hideSensitive: Boolean,
+    ) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            putExtra(EXTRA_ACTION, ACTION_VIEW_PLANS)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 107, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val publicNotification = NotificationCompat.Builder(context, CHANNEL_BILLS)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Scheduled Bill Due")
+            .setContentText("A recurring bill is due today.")
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        val currency = app.privatemoney.domain.model.Currency.fromCode(currencyCode) ?: app.privatemoney.domain.model.Currency.INR
+        val moneyStr = app.privatemoney.ui.MoneyFormat.format(amountMinor, currency)
+        val privateText = if (hideSensitive) {
+            "$description is due today. Tap to review."
+        } else {
+            "$description ($moneyStr) is due today. Tap to review."
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_BILLS)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(privateText)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicNotification)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        NotificationManagerCompat.from(context).notify(description.hashCode(), notification)
     }
 }
