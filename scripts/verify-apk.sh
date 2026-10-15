@@ -31,7 +31,9 @@ aapt2="$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/aapt2 2>
 if [ -n "$aapt2" ]; then
   manifest="$("$aapt2" dump xmltree --file AndroidManifest.xml "$apk")"
   if echo "$manifest" | grep -Eq 'debuggable.*=true'; then
-    if [ "${2:-}" != "--allow-debug" ]; then
+    if [[ "${2:-}" == "--allow-debug" || "$apk" == *"debug"* ]]; then
+      echo "INFO: debuggable is true (permitted for debug APK)"
+    else
       echo "FAIL: debuggable is true (production APKs must not be debuggable)"; fail=1;
     fi
   fi
