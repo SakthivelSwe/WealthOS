@@ -52,19 +52,47 @@ class CloudSyncService(
     private val magic = byteArrayOf(0x57, 0x4F, 0x53, 0x42) // "WOSB"
     private val currentVersion = 1
 
+    private data class BackupDataSnapshot(
+        val accounts: List<AccountEntity>,
+        val categories: List<CategoryEntity>,
+        val txns: List<TxnEntity>,
+        val entries: List<JournalEntryEntity>,
+        val goals: List<GoalEntity>,
+        val debts: List<DebtEntity>,
+        val chits: List<ChitFundEntity>,
+        val recurring: List<RecurringTxnEntity>,
+    )
+
     /**
      * Creates an encrypted, portable backup envelope from the local Room database.
+     * Reads all tables atomically within a single database transaction.
+     * Uses PBKDF2WithHmacSHA256 (100,000 iterations, 256-bit key) and AES/GCM/NoPadding (128-bit tag).
+     * Binds unencrypted metadata via AEAD Associated Authenticated Data (AAD).
      */
     suspend fun createBackupEnvelope(userPin: String = ""): ByteArray = withContext(Dispatchers.IO) {
         val effectivePin = if (userPin.isBlank()) settings.autoVaultKey else userPin
-        val accounts = db.accountDao().getAllForBackup()
-        val categories = db.categoryDao().getAllForBackup()
-        val txns = db.ledgerDao().getAllForBackup()
-        val entries = db.ledgerDao().getAllEntriesForBackup()
-        val goals = db.goalDao().getAllForBackup()
-        val debts = db.debtDao().getAllForBackup()
-        val chits = db.chitFundDao().getAllForBackup()
-        val recurring = db.recurringTxnDao().getAllForBackup()
+
+        val snapshot = db.withTransaction {
+            BackupDataSnapshot(
+                accounts = db.accountDao().getAllForBackup(),
+                categories = db.categoryDao().getAllForBackup(),
+                txns = db.ledgerDao().getAllForBackup(),
+                entries = db.ledgerDao().getAllEntriesForBackup(),
+                goals = db.goalDao().getAllForBackup(),
+                debts = db.debtDao().getAllForBackup(),
+                chits = db.chitFundDao().getAllForBackup(),
+                recurring = db.recurringTxnDao().getAllForBackup(),
+            )
+        }
+
+        val accounts = snapshot.accounts
+        val categories = snapshot.categories
+        val txns = snapshot.txns
+        val entries = snapshot.entries
+        val goals = snapshot.goals
+        val debts = snapshot.debts
+        val chits = snapshot.chits
+        val recurring = snapshot.recurring
 
         val rootJson = JSONObject().apply {
             put("accounts", JSONArray().apply {
@@ -223,13 +251,20 @@ class CloudSyncService(
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
 
-        // PBKDF2 derivation
+        // PBKDF2 derivation with explicit password clearing
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val pbeSpec = PBEKeySpec(effectivePin.toCharArray(), salt, 100_000, 256)
-        val secretKey = SecretKeySpec(factory.generateSecret(pbeSpec).encoded, "AES")
+        val pinChars = effectivePin.toCharArray()
+        val pbeSpec = PBEKeySpec(pinChars, salt, 100_000, 256)
+        val secretKeyBytes = factory.generateSecret(pbeSpec).encoded
+        pbeSpec.clearPassword()
+        java.util.Arrays.fill(pinChars, '\u0000')
 
+        val secretKey = SecretKeySpec(secretKeyBytes, "AES")
+
+        // Encrypt with AEAD AAD (Associated Authenticated Data) binding metadataBytes
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+        cipher.updateAAD(metadataBytes)
         val ciphertext = cipher.doFinal(rawJsonBytes)
 
         // Assemble envelope
@@ -550,7 +585,13 @@ class CloudSyncService(
         )
     }
 
-    private fun readEnvelopeMetadata(envelope: ByteArray): BackupMetadata {
+    fun readEnvelopeMetadata(envelope: ByteArray): BackupMetadata {
+        if (envelope.size < MIN_ENVELOPE_SIZE) {
+            throw IllegalArgumentException("Invalid backup format: envelope truncated (${envelope.size} bytes).")
+        }
+        if (envelope.size > MAX_ENVELOPE_SIZE) {
+            throw IllegalArgumentException("Invalid backup format: envelope exceeds maximum size ($MAX_ENVELOPE_SIZE bytes).")
+        }
         val buffer = ByteBuffer.wrap(envelope)
         val fileMagic = ByteArray(4)
         buffer.get(fileMagic)
@@ -561,7 +602,16 @@ class CloudSyncService(
         if (version > currentVersion) {
             throw IllegalArgumentException("Backup was created with newer app version ($version). Please update WealthOS.")
         }
+        if (version < 1) {
+            throw IllegalArgumentException("Invalid backup format: unsupported version ($version).")
+        }
         val metadataLen = buffer.int
+        if (metadataLen <= 0 || metadataLen > MAX_METADATA_SIZE) {
+            throw IllegalArgumentException("Invalid backup metadata size: $metadataLen bytes.")
+        }
+        if (buffer.remaining() < metadataLen + 16 + 12 + 16) {
+            throw IllegalArgumentException("Invalid backup format: payload truncated for specified metadata length.")
+        }
         val metadataBytes = ByteArray(metadataLen)
         buffer.get(metadataBytes)
         val json = JSONObject(String(metadataBytes, Charsets.UTF_8))
@@ -569,6 +619,12 @@ class CloudSyncService(
     }
 
     private fun decryptEnvelope(envelope: ByteArray, userPin: String): Pair<BackupMetadata, JSONObject> {
+        if (envelope.size < MIN_ENVELOPE_SIZE) {
+            throw IllegalArgumentException("Invalid backup format: envelope truncated (${envelope.size} bytes).")
+        }
+        if (envelope.size > MAX_ENVELOPE_SIZE) {
+            throw IllegalArgumentException("Invalid backup format: envelope exceeds maximum size ($MAX_ENVELOPE_SIZE bytes).")
+        }
         val buffer = ByteBuffer.wrap(envelope)
         val fileMagic = ByteArray(4)
         buffer.get(fileMagic)
@@ -579,7 +635,16 @@ class CloudSyncService(
         if (version > currentVersion) {
             throw IllegalArgumentException("Incompatible backup version ($version). Please update WealthOS.")
         }
+        if (version < 1) {
+            throw IllegalArgumentException("Invalid backup format: unsupported version ($version).")
+        }
         val metadataLen = buffer.int
+        if (metadataLen <= 0 || metadataLen > MAX_METADATA_SIZE) {
+            throw IllegalArgumentException("Invalid backup metadata size: $metadataLen bytes.")
+        }
+        if (buffer.remaining() < metadataLen + 16 + 12 + 16) {
+            throw IllegalArgumentException("Invalid backup format: payload truncated.")
+        }
         val metadataBytes = ByteArray(metadataLen)
         buffer.get(metadataBytes)
         val metadata = BackupMetadata.fromJson(JSONObject(String(metadataBytes, Charsets.UTF_8)))
@@ -592,25 +657,34 @@ class CloudSyncService(
         val ciphertext = ByteArray(buffer.remaining())
         buffer.get(ciphertext)
 
-        // Decrypt
+        // Decrypt with derived key and verify AEAD AAD
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val candidates = if (userPin.isNotBlank()) {
             listOf(userPin)
         } else {
-            listOf(settings.autoVaultKey, "0000")
+            listOf(settings.autoVaultKey)
         }
 
         var decryptedBytes: ByteArray? = null
         for (candidate in candidates) {
+            if (candidate.isBlank()) continue
+            val pinChars = candidate.toCharArray()
             try {
-                val pbeSpec = PBEKeySpec(candidate.toCharArray(), salt, 100_000, 256)
-                val secretKey = SecretKeySpec(factory.generateSecret(pbeSpec).encoded, "AES")
+                val pbeSpec = PBEKeySpec(pinChars, salt, 100_000, 256)
+                val secretKeyBytes = factory.generateSecret(pbeSpec).encoded
+                pbeSpec.clearPassword()
+                val secretKey = SecretKeySpec(secretKeyBytes, "AES")
+
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
+                cipher.updateAAD(metadataBytes)
                 decryptedBytes = cipher.doFinal(ciphertext)
+                java.util.Arrays.fill(secretKeyBytes, 0.toByte())
                 break
             } catch (_: Exception) {
-                // Try next candidate
+                // Try next candidate or fail
+            } finally {
+                java.util.Arrays.fill(pinChars, '\u0000')
             }
         }
 
@@ -618,7 +692,7 @@ class CloudSyncService(
             throw SecurityException("Incorrect PIN / password or corrupted backup payload.")
         }
 
-        // Integrity verification
+        // Secondary data integrity verification
         val calculatedHash = sha256(decryptedBytes)
         if (metadata.checksumSha256.isNotBlank() && metadata.checksumSha256 != calculatedHash) {
             throw SecurityException("Backup integrity verification failed: data hash mismatch.")
@@ -640,5 +714,8 @@ class CloudSyncService(
     companion object {
         const val SUPABASE_URL = "https://zahzagnindkkttdpmqii.supabase.co"
         const val SUPABASE_ANON_KEY = ""
+        const val MIN_ENVELOPE_SIZE = 58
+        const val MAX_ENVELOPE_SIZE = 50 * 1024 * 1024 // 50 MB
+        const val MAX_METADATA_SIZE = 64 * 1024 // 64 KB
     }
 }
