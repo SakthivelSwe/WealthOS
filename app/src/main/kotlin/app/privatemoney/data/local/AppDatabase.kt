@@ -93,6 +93,12 @@ interface LedgerDao {
     @Query("UPDATE txn SET merchant = :merchant, description = :description, notes = :notes, updatedAt = :updatedAt WHERE id = :id AND deletedAt IS NULL")
     suspend fun updateDetails(id: String, merchant: String?, description: String?, notes: String?, updatedAt: Long): Int
 
+    @Query("SELECT * FROM txn WHERE id = :id AND deletedAt IS NULL")
+    suspend fun getTxn(id: String): TxnEntity?
+
+    @Query("SELECT * FROM journal_entry WHERE txnId = :txnId")
+    suspend fun getEntriesForTxn(txnId: String): List<JournalEntryEntity>
+
     /** Derived balance: opening balance plus the sum of live journal legs. */
     @Query(
         """
@@ -107,39 +113,39 @@ interface LedgerDao {
 
     /**
      * Sum of balances of active liquid accounts. The type list must match AccountType.isLiquid
-     * (BANK, CASH, UPI_WALLET, SAVINGS).
+     * (BANK, CASH, UPI_WALLET, SAVINGS). Optionally filtered by currency.
      */
     @Query(
         """
         SELECT
           (SELECT COALESCE(SUM(openingBalanceMinor), 0) FROM account
-             WHERE archived = 0 AND type IN ('BANK','CASH','UPI_WALLET','SAVINGS'))
+             WHERE archived = 0 AND (:currency IS NULL OR currency = :currency) AND type IN ('BANK','CASH','UPI_WALLET','SAVINGS'))
           +
           (SELECT COALESCE(SUM(j.amountMinor), 0) FROM journal_entry j
              JOIN txn t ON t.id = j.txnId
              JOIN account a ON a.id = j.accountId
-             WHERE t.deletedAt IS NULL AND a.archived = 0
+             WHERE t.deletedAt IS NULL AND a.archived = 0 AND (:currency IS NULL OR a.currency = :currency)
                AND a.type IN ('BANK','CASH','UPI_WALLET','SAVINGS'))
         """,
     )
-    fun observeLiquidBalance(): Flow<Long>
+    fun observeLiquidBalance(currency: String? = null): Flow<Long>
 
     @Query(
         """
         SELECT COALESCE(SUM(amountMinor), 0) FROM txn
-        WHERE type = :type AND deletedAt IS NULL AND localDate >= :fromDate AND localDate < :toDate
+        WHERE type = :type AND (:currency IS NULL OR currency = :currency) AND deletedAt IS NULL AND localDate >= :fromDate AND localDate < :toDate
         """,
     )
-    fun observeTotal(type: String, fromDate: String, toDate: String): Flow<Long>
+    fun observeTotal(type: String, fromDate: String, toDate: String, currency: String? = null): Flow<Long>
 
     @Query(
         """
         SELECT needWant AS needWant, COALESCE(SUM(amountMinor), 0) AS total FROM txn
-        WHERE type = 'EXPENSE' AND deletedAt IS NULL AND localDate >= :fromDate AND localDate < :toDate
+        WHERE type = 'EXPENSE' AND (:currency IS NULL OR currency = :currency) AND deletedAt IS NULL AND localDate >= :fromDate AND localDate < :toDate
         GROUP BY needWant
         """,
     )
-    fun observeLaneTotals(fromDate: String, toDate: String): Flow<List<LaneTotalRow>>
+    fun observeLaneTotals(fromDate: String, toDate: String, currency: String? = null): Flow<List<LaneTotalRow>>
 
     @Query("SELECT * FROM txn WHERE deletedAt IS NULL ORDER BY localDate DESC, createdAt DESC LIMIT :limit OFFSET :offset")
     suspend fun page(limit: Int, offset: Int): List<TxnEntity>
@@ -164,27 +170,28 @@ interface LedgerDao {
         SELECT substr(localDate, 1, 7) AS month, type, COALESCE(SUM(amountMinor), 0) AS total
         FROM txn
         WHERE deletedAt IS NULL
+          AND (:currency IS NULL OR currency = :currency)
           AND type IN ('INCOME','EXPENSE')
           AND localDate >= :fromDate
         GROUP BY month, type
         ORDER BY month ASC
         """,
     )
-    fun observeMonthlyTotals(fromDate: String): Flow<List<MonthlyTotalRow>>
+    fun observeMonthlyTotals(fromDate: String, currency: String? = null): Flow<List<MonthlyTotalRow>>
 
     /** Top expense categories for a date range. */
     @Query(
         """
         SELECT categoryId, COALESCE(SUM(amountMinor), 0) AS total
         FROM txn
-        WHERE type = 'EXPENSE' AND deletedAt IS NULL
+        WHERE type = 'EXPENSE' AND (:currency IS NULL OR currency = :currency) AND deletedAt IS NULL
           AND localDate >= :fromDate AND localDate < :toDate
         GROUP BY categoryId
         ORDER BY total DESC
         LIMIT :limit
         """,
     )
-    fun observeTopCategories(fromDate: String, toDate: String, limit: Int): Flow<List<CategorySpendRow>>
+    fun observeTopCategories(fromDate: String, toDate: String, limit: Int, currency: String? = null): Flow<List<CategorySpendRow>>
 
     @Query(
         """

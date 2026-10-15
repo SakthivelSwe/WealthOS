@@ -135,16 +135,16 @@ class InsightsViewModel(
 
     val uiState: StateFlow<InsightsUiState> = combine(
         combine(
-            ledger.observeMonthlyTotals(startTrend),
-            ledger.observeTopCategories(startMonth, endMonth, 6),
+            ledger.observeMonthlyTotals(startTrend, settings.currency.code),
+            ledger.observeTopCategories(startMonth, endMonth, 6, settings.currency.code),
             categories.observeActive(),
-            ledger.observeTotal(TransactionType.EXPENSE, startMonth, endMonth),
+            ledger.observeTotal(TransactionType.EXPENSE, startMonth, endMonth, settings.currency.code),
         ) { monthlyRows, topCatRows, cats, monthExpense ->
             MonthlySpendData(monthlyRows, topCatRows, cats, monthExpense)
         },
         combine(
-            ledger.observeTotal(TransactionType.EXPENSE, thisWeekStart, thisWeekEnd),
-            ledger.observeTotal(TransactionType.EXPENSE, lastWeekStart, lastWeekEnd),
+            ledger.observeTotal(TransactionType.EXPENSE, thisWeekStart, thisWeekEnd, settings.currency.code),
+            ledger.observeTotal(TransactionType.EXPENSE, lastWeekStart, lastWeekEnd, settings.currency.code),
         ) { thisWeek, lastWeek ->
             Pair(thisWeek, lastWeek)
         },

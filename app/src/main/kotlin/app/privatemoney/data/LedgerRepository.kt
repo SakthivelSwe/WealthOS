@@ -63,6 +63,49 @@ class LedgerRepository(private val db: AppDatabase, private val clock: () -> Lon
         }
     }
 
+    suspend fun getTxn(id: String): TxnEntity? = db.ledgerDao().getTxn(id)
+
+    /**
+     * Safely replaces an existing transaction:
+     * 1. Validates the new draft and builds balanced journal legs.
+     * 2. Soft-deletes the old transaction to preserve audit history.
+     * 3. Inserts the new transaction and legs atomically within a DB transaction.
+     */
+    suspend fun replace(oldId: String, newDraft: TransactionDraft, newDetails: TransactionDetails) {
+        val legs = JournalPosting.post(newDraft)
+        check(JournalPosting.isBalanced(legs)) { "Unbalanced journal" }
+        val now = clock()
+        db.withTransaction {
+            val dao = db.ledgerDao()
+            val deleted = dao.softDelete(oldId, now)
+            check(deleted > 0) { "Transaction $oldId not found or already deleted" }
+            dao.insertTxn(
+                TxnEntity(
+                    id = newDraft.id,
+                    type = newDraft.type.name,
+                    amountMinor = newDraft.amountMinor,
+                    currency = newDraft.currency.code,
+                    localDate = newDetails.localDate,
+                    localTime = newDetails.localTime,
+                    accountId = newDraft.accountId,
+                    toAccountId = newDraft.toAccountId,
+                    categoryId = newDraft.categoryId,
+                    merchant = newDetails.merchant,
+                    description = newDetails.description,
+                    notes = newDetails.notes,
+                    paymentMethod = newDetails.paymentMethod,
+                    needWant = newDetails.needWant,
+                    imported = newDetails.imported,
+                    source = newDetails.source,
+                    createdAt = now,
+                    updatedAt = now,
+                    deletedAt = null,
+                ),
+            )
+            dao.insertEntries(legs.map { JournalEntryEntity(txnId = it.txnId, accountId = it.accountId, categoryId = it.categoryId, amountMinor = it.amountMinor) })
+        }
+    }
+
     /** Soft delete keeps the record for audit; balances ignore deleted transactions. */
     suspend fun delete(id: String): Boolean = db.ledgerDao().softDelete(id, clock()) > 0
 
@@ -74,18 +117,18 @@ class LedgerRepository(private val db: AppDatabase, private val clock: () -> Lon
     fun pagingSource(query: String = ""): PagingSource<Int, TxnEntity> = 
         if (query.isBlank()) db.ledgerDao().pagingSource() else db.ledgerDao().pagingSourceFiltered(query)
 
-    fun observeLiquidBalance(): Flow<Long> = db.ledgerDao().observeLiquidBalance()
+    fun observeLiquidBalance(currency: String? = null): Flow<Long> = db.ledgerDao().observeLiquidBalance(currency)
 
     /** Total of [type] transactions with localDate in [fromDate, toDate) (ISO yyyy-MM-dd strings). */
-    fun observeTotal(type: TransactionType, fromDate: String, toDate: String): Flow<Long> =
-        db.ledgerDao().observeTotal(type.name, fromDate, toDate)
+    fun observeTotal(type: TransactionType, fromDate: String, toDate: String, currency: String? = null): Flow<Long> =
+        db.ledgerDao().observeTotal(type.name, fromDate, toDate, currency)
 
-    fun observeLaneTotals(fromDate: String, toDate: String): Flow<List<LaneTotalRow>> =
-        db.ledgerDao().observeLaneTotals(fromDate, toDate)
+    fun observeLaneTotals(fromDate: String, toDate: String, currency: String? = null): Flow<List<LaneTotalRow>> =
+        db.ledgerDao().observeLaneTotals(fromDate, toDate, currency)
 
-    fun observeMonthlyTotals(fromDate: String): Flow<List<app.privatemoney.data.local.MonthlyTotalRow>> =
-        db.ledgerDao().observeMonthlyTotals(fromDate)
+    fun observeMonthlyTotals(fromDate: String, currency: String? = null): Flow<List<app.privatemoney.data.local.MonthlyTotalRow>> =
+        db.ledgerDao().observeMonthlyTotals(fromDate, currency)
 
-    fun observeTopCategories(fromDate: String, toDate: String, limit: Int): Flow<List<app.privatemoney.data.local.CategorySpendRow>> =
-        db.ledgerDao().observeTopCategories(fromDate, toDate, limit)
+    fun observeTopCategories(fromDate: String, toDate: String, limit: Int, currency: String? = null): Flow<List<app.privatemoney.data.local.CategorySpendRow>> =
+        db.ledgerDao().observeTopCategories(fromDate, toDate, limit, currency)
 }

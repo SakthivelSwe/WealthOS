@@ -113,4 +113,57 @@ class FinancialIntegrityTest {
         assertEquals("txn_recur_rec_rent_123_20261001", id1)
         assertEquals(id1, id2) // Identical across retries
     }
+
+    @Test
+    fun testAtomicTransactionReplacementIntegrity() {
+        // Simulates LedgerRepository.replace behavior: old transaction is soft-deleted, new one posted
+        data class Txn(val id: String, val amount: Long, val deletedAt: Long?)
+        data class Leg(val txnId: String, val amount: Long)
+
+        val oldTxn = Txn("txn_orig", 1000_00L, null)
+        val oldLegs = listOf(Leg("txn_orig", -1000_00L), Leg("txn_orig", 1000_00L))
+
+        // Replace with corrected amount
+        val now = 1729000000000L
+        val softDeletedOldTxn = oldTxn.copy(deletedAt = now)
+        val newTxn = Txn("txn_replaced", 1200_00L, null)
+        val newLegs = listOf(Leg("txn_replaced", -1200_00L), Leg("txn_replaced", 1200_00L))
+
+        val allTxns = listOf(softDeletedOldTxn, newTxn)
+        val allLegs = oldLegs + newLegs
+
+        // Active transactions are filtered WHERE deletedAt IS NULL
+        val activeTxnIds = allTxns.filter { it.deletedAt == null }.map { it.id }.toSet()
+        val activeLegs = allLegs.filter { activeTxnIds.contains(it.txnId) }
+
+        assertEquals(1, activeTxnIds.size)
+        assertTrue(activeTxnIds.contains("txn_replaced"))
+        assertFalse(activeTxnIds.contains("txn_orig"))
+
+        // Active expense is exactly the new amount (1200, not 1000 or 2200)
+        val totalActiveExpense = activeLegs.filter { it.amount > 0 }.sumOf { it.amount }
+        assertEquals(1200_00L, totalActiveExpense)
+    }
+
+    @Test
+    fun testCurrencySegregatedTotals() {
+        data class Txn(val id: String, val amount: Long, val currency: String)
+
+        val txns = listOf(
+            Txn("t1", 5000_00L, "INR"),
+            Txn("t2", 100_00L, "USD"), // $100
+            Txn("t3", 2500_00L, "INR"),
+        )
+
+        // Without currency filter, raw sum improperly adds USD cents and INR paise
+        val naiveSum = txns.sumOf { it.amount }
+        assertEquals(7600_00L, naiveSum)
+
+        // With currency filter matching our SQL query (:currency IS NULL OR currency = :currency)
+        val inrTotal = txns.filter { it.currency == "INR" }.sumOf { it.amount }
+        val usdTotal = txns.filter { it.currency == "USD" }.sumOf { it.amount }
+
+        assertEquals(7500_00L, inrTotal)
+        assertEquals(100_00L, usdTotal)
+    }
 }

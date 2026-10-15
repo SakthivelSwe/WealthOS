@@ -133,7 +133,7 @@ fun InsightsRoute(viewModel: InsightsViewModel) {
 
             items(state.topCategories.size) { i ->
                 val cat = state.topCategories[i]
-                val pct = if (totalMonthExpense > 0) ((cat.amountMinor.toDouble() / totalMonthExpense) * 100).toInt() else 0
+                val pct = Money.calculatePercentage(cat.amountMinor, totalMonthExpense)
                 CategorySpendCard(
                     rank = i + 1,
                     cat = cat,

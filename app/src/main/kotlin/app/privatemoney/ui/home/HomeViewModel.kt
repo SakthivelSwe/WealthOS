@@ -56,9 +56,9 @@ class HomeViewModel(
         val accountsFlow = accounts?.observeActiveWithBalances() ?: flowOf(emptyList())
 
         combine(
-            ledger.observeLiquidBalance(),
-            ledger.observeTotal(TransactionType.INCOME, from.toString(), to.toString()),
-            ledger.observeTotal(TransactionType.EXPENSE, from.toString(), to.toString()),
+            ledger.observeLiquidBalance(currency.code),
+            ledger.observeTotal(TransactionType.INCOME, from.toString(), to.toString(), currency.code),
+            ledger.observeTotal(TransactionType.EXPENSE, from.toString(), to.toString(), currency.code),
             ledger.observeRecent(RECENT_COUNT),
             categories.observeActive(),
             recurringFlow,

@@ -67,6 +67,7 @@ class PlansViewModel(
         ledger.observeLaneTotals(
             fromDate = YearMonth.from(clock()).atDay(1).toString(),
             toDate = YearMonth.from(clock()).plusMonths(1).atDay(1).toString(),
+            currency = settings.currency.code,
         ),
         planningDataFlow
     ) { _, rows, pData ->

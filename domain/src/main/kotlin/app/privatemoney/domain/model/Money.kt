@@ -70,5 +70,17 @@ data class Money(val amountMinor: Long, val currency: Currency) : Comparable<Mon
 
         fun sum(values: Iterable<Money>, currency: Currency): Money =
             values.fold(zero(currency)) { acc, m -> acc + m }
+
+        /**
+         * Calculates integer percentage using explicit rounding (HALF_UP).
+         * Safely handles zero/negative denominator, no income/spend, and negative balances.
+         */
+        fun calculatePercentage(numeratorMinor: Long, denominatorMinor: Long): Int {
+            if (denominatorMinor <= 0L || numeratorMinor <= 0L) return 0
+            return BigDecimal.valueOf(numeratorMinor)
+                .multiply(BigDecimal(100))
+                .divide(BigDecimal.valueOf(denominatorMinor), 0, java.math.RoundingMode.HALF_UP)
+                .intValueExact()
+        }
     }
 }

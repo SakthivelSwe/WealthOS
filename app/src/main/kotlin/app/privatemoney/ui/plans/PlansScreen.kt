@@ -561,10 +561,10 @@ private fun GoalCard(
     onContribute: (Long) -> Unit,
 ) {
     val finance = LocalFinanceColors.current
+    val pctInt = Money.calculatePercentage(goal.currentAmountMinor, goal.targetAmountMinor)
     val pct = if (goal.targetAmountMinor > 0) {
-        (goal.currentAmountMinor.toDouble() / goal.targetAmountMinor.toDouble()).coerceIn(0.0, 1.0)
-    } else 0.0
-    val pctInt = (pct * 100).toInt()
+        (goal.currentAmountMinor.toFloat() / goal.targetAmountMinor.toFloat()).coerceIn(0f, 1f)
+    } else 0f
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
