@@ -15,11 +15,13 @@ import app.privatemoney.domain.planning.SafeToSpendEngine
 import app.privatemoney.domain.planning.SafeToSpendInput
 import app.privatemoney.ui.ledger.TransactionRowUi
 import app.privatemoney.ui.ledger.toRowUi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import java.time.LocalDate
 import java.time.ZoneId
 
