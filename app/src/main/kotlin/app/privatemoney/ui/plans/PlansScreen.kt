@@ -60,6 +60,7 @@ import app.privatemoney.data.local.DebtEntity
 import app.privatemoney.data.local.GoalEntity
 import app.privatemoney.data.local.RecurringTxnEntity
 import app.privatemoney.domain.model.Currency
+import app.privatemoney.domain.model.Money
 import app.privatemoney.domain.planning.BudgetSplit
 import app.privatemoney.domain.planning.Lane
 import app.privatemoney.domain.planning.LaneStatus

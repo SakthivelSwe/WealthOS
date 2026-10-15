@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.privatemoney.domain.model.Currency
+import app.privatemoney.domain.model.Money
 import app.privatemoney.ui.MoneyFormat
 import app.privatemoney.ui.components.CategoryGlyph
 import app.privatemoney.ui.components.EmptyState
