@@ -447,6 +447,17 @@ private fun BudgetSplitHeroCard(uiState: PlansUiState) {
                 MoneyText(uiState.basisIncomeMinor, uiState.currency, style = MoneyStyles.large, tint = MoneyTint.PRIMARY)
             }
 
+            if (uiState.actualIncomeMinor > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("ACTUAL RECEIVED THIS MONTH", style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Medium, color = finance.muted, letterSpacing = 0.5.sp))
+                    MoneyText(uiState.actualIncomeMinor, uiState.currency, style = MoneyStyles.small, tint = MoneyTint.POSITIVE)
+                }
+            }
+
             // Segmented Progress Bar
             Row(
                 modifier = Modifier
@@ -674,6 +685,13 @@ private fun QuickDepositChip(label: String, onClick: () -> Unit) {
 @Composable
 private fun DebtCard(debt: DebtEntity, currency: Currency) {
     val finance = LocalFinanceColors.current
+    val payoffMonths = remember(debt.currentBalanceMinor, debt.annualPercent, debt.expectedMonthlyPaymentMinor) {
+        val apr = runCatching { java.math.BigDecimal(debt.annualPercent) }.getOrNull()
+        if (apr != null && debt.currentBalanceMinor > 0 && debt.expectedMonthlyPaymentMinor > 0) {
+            app.privatemoney.domain.planning.LoanEngine.payoff(debt.currentBalanceMinor, apr, debt.expectedMonthlyPaymentMinor)?.months
+        } else null
+    }
+
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -690,6 +708,19 @@ private fun DebtCard(debt: DebtEntity, currency: Currency) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Balance Remaining", style = MaterialTheme.typography.bodySmall, color = finance.muted)
                 MoneyText(debt.currentBalanceMinor, currency, style = MoneyStyles.row, tint = MoneyTint.NEGATIVE)
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Expected Payment", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                Text(
+                    "${MoneyFormat.format(debt.expectedMonthlyPaymentMinor, currency)} / mo",
+                    style = TextStyle(fontSize = 12.sp, color = finance.muted),
+                )
+            }
+            if (payoffMonths != null) {
+                Text(
+                    text = "Projected payoff: ~$payoffMonths months (Assumes fixed rate & payments; projection only)",
+                    style = TextStyle(fontSize = 10.sp, color = finance.muted),
+                )
             }
         }
     }
@@ -725,6 +756,10 @@ private fun ChitFundExplainerBanner() {
                 Text(
                     text = "A group of members contribute monthly. Total amount = members × monthly. Each month one member wins the prize (auction price = total - discount). Jewel Chit = prize is gold grams instead of cash.",
                     style = TextStyle(fontSize = 11.sp, color = Color(0xFFE2E8F0), lineHeight = 15.sp),
+                )
+                Text(
+                    text = "⚠️ Disclaimer: Chit funds carry counterparty and credit risk. Track personal contributions and payouts here; this app does not guarantee returns or legal underwriting.",
+                    style = TextStyle(fontSize = 10.sp, color = Color(0xFFF59E0B), lineHeight = 14.sp),
                 )
             }
         }

@@ -26,6 +26,7 @@ import java.time.YearMonth
 
 data class PlansUiState(
     val basisIncomeMinor: Long,
+    val actualIncomeMinor: Long = 0L,
     val split: BudgetSplit,
     val currency: Currency,
     val isConfigured: Boolean,
@@ -69,8 +70,14 @@ class PlansViewModel(
             toDate = YearMonth.from(clock()).plusMonths(1).atDay(1).toString(),
             currency = settings.currency.code,
         ),
+        ledger.observeTotal(
+            type = app.privatemoney.domain.ledger.TransactionType.INCOME,
+            fromDate = YearMonth.from(clock()).atDay(1).toString(),
+            toDate = YearMonth.from(clock()).plusMonths(1).atDay(1).toString(),
+            currency = settings.currency.code,
+        ),
         planningDataFlow
-    ) { _, rows, pData ->
+    ) { _, rows, actualIncome, pData ->
         val income = settings.basisIncomeMinor
         val split = BudgetSplit(settings.needsPct, settings.wantsPct, settings.savingsPct)
         
@@ -96,6 +103,7 @@ class PlansViewModel(
 
         PlansUiState(
             basisIncomeMinor = income,
+            actualIncomeMinor = actualIncome,
             split = split,
             currency = settings.currency,
             isConfigured = income > 0,
@@ -106,7 +114,7 @@ class PlansViewModel(
             chitFunds = pData.chitFunds,
             recurringTxns = pData.recurringTxns,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlansUiState(0L, BudgetSplit.DEFAULT, settings.currency, false))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlansUiState(0L, 0L, BudgetSplit.DEFAULT, settings.currency, false))
 
     fun updateConfig(incomeMinor: Long, split: BudgetSplit) {
         settings.basisIncomeMinor = incomeMinor

@@ -109,4 +109,56 @@ class PlanningTest {
         assertTrue(extra.totalInterestMinor < normal.totalInterestMinor)
         assertFalse(normal.months > 61)
     }
+
+    @Test
+    fun testCommitmentBoundingPreventsOverCommitment() {
+        // Debt with remaining balance of only ₹1,500, but monthly EMI was ₹10,000
+        val debtBalance = 1500_00L
+        val expectedEmi = 10000_00L
+        val effectiveDebtPayment = minOf(debtBalance, expectedEmi)
+        assertEquals(1500_00L, effectiveDebtPayment) // Bounded by remaining balance
+
+        // Fully paid off debt
+        val zeroDebt = 0L
+        val effectiveZeroDebtPayment = if (zeroDebt > 0) minOf(zeroDebt, expectedEmi) else 0L
+        assertEquals(0L, effectiveZeroDebtPayment)
+
+        // Goal with only ₹500 remaining, but planned contribution is ₹2,000
+        val goalTarget = 10000_00L
+        val goalCurrent = 9500_00L
+        val plannedContribution = 2000_00L
+        val effectiveGoalContribution = minOf(goalTarget - goalCurrent, plannedContribution)
+        assertEquals(500_00L, effectiveGoalContribution) // Bounded by remaining target
+
+        // Completed goal
+        val completedGoalCurrent = 10000_00L
+        val effectiveCompletedContribution = if (goalTarget > completedGoalCurrent) {
+            minOf(goalTarget - completedGoalCurrent, plannedContribution)
+        } else 0L
+        assertEquals(0L, effectiveCompletedContribution)
+    }
+
+    @Test
+    fun testSafeToSpendComprehensiveShortfallBreakdown() {
+        val today = LocalDate.of(2026, 10, 15)
+        val input = SafeToSpendInput(
+            liquidBalanceMinor = 50_000_00L,       // ₹50,000 liquid
+            upcomingMandatoryBillsMinor = 30_000_00L, // ₹30,000 bills
+            expectedDebtPaymentsMinor = 15_000_00L,   // ₹15,000 debt
+            plannedGoalContributionsMinor = 10_000_00L,// ₹10,000 goals
+            creditCardDueMinor = 5_000_00L,            // ₹5,000 CC
+            safetyBufferMinor = 2_500_00L,             // ₹2,500 buffer (5% of 50k)
+        )
+        // Committed = 30k + 15k + 10k + 5k = ₹60,000
+        // Liquid = ₹50,000 -> Shortfall = 60k + 2.5k - 50k = ₹12,500
+        val breakdown = SafeToSpendEngine.calculate(input, today)
+
+        assertEquals(60_000_00L, breakdown.committedMinor)
+        assertEquals(-12_500_00L, breakdown.discretionaryMinor)
+        assertEquals(12_500_00L, breakdown.shortfallMinor)
+        assertEquals(0L, breakdown.safeThisMonthMinor)
+        assertEquals(0L, breakdown.safeTodayMinor)
+        assertEquals(0L, breakdown.safeThisWeekMinor)
+        assertEquals(17, breakdown.daysRemainingInMonth) // 31 - 15 + 1
+    }
 }

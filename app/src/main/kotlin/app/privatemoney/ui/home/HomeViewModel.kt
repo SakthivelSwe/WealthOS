@@ -42,11 +42,18 @@ class HomeViewModel(
     planning: PlanningRepository? = null,
     accounts: AccountRepository? = null,
     zone: ZoneId = ZoneId.systemDefault(),
+    private val clock: () -> LocalDate = { LocalDate.now(zone) },
 ) : ViewModel() {
 
+    private val refreshTrigger = MutableStateFlow(0)
+
+    fun refresh() {
+        refreshTrigger.update { it + 1 }
+    }
+
     val state: StateFlow<HomeUiState> = run {
-        val today = LocalDate.now(zone)
-        val from = today.withDayOfMonth(1)
+        val initialToday = clock()
+        val from = initialToday.withDayOfMonth(1)
         val to = from.plusMonths(1)
         val currency = settings.currency
 
@@ -56,6 +63,7 @@ class HomeViewModel(
         val accountsFlow = accounts?.observeActiveWithBalances() ?: flowOf(emptyList())
 
         combine(
+            refreshTrigger,
             ledger.observeLiquidBalance(currency.code),
             ledger.observeTotal(TransactionType.INCOME, from.toString(), to.toString(), currency.code),
             ledger.observeTotal(TransactionType.EXPENSE, from.toString(), to.toString(), currency.code),
@@ -66,39 +74,40 @@ class HomeViewModel(
             goalsFlow,
             accountsFlow,
         ) { args ->
-            val liquid = args[0] as Long
-            val income = args[1] as Long
-            val expense = args[2] as Long
+            val liquid = args[1] as Long
+            val income = args[2] as Long
+            val expense = args[3] as Long
             @Suppress("UNCHECKED_CAST")
-            val recent = args[3] as List<app.privatemoney.data.local.TxnEntity>
+            val recent = args[4] as List<app.privatemoney.data.local.TxnEntity>
             @Suppress("UNCHECKED_CAST")
-            val cats = args[4] as List<app.privatemoney.data.local.CategoryEntity>
+            val cats = args[5] as List<app.privatemoney.data.local.CategoryEntity>
             @Suppress("UNCHECKED_CAST")
-            val recurringList = args[5] as List<app.privatemoney.data.local.RecurringTxnEntity>
+            val recurringList = args[6] as List<app.privatemoney.data.local.RecurringTxnEntity>
             @Suppress("UNCHECKED_CAST")
-            val debtsList = args[6] as List<app.privatemoney.data.local.DebtEntity>
+            val debtsList = args[7] as List<app.privatemoney.data.local.DebtEntity>
             @Suppress("UNCHECKED_CAST")
-            val goalsList = args[7] as List<app.privatemoney.data.local.GoalEntity>
+            val goalsList = args[8] as List<app.privatemoney.data.local.GoalEntity>
             @Suppress("UNCHECKED_CAST")
-            val acctBalances = args[8] as List<app.privatemoney.data.local.AccountWithBalance>
+            val acctBalances = args[9] as List<app.privatemoney.data.local.AccountWithBalance>
 
             val names = cats.associate { it.id to it.name }
 
+            val today = clock()
             val userCurrency = currency.code
             val currentMonthPrefix = today.toString().take(7)
             val upcomingBills = recurringList
                 .filter { it.active && it.type == "EXPENSE" && it.currency == userCurrency && it.nextRunDate.startsWith(currentMonthPrefix) }
                 .sumOf { it.amountMinor }
             val debtPayments = debtsList
-                .filter { !it.archived && it.currency == userCurrency }
-                .sumOf { it.expectedMonthlyPaymentMinor }
+                .filter { !it.archived && it.currency == userCurrency && it.currentBalanceMinor > 0 }
+                .sumOf { minOf(it.currentBalanceMinor, it.expectedMonthlyPaymentMinor) }
             val goalContributions = goalsList
-                .filter { !it.archived && it.currency == userCurrency }
-                .sumOf { it.plannedMonthlyContributionMinor }
+                .filter { !it.archived && it.currency == userCurrency && it.targetAmountMinor > it.currentAmountMinor }
+                .sumOf { minOf(it.targetAmountMinor - it.currentAmountMinor, it.plannedMonthlyContributionMinor) }
             val ccOutstanding = acctBalances
                 .filter { it.account.type == "CREDIT_CARD" && it.account.currency == userCurrency && it.currentBalanceMinor < 0 }
                 .sumOf { kotlin.math.abs(it.currentBalanceMinor) }
-            val buffer = if (income > 0) (income * 0.05).toLong() else 0L
+            val buffer = if (income > 0) (income * 5) / 100 else 0L
 
             val safeInput = SafeToSpendInput(
                 liquidBalanceMinor = liquid,
