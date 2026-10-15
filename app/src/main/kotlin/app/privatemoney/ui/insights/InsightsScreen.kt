@@ -29,9 +29,13 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -90,6 +94,28 @@ fun InsightsRoute(viewModel: InsightsViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     color = finance.muted,
                 )
+            }
+        }
+
+        // Selectable Period Filter
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                InsightsPeriod.values().forEach { period ->
+                    FilterChip(
+                        selected = state.selectedPeriod == period,
+                        onClick = { viewModel.selectPeriod(period) },
+                        label = { Text(period.label, style = MaterialTheme.typography.bodySmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                    )
+                }
             }
         }
 
