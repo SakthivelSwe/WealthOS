@@ -7,8 +7,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isDemoFallback: boolean;
-  signInWithOtp: (phone: string) => Promise<{ error: Error | null; isDemoFallback?: boolean }>;
-  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
+  signInWithOtp: (target: string, isEmail?: boolean) => Promise<{ error: Error | null; isDemoFallback?: boolean }>;
+  verifyOtp: (target: string, token: string, isEmail?: boolean) => Promise<{ error: Error | null }>;
   loginAsDemo: () => void;
   signOut: () => Promise<void>;
   deleteAllUserData: () => Promise<{ error: Error | null }>;
@@ -65,39 +65,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signInWithOtp = useCallback(async (phone: string) => {
+  const signInWithOtp = useCallback(async (target: string, isEmail: boolean = false) => {
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone });
+      const payload: any = isEmail ? { email: target } : { phone: target };
+      const { error } = await supabase.auth.signInWithOtp(payload);
       if (error) {
-        // Supabase SMS provider not configured – use dev/demo OTP fallback
-        const isProviderError = error.message?.toLowerCase().includes('sms') ||
-          error.message?.toLowerCase().includes('provider') ||
-          error.message?.toLowerCase().includes('not enabled') ||
-          error.message?.toLowerCase().includes('phone') ||
-          error.status === 422;
-        if (isProviderError) {
-          console.warn('[WealthOS] SMS provider not configured. Using dev OTP fallback.');
-          setDemoPendingPhone(phone);
-          setIsDemoFallback(true);
-          return { error: null, isDemoFallback: true };
+        if (!isEmail) {
+          // Supabase SMS provider not configured – use dev/demo OTP fallback
+          const isProviderError = error.message?.toLowerCase().includes('sms') ||
+            error.message?.toLowerCase().includes('provider') ||
+            error.message?.toLowerCase().includes('not enabled') ||
+            error.message?.toLowerCase().includes('phone') ||
+            error.status === 422;
+          if (isProviderError) {
+            console.warn('[WealthOS] Supabase SMS provider not configured. Using dev OTP fallback.');
+            setDemoPendingPhone(target);
+            setIsDemoFallback(true);
+            return { error: null, isDemoFallback: true };
+          }
         }
         return { error: new Error(error.message) };
       }
       setIsDemoFallback(false);
       return { error: null, isDemoFallback: false };
     } catch (err: any) {
-      console.warn('[WealthOS] Network error sending OTP. Using dev fallback.');
-      setDemoPendingPhone(phone);
-      setIsDemoFallback(true);
-      return { error: null, isDemoFallback: true };
+      if (!isEmail) {
+        console.warn('[WealthOS] Network error sending OTP. Using dev fallback.');
+        setDemoPendingPhone(target);
+        setIsDemoFallback(true);
+        return { error: null, isDemoFallback: true };
+      }
+      return { error: new Error(err.message || 'Failed to send OTP') };
     }
   }, []);
 
-  const verifyOtp = useCallback(async (phone: string, token: string) => {
-    // 1. Try Supabase real SMS OTP first (production path)
-    if (!isDemoFallback) {
+  const verifyOtp = useCallback(async (target: string, token: string, isEmail: boolean = false) => {
+    // 1. Try Supabase real OTP first (production path for both phone and email)
+    if (!isDemoFallback || isEmail) {
       try {
-        const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+        const payload: any = isEmail
+          ? { email: target, token, type: 'email' }
+          : { phone: target, token, type: 'sms' };
+        const { data, error } = await supabase.auth.verifyOtp(payload);
         if (!error && data?.session) {
           localStorage.removeItem(DEMO_SESSION_KEY);
           setSession(data.session);
@@ -105,28 +114,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { error: null };
         }
         if (error) {
-          return { error: new Error(error.message || 'Invalid OTP. Please check the code sent to your phone.') };
+          return { error: new Error(error.message || 'Invalid verification code. Please check and try again.') };
         }
       } catch (err: any) {
         return { error: new Error('Network error verifying OTP. Please try again.') };
       }
     }
 
-    // 2. Dev/demo fallback – only when SMS provider isn't configured
-    if (isDemoFallback && demoPendingPhone === phone) {
+    // 2. Dev/demo fallback – only for phone when SMS provider isn't configured in Supabase
+    if (isDemoFallback && !isEmail && demoPendingPhone === target) {
       if (token !== '123456') {
-        return { error: new Error('Dev OTP is 123456 (SMS provider not configured)') };
+        return { error: new Error('Dev OTP is 123456 (SMS provider not configured in Supabase)') };
       }
-      const rawDigits = phone.replace(/\D/g, '').slice(-12).padStart(12, '0');
+      const rawDigits = target.replace(/\D/g, '').slice(-12).padStart(12, '0');
       const demoUuid = `00000000-0000-4000-8000-${rawDigits}`;
 
       const demoUser: User = {
         id: demoUuid,
         app_metadata: { provider: 'phone' },
-        user_metadata: { phone },
+        user_metadata: { phone: target },
         aud: 'authenticated',
         created_at: new Date().toISOString(),
-        phone,
+        phone: target,
       } as unknown as User;
 
       const mockSession = {
