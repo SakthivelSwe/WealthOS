@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Phone, Mail, Shield, ArrowRight, Loader2, Sparkles, Lock, KeyRound } from 'lucide-react';
+import { Mail, Shield, Loader2, Sparkles, KeyRound } from 'lucide-react';
 
 export function LoginPage() {
   const { signInWithOtp, verifyOtp, loginAsDemo } = useAuth();
-  const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [authMode, setAuthMode] = useState<'phone' | 'email'>('email');
-  const [phone, setPhone] = useState('');
+  const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState('');
@@ -18,52 +16,35 @@ export function LoginPage() {
     setError('');
     setInfoMsg('');
 
-    if (authMode === 'email') {
-      const cleanEmail = email.trim();
-      if (!cleanEmail || !cleanEmail.includes('@')) {
-        setError('Please enter a valid email address');
-        return;
-      }
-      setLoading(true);
-      const result = await signInWithOtp(cleanEmail, true);
-      setLoading(false);
-      if (result.error) {
-        setError(result.error.message);
-        return;
-      }
-      setInfoMsg(`✅ Verification code dispatched to ${cleanEmail}. Check your inbox or spam folder.`);
-      setStep('otp');
-    } else {
-      if (phone.length < 10) {
-        setError('Enter a valid 10-digit mobile number');
-        return;
-      }
-      setLoading(true);
-      const fullPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-      const result = await signInWithOtp(fullPhone, false);
-      setLoading(false);
-      if (result.error) {
-        setError(result.error.message);
-        return;
-      }
-      if (result.isDemoFallback) {
-        setInfoMsg('⚠️ SMS Provider (Twilio) not configured in your Supabase project. Use test code 123456, or switch to Email Login to receive a live code.');
-      } else {
-        setInfoMsg('✅ OTP sent to your phone via SMS. Check messages.');
-      }
-      setStep('otp');
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
     }
+    setLoading(true);
+    const result = await signInWithOtp(cleanEmail, true);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+    setInfoMsg(`✅ Verification code dispatched to ${cleanEmail}. Check your inbox or spam folder.`);
+    setStep('otp');
   };
 
   const handleVerifyOtp = async () => {
     const token = otp.join('');
-    if (token.length !== 6) { setError('Enter the 6-digit OTP'); return; }
+    if (token.length !== 6) {
+      setError('Please enter the 6-digit code');
+      return;
+    }
     setError('');
     setLoading(true);
-    const target = authMode === 'email' ? email.trim() : (phone.startsWith('+') ? phone : `+91${phone}`);
-    const { error } = await verifyOtp(target, token, authMode === 'email');
+    const { error } = await verifyOtp(email.trim(), token, true);
     setLoading(false);
-    if (error) { setError(error.message); }
+    if (error) {
+      setError(error.message);
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -177,130 +158,30 @@ export function LoginPage() {
           </p>
         </div>
 
-        {step === 'phone' ? (
+        {step === 'email' ? (
           <>
-            {/* Mode Switcher: Free Email OTP vs Phone SMS */}
-            <div
-              style={{
-                display: 'flex',
-                background: 'rgba(255, 255, 255, 0.04)',
-                borderRadius: 'var(--radius-md)',
-                padding: 4,
-                marginBottom: 20,
-                border: '1px solid var(--glass-border-bright)',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => { setAuthMode('email'); setError(''); setInfoMsg(''); }}
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: authMode === 'email' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-                  border: authMode === 'email' ? '1px solid var(--neon-cyan)' : '1px solid transparent',
-                  color: authMode === 'email' ? '#fff' : 'var(--text-tertiary)',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  transition: 'all 0.18s ease',
-                }}
-              >
-                <Mail size={14} style={{ color: authMode === 'email' ? 'var(--neon-cyan)' : 'inherit' }} /> Email (100% Free)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthMode('phone'); setError(''); setInfoMsg(''); }}
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: authMode === 'phone' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-                  border: authMode === 'phone' ? '1px solid var(--neon-cyan)' : '1px solid transparent',
-                  color: authMode === 'phone' ? '#fff' : 'var(--text-tertiary)',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  transition: 'all 0.18s ease',
-                }}
-              >
-                <Phone size={14} style={{ color: authMode === 'phone' ? 'var(--neon-cyan)' : 'inherit' }} /> Mobile Phone
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 20, lineHeight: 1.5 }}>
-              {authMode === 'email'
-                ? 'Enter your email address to receive a live 6-digit verification code directly in your inbox. No payments or phone carrier fees required.'
-                : 'Enter your mobile number to authenticate. (Use test code 123456 or add your number to Supabase Test Phone Numbers for free).'}
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 22, lineHeight: 1.6 }}>
+              Enter your email address to authenticate. A 100% free one-time verification code will be dispatched to your inbox.
             </p>
 
-            {authMode === 'phone' ? (
-              <div className="form-group" style={{ marginBottom: 20 }}>
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Phone size={14} style={{ color: 'var(--neon-cyan)' }} /> Mobile Phone Number
-                </label>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '0 14px',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid var(--glass-border-bright)',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--neon-cyan)',
-                      fontSize: '0.95rem',
-                      fontWeight: 700,
-                      fontFamily: 'var(--font-mono)',
-                      flexShrink: 0,
-                    }}
-                  >
-                    +91
-                  </div>
-                  <input
-                    type="tel"
-                    placeholder="Enter 10-digit number"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
-                    autoFocus
-                    style={{
-                      flex: 1,
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '1.05rem',
-                      letterSpacing: '0.05em',
-                    }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="form-group" style={{ marginBottom: 20 }}>
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Mail size={14} style={{ color: 'var(--neon-cyan)' }} /> Email Address
-                </label>
-                <input
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '1rem',
-                  }}
-                />
-              </div>
-            )}
+            <div className="form-group" style={{ marginBottom: 20 }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Mail size={14} style={{ color: 'var(--neon-cyan)' }} /> Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
+                autoFocus
+                style={{
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '1rem',
+                }}
+              />
+            </div>
 
             {error && (
               <div style={{ color: 'var(--neon-rose)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'var(--neon-rose-glow)', padding: '6px 10px', borderRadius: 8 }}>
@@ -314,7 +195,7 @@ export function LoginPage() {
               disabled={loading}
               style={{ width: '100%', marginBottom: 16 }}
             >
-              {loading ? <Loader2 size={18} className="spinner" /> : <><Lock size={16} /> Request Secure OTP</>}
+              {loading ? <Loader2 size={18} className="spinner" /> : <><Mail size={16} /> Request Secure OTP</>}
             </button>
 
             <div style={{ position: 'relative', margin: '20px 0', textAlign: 'center' }}>
@@ -345,14 +226,14 @@ export function LoginPage() {
             >
               <Shield size={18} style={{ color: 'var(--neon-emerald)', flexShrink: 0 }} />
               <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
-                End-to-end PBKDF2 encryption. Sessions stay active until explicit logout.
+                100% Free Supabase authentication. End-to-end encryption with zero telecom fees.
               </span>
             </div>
           </>
         ) : (
           <>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 20 }}>
-              Enter the 6-digit verification code sent to <strong style={{ color: 'var(--neon-cyan)' }}>{authMode === 'email' ? email : `+91 ${phone}`}</strong>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 16 }}>
+              Enter the 6-digit verification code sent to <strong style={{ color: 'var(--neon-cyan)' }}>{email}</strong>
             </p>
 
             {infoMsg && (
@@ -364,7 +245,7 @@ export function LoginPage() {
                   padding: '8px 12px',
                   fontSize: '0.8rem',
                   color: 'var(--neon-cyan)',
-                  marginBottom: 16,
+                  marginBottom: 14,
                   textAlign: 'center',
                 }}
               >
@@ -372,23 +253,21 @@ export function LoginPage() {
               </div>
             )}
 
-            {authMode === 'email' && (
-              <div
-                style={{
-                  background: 'rgba(99, 102, 241, 0.1)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '10px 14px',
-                  marginBottom: 18,
-                  fontSize: '0.8rem',
-                  lineHeight: 1.5,
-                  color: '#e2e8f0',
-                  textAlign: 'center',
-                }}
-              >
-                💡 <strong>Instant 1-Click Login</strong>: You can click the <strong>[Sign in]</strong> link inside your email, or type/paste the code below.
-              </div>
-            )}
+            <div
+              style={{
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                padding: '10px 14px',
+                marginBottom: 18,
+                fontSize: '0.8rem',
+                lineHeight: 1.5,
+                color: '#e2e8f0',
+                textAlign: 'center',
+              }}
+            >
+              💡 <strong>1-Click Instant Login</strong>: You can also click the <strong>[Sign in]</strong> link inside your email to log in automatically.
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 22 }}>
               {otp.map((digit, i) => (
@@ -435,10 +314,10 @@ export function LoginPage() {
 
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => { setStep('phone'); setOtp(['','','','','','']); setError(''); setInfoMsg(''); }}
+              onClick={() => { setStep('email'); setOtp(['','','','','','']); setError(''); setInfoMsg(''); }}
               style={{ width: '100%' }}
             >
-              ← Edit {authMode === 'email' ? 'Email Address' : 'Phone Number'}
+              ← Change Email Address
             </button>
           </>
         )}
