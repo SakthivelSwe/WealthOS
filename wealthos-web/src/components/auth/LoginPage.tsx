@@ -5,7 +5,7 @@ import { Phone, Mail, Shield, ArrowRight, Loader2, Sparkles, Lock, KeyRound } fr
 export function LoginPage() {
   const { signInWithOtp, verifyOtp, loginAsDemo } = useAuth();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [authMode, setAuthMode] = useState<'phone' | 'email'>('phone');
+  const [authMode, setAuthMode] = useState<'phone' | 'email'>('email');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -169,7 +169,7 @@ export function LoginPage() {
 
         {step === 'phone' ? (
           <>
-            {/* Mode Switcher: Phone SMS vs Free Email OTP */}
+            {/* Mode Switcher: Free Email OTP vs Phone SMS */}
             <div
               style={{
                 display: 'flex',
@@ -180,28 +180,6 @@ export function LoginPage() {
                 border: '1px solid var(--glass-border-bright)',
               }}
             >
-              <button
-                type="button"
-                onClick={() => { setAuthMode('phone'); setError(''); setInfoMsg(''); }}
-                style={{
-                  flex: 1,
-                  padding: '9px 12px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: authMode === 'phone' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
-                  border: authMode === 'phone' ? '1px solid var(--neon-cyan)' : '1px solid transparent',
-                  color: authMode === 'phone' ? '#fff' : 'var(--text-tertiary)',
-                  fontWeight: 700,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  transition: 'all 0.18s ease',
-                }}
-              >
-                <Phone size={14} style={{ color: authMode === 'phone' ? 'var(--neon-cyan)' : 'inherit' }} /> Mobile SMS
-              </button>
               <button
                 type="button"
                 onClick={() => { setAuthMode('email'); setError(''); setInfoMsg(''); }}
@@ -222,14 +200,36 @@ export function LoginPage() {
                   transition: 'all 0.18s ease',
                 }}
               >
-                <Mail size={14} style={{ color: authMode === 'email' ? 'var(--neon-cyan)' : 'inherit' }} /> Email (Free Live OTP)
+                <Mail size={14} style={{ color: authMode === 'email' ? 'var(--neon-cyan)' : 'inherit' }} /> Email (100% Free)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('phone'); setError(''); setInfoMsg(''); }}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: authMode === 'phone' ? 'rgba(6, 182, 212, 0.15)' : 'transparent',
+                  border: authMode === 'phone' ? '1px solid var(--neon-cyan)' : '1px solid transparent',
+                  color: authMode === 'phone' ? '#fff' : 'var(--text-tertiary)',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  transition: 'all 0.18s ease',
+                }}
+              >
+                <Phone size={14} style={{ color: authMode === 'phone' ? 'var(--neon-cyan)' : 'inherit' }} /> Mobile Phone
               </button>
             </div>
 
             <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 20, lineHeight: 1.5 }}>
               {authMode === 'email'
-                ? 'Enter your email address to receive a live 6-digit verification code directly in your inbox.'
-                : 'Enter your mobile number to authenticate. (Requires Twilio/SMS configured in Supabase).'}
+                ? 'Enter your email address to receive a live 6-digit verification code directly in your inbox. No payments or phone carrier fees required.'
+                : 'Enter your mobile number to authenticate. (Use test code 123456 or add your number to Supabase Test Phone Numbers for free).'}
             </p>
 
             {authMode === 'phone' ? (
