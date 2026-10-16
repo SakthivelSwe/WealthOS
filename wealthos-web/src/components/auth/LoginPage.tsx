@@ -67,12 +67,22 @@ export function LoginPage() {
   };
 
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) value = value.slice(-1);
+    const digits = value.replace(/\D/g, '');
+    if (digits.length > 1) {
+      const newOtp = [...otp];
+      for (let i = 0; i < otp.length && i < digits.length; i++) {
+        newOtp[i] = digits[i];
+      }
+      setOtp(newOtp);
+      const nextFocus = Math.min(digits.length, otp.length - 1);
+      otpRefs.current[nextFocus]?.focus();
+      return;
+    }
     if (value && !/^\d$/.test(value)) return;
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    if (value && index < 5) otpRefs.current[index + 1]?.focus();
+    if (value && index < otp.length - 1) otpRefs.current[index + 1]?.focus();
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
@@ -354,11 +364,29 @@ export function LoginPage() {
                   padding: '8px 12px',
                   fontSize: '0.8rem',
                   color: 'var(--neon-cyan)',
-                  marginBottom: 18,
+                  marginBottom: 16,
                   textAlign: 'center',
                 }}
               >
                 ℹ️ {infoMsg}
+              </div>
+            )}
+
+            {authMode === 'email' && (
+              <div
+                style={{
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '10px 14px',
+                  marginBottom: 18,
+                  fontSize: '0.8rem',
+                  lineHeight: 1.5,
+                  color: '#e2e8f0',
+                  textAlign: 'center',
+                }}
+              >
+                💡 <strong>Instant 1-Click Login</strong>: You can click the <strong>[Sign in]</strong> link inside your email, or type/paste the code below.
               </div>
             )}
 

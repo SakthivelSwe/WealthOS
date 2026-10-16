@@ -67,7 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithOtp = useCallback(async (target: string, isEmail: boolean = false) => {
     try {
-      const payload: any = isEmail ? { email: target } : { phone: target };
+      const payload: any = isEmail
+        ? {
+            email: target,
+            options: {
+              emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : 'https://wealthos-dw9.pages.dev/login',
+            },
+          }
+        : { phone: target };
       const { error } = await supabase.auth.signInWithOtp(payload);
       if (error) {
         if (!isEmail) {
