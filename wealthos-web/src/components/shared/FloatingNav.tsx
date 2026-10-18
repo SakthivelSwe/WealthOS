@@ -173,7 +173,7 @@ export function FloatingNav({ onOpenCommand, onOpenNewTxn }: FloatingNavProps) {
                     className="dropdown-item danger"
                     onClick={() => {
                       setProfileOpen(false);
-                      if (confirm('Sign out of WealthOS?')) signOut();
+                      signOut();
                     }}
                   >
                     <LogOut size={14} />

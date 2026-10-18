@@ -441,9 +441,17 @@ export function LedgerPage() {
 
         {grouped.length === 0 && (
           <div className="cyber-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
-            <Clock size={32} style={{ margin: '0 auto 12px auto', opacity: 0.5 }} />
-            <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.1rem', fontWeight: 700 }}>No Transactions Found</div>
-            <p style={{ fontSize: '0.82rem', marginTop: 4 }}>Adjust your search filter or record a new transaction.</p>
+            <Clock size={36} style={{ margin: '0 auto 12px auto', color: 'var(--neon-cyan)', opacity: 0.7 }} />
+            <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>No Transactions Found</div>
+            <p style={{ fontSize: '0.85rem', marginTop: 4, maxWidth: 400, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20 }}>
+              Your ledger starts fresh today. Record an expense, income, or transfer to track your cashflow.
+            </p>
+            <button
+              className="btn btn-primary btn-md"
+              onClick={() => { setEditTxn(undefined); setShowModal(true); }}
+            >
+              <Plus size={16} /> Record First Entry
+            </button>
           </div>
         )}
       </div>

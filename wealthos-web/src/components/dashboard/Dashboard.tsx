@@ -138,6 +138,56 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* First-Time User Onboarding Hero */}
+      {accounts.length === 0 && (
+        <div
+          className="animate-pop"
+          style={{
+            background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.14) 0%, rgba(99, 102, 241, 0.14) 100%)',
+            border: '1px solid rgba(6, 182, 212, 0.4)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '24px 28px',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: '0 20px 45px -15px rgba(0, 0, 0, 0.6), 0 0 25px rgba(6, 182, 212, 0.15)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
+            <div style={{ maxWidth: 620 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span className="badge badge-cyan" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                  ✨ YOUR SOVEREIGN VAULT STARTS TODAY
+                </span>
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.45rem', fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                Welcome to WealthOS, {userName}!
+              </h2>
+              <p style={{ color: '#cbd5e1', fontSize: '0.88rem', lineHeight: 1.6, margin: 0 }}>
+                Your private financial vault is completely fresh and clean starting today. Add your primary bank account, credit card, or cash wallet to begin tracking your liquid assets and monthly flow.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={() => navigate('/vaults')}
+                style={{ boxShadow: '0 0 20px var(--neon-cyan-glow)' }}
+              >
+                <Plus size={18} /> Add Your First Vault Account
+              </button>
+              {onOpenNewTxn && (
+                <button
+                  className="btn btn-secondary btn-lg"
+                  onClick={onOpenNewTxn}
+                >
+                  <Zap size={16} /> Quick Entry
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ========================================================
           HERO ROW: 3D HOLOGRAPHIC CARD + SPATIAL TELEMETRY
           ======================================================== */}
@@ -406,86 +456,109 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {recentTxns.map((txn) => {
-            const isExpense = txn.type === 'EXPENSE';
-            const isIncome = txn.type === 'INCOME';
-            const sign = isExpense ? '-' : isIncome ? '+' : '';
-            const color = isExpense ? 'var(--neon-rose)' : isIncome ? 'var(--neon-emerald)' : 'var(--neon-cyan)';
+          {recentTxns.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '36px 16px',
+                background: 'rgba(255, 255, 255, 0.01)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px dashed var(--glass-border)',
+              }}
+            >
+              <Clock size={28} style={{ color: 'var(--neon-cyan)', opacity: 0.7, marginBottom: 8 }} />
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f1f5f9' }}>No Recent Transactions</div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', margin: '4px 0 16px 0', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
+                Your financial ledger starts fresh today. Entries you record or sync from your Android device will show up here in realtime.
+              </p>
+              {onOpenNewTxn && (
+                <button className="btn btn-secondary btn-sm" onClick={onOpenNewTxn}>
+                  <Plus size={14} /> Record First Entry
+                </button>
+              )}
+            </div>
+          ) : (
+            recentTxns.map((txn) => {
+              const isExpense = txn.type === 'EXPENSE';
+              const isIncome = txn.type === 'INCOME';
+              const sign = isExpense ? '-' : isIncome ? '+' : '';
+              const color = isExpense ? 'var(--neon-rose)' : isIncome ? 'var(--neon-emerald)' : 'var(--neon-cyan)';
 
-            return (
-              <div
-                key={txn.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid var(--glass-border)',
-                  borderRadius: 'var(--radius-md)',
-                  transition: 'all 0.2s ease',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                  e.currentTarget.style.borderColor = 'var(--glass-border-bright)';
-                  e.currentTarget.style.transform = 'translateX(4px)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
-                  e.currentTarget.style.borderColor = 'var(--glass-border)';
-                  e.currentTarget.style.transform = 'translateX(0)';
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      background: isExpense ? 'var(--neon-rose-glow)' : isIncome ? 'var(--neon-emerald-glow)' : 'var(--neon-cyan-glow)',
-                      color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                    }}
-                  >
-                    {isExpense ? <ArrowUpRight size={18} /> : isIncome ? <ArrowDownRight size={18} /> : <CreditCard size={18} />}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
-                      {txn.merchant || txn.description || 'Transaction'}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>{txn.local_date}</span>
-                      <span>•</span>
-                      <span>{accounts.find(a => a.id === txn.account_id)?.name || 'Account'}</span>
-                      {txn.category_id && <span>• {getCategoryDisplayName(txn.category_id, categories)}</span>}
-                      {txn.need_want && (
-                        <>
-                          <span>•</span>
-                          <span className={`badge ${txn.need_want === 'NEED' ? 'badge-cyan' : txn.need_want === 'WANT' ? 'badge-purple' : 'badge-green'}`}>
-                            {txn.need_want}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
+              return (
                 <div
+                  key={txn.id}
                   style={{
-                    fontFamily: 'var(--font-outfit)',
-                    fontWeight: 800,
-                    fontSize: '1.1rem',
-                    color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: 'var(--radius-md)',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'var(--glass-border-bright)';
+                    e.currentTarget.style.transform = 'translateX(4px)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)';
+                    e.currentTarget.style.borderColor = 'var(--glass-border)';
+                    e.currentTarget.style.transform = 'translateX(0)';
                   }}
                 >
-                  {sign}{formatMoney(txn.amount_minor, currency, masked)}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        background: isExpense ? 'var(--neon-rose-glow)' : isIncome ? 'var(--neon-emerald-glow)' : 'var(--neon-cyan-glow)',
+                        color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                      }}
+                    >
+                      {isExpense ? <ArrowUpRight size={18} /> : isIncome ? <ArrowDownRight size={18} /> : <CreditCard size={18} />}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                        {txn.merchant || txn.description || 'Transaction'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{txn.local_date}</span>
+                        <span>•</span>
+                        <span>{accounts.find(a => a.id === txn.account_id)?.name || 'Account'}</span>
+                        {txn.category_id && <span>• {getCategoryDisplayName(txn.category_id, categories)}</span>}
+                        {txn.need_want && (
+                          <>
+                            <span>•</span>
+                            <span className={`badge ${txn.need_want === 'NEED' ? 'badge-cyan' : txn.need_want === 'WANT' ? 'badge-purple' : 'badge-green'}`}>
+                              {txn.need_want}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-outfit)',
+                      fontWeight: 800,
+                      fontSize: '1.1rem',
+                      color,
+                    }}
+                  >
+                    {sign}{formatMoney(txn.amount_minor, currency, masked)}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </div>

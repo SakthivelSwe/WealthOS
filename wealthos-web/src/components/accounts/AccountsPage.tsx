@@ -163,7 +163,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
 }
 
 export function AccountsPage() {
-  const { accounts, journalEntries, transactions, deleteAccount, settings } = useData();
+  const { accounts, journalEntries, transactions, addAccount, deleteAccount, settings } = useData();
   const [showModal, setShowModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | undefined>();
   const currency = settings?.currency || 'INR';
@@ -277,7 +277,85 @@ export function AccountsPage() {
       </div>
 
       {/* Account Groups */}
-      {Object.entries(groupedByType).map(([type, accs]) => (
+      {computedAccounts.length === 0 ? (
+        <div
+          className="cyber-card"
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            background: 'rgba(255, 255, 255, 0.02)',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px dashed var(--glass-border-bright)',
+          }}
+        >
+          <Building2 size={44} style={{ color: 'var(--neon-cyan)', marginBottom: 16, opacity: 0.8 }} />
+          <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginBottom: 8 }}>
+            No Vault Accounts Added Yet
+          </h2>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '0.88rem', maxWidth: 480, margin: '0 auto 24px auto', lineHeight: 1.6 }}>
+            Your ledger starts fresh today. Connect your first primary bank account, credit card, cash wallet, or savings account to start monitoring balances.
+          </p>
+
+          <button
+            className="btn btn-primary btn-lg"
+            onClick={() => { setEditAccount(undefined); setShowModal(true); }}
+            style={{ marginBottom: 28 }}
+          >
+            <Plus size={18} /> Add Your First Vault Account
+          </button>
+
+          {/* Quick-add popular Indian banks */}
+          <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'left' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12, textAlign: 'center' }}>
+              Or quick-add with 1 click:
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {POPULAR_BANKS.map(bank => (
+                <button
+                  key={bank.id}
+                  type="button"
+                  onClick={async () => {
+                    const newId = 'acc_' + bank.id + '_' + Date.now();
+                    await addAccount({
+                      id: newId,
+                      name: bank.sampleName,
+                      type: bank.defaultType,
+                      institution: bank.name,
+                      last_four: '0000',
+                      opening_balance_minor: 0,
+                      currency,
+                      include_in_net_worth: true,
+                      include_in_stats: true,
+                      archived: false,
+                      created_at: Date.now(),
+                      updated_at: Date.now(),
+                    });
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-pill)',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    border: `1px solid ${bank.color}55`,
+                    background: bank.badgeBg,
+                    color: bank.color,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
+                >
+                  <Plus size={14} /> {bank.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        Object.entries(groupedByType).map(([type, accs]) => (
         <div key={type}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <span style={{ fontFamily: 'var(--font-outfit)', fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -373,7 +451,7 @@ export function AccountsPage() {
             })}
           </div>
         </div>
-      ))}
+      )))}
 
       {showModal && <AccountModal account={editAccount} onClose={() => setShowModal(false)} />}
     </div>

@@ -6,6 +6,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  isDemo: boolean;
   isDemoFallback: boolean;
   signInWithOtp: (target: string, isEmail?: boolean) => Promise<{ error: Error | null; isDemoFallback?: boolean }>;
   verifyOtp: (target: string, token: string, isEmail?: boolean) => Promise<{ error: Error | null }>;
@@ -23,6 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [demoPendingPhone, setDemoPendingPhone] = useState<string | null>(null);
   const [isDemoFallback, setIsDemoFallback] = useState(false);
+
+  const isDemo = Boolean(
+    session?.user?.id === '00000000-0000-4000-8000-000000000001' ||
+    (typeof window !== 'undefined' && localStorage.getItem(DEMO_SESSION_KEY) && !session?.user?.email)
+  );
 
   useEffect(() => {
     // 1. Check local demo session first
@@ -46,6 +52,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
+          if (session.user?.email) {
+            localStorage.removeItem(DEMO_SESSION_KEY);
+          }
           setSession(session);
         }
         setLoading(false);
@@ -55,7 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         if (session) {
+          if (session.user?.email) {
+            localStorage.removeItem(DEMO_SESSION_KEY);
+          }
           setSession(session);
+        } else if (_event === 'SIGNED_OUT') {
+          setSession(null);
         }
       });
 
@@ -71,12 +85,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? {
             email: target,
             options: {
-              emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/login` : 'https://wealthos-dw9.pages.dev/login',
+              emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : 'https://wealthos-dw9.pages.dev/',
             },
           }
         : { phone: target };
       const { error } = await supabase.auth.signInWithOtp(payload);
       if (error) {
+        const isApiKeyError = error.message?.toLowerCase().includes('api key') ||
+          error.message?.toLowerCase().includes('invalid');
+        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+        if (isEmail && isApiKeyError && isLocalhost) {
+          console.warn('[WealthOS] Localhost testing: Supabase API key not configured, enabling localhost dev email simulation.');
+          setDemoPendingPhone(target);
+          setIsDemoFallback(true);
+          return { error: null, isDemoFallback: true };
+        }
+
         if (!isEmail) {
           // Supabase SMS provider not configured – use dev/demo OTP fallback
           const isProviderError = error.message?.toLowerCase().includes('sms') ||
@@ -120,16 +145,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setDemoPendingPhone(null);
           return { error: null };
         }
-        if (error) {
+        if (error && !isDemoFallback) {
           return { error: new Error(error.message || 'Invalid verification code. Please check and try again.') };
         }
       } catch (err: any) {
-        return { error: new Error('Network error verifying OTP. Please try again.') };
+        if (!isDemoFallback) {
+          return { error: new Error('Network error verifying OTP. Please try again.') };
+        }
       }
     }
 
-    // 2. Dev/demo fallback – only for phone when SMS provider isn't configured in Supabase
-    if (isDemoFallback && !isEmail && demoPendingPhone === target) {
+    // 2. Dev/demo fallback – for phone or localhost dev without Supabase key
+    if (isDemoFallback && demoPendingPhone === target) {
+      if (isEmail) {
+        const rawId = 'usr_' + btoa(target).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+        const emailUser: User = {
+          id: rawId,
+          email: target,
+          app_metadata: { provider: 'email' },
+          user_metadata: { email: target, name: target.split('@')[0] },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as unknown as User;
+
+        const emailSession: Session = {
+          access_token: 'local-dev-token',
+          token_type: 'bearer',
+          expires_in: 31536000,
+          refresh_token: 'local-dev-refresh',
+          user: emailUser,
+        } as unknown as Session;
+
+        localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(emailUser));
+        setSession(emailSession);
+        setDemoPendingPhone(null);
+        setIsDemoFallback(false);
+        return { error: null };
+      }
+
       if (token !== '123456') {
         return { error: new Error('Dev OTP is 123456 (SMS provider not configured in Supabase)') };
       }
@@ -238,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       user: session?.user ?? null,
       loading,
+      isDemo,
       isDemoFallback,
       signInWithOtp,
       verifyOtp,

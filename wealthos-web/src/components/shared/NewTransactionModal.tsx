@@ -196,7 +196,7 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
                           type: bank.defaultType,
                           institution: bank.name,
                           last_four: '4291',
-                          opening_balance_minor: 5000000,
+                          opening_balance_minor: 0,
                           currency,
                           include_in_net_worth: true,
                           include_in_stats: true,

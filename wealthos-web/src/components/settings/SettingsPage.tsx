@@ -430,7 +430,7 @@ export function SettingsPage() {
 
                 <button
                   className="btn btn-danger"
-                  onClick={() => { if (confirm('Disconnect session? Your cloud data remains intact in Supabase.')) signOut(); }}
+                  onClick={() => signOut()}
                   style={{ width: '100%', marginTop: 10 }}
                 >
                   <LogOut size={16} /> Disconnect & Sign Out

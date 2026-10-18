@@ -41,46 +41,107 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | null>(null);
 
-const STORAGE_PREFIX = 'wealthos_cache_';
-
-function getLocal<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function setLocal<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
-  } catch (e) {
-    console.warn('LocalStorage save failed:', e);
-  }
-}
-
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const userId = user?.id || 'demo_user';
+  const { user, isDemo } = useAuth();
+  const userId = user?.id || (isDemo ? 'demo_user' : 'guest_user');
 
-  const [accounts, setAccounts] = useState<Account[]>(() => getLocal('accounts', []));
-  const [transactions, setTransactions] = useState<Transaction[]>(() => getLocal('transactions', []));
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(() => getLocal('journalEntries', []));
-  const [categories, setCategories] = useState<Category[]>(() => getLocal('categories', []));
-  const [goals, setGoals] = useState<Goal[]>(() => getLocal('goals', []));
-  const [debts, setDebts] = useState<Debt[]>(() => getLocal('debts', []));
-  const [chitFunds, setChitFunds] = useState<ChitFund[]>(() => getLocal('chitFunds', []));
-  const [recurringTxns, setRecurringTxns] = useState<RecurringTransaction[]>(() => getLocal('recurringTxns', []));
-  const [budgets, setBudgets] = useState<Budget[]>(() => getLocal('budgets', []));
-  const [settings, setSettings] = useState<UserSettings | null>(() => getLocal('settings', null));
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => getLocal('notifications', []));
+  const getStorageKey = useCallback((key: string) => `wealthos_v2_${userId}_${key}`, [userId]);
+
+  const getLocal = useCallback(<T,>(key: string, fallback: T): T => {
+    try {
+      const raw = localStorage.getItem(getStorageKey(key));
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  }, [getStorageKey]);
+
+  const setLocal = useCallback(<T,>(key: string, value: T) => {
+    try {
+      localStorage.setItem(getStorageKey(key), JSON.stringify(value));
+    } catch (e) {
+      console.warn('LocalStorage save failed:', e);
+    }
+  }, [getStorageKey]);
+
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
+  const [chitFunds, setChitFunds] = useState<ChitFund[]>([]);
+  const [recurringTxns, setRecurringTxns] = useState<RecurringTransaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
 
+    if (isDemo) {
+      // Demo session gets simulated seed data
+      const cachedAccounts = getLocal<Account[]>('accounts', []);
+      if (cachedAccounts.length === 0) {
+        const sample = getSampleSeedData(userId);
+        const defaultCategories = SEED_CATEGORIES.map(c => ({ ...c, user_id: userId }));
+        const defaultSettings: UserSettings = {
+          user_id: userId,
+          currency: 'INR',
+          theme_mode: 'DARK',
+          mask_amounts: false,
+          user_name: 'Demo User',
+          phone_number: '+91 98765 43210',
+          basis_income_minor: 9500000,
+          needs_pct: 50,
+          wants_pct: 30,
+          savings_pct: 20,
+          daily_reminder_enabled: true,
+          daily_reminder_hour: 21,
+          updated_at: Date.now(),
+        };
+
+        setAccounts(sample.accounts);
+        setTransactions(sample.transactions);
+        setJournalEntries(sample.journalEntries);
+        setGoals(sample.goals);
+        setDebts(sample.debts);
+        setChitFunds(sample.chitFunds);
+        setRecurringTxns(sample.recurringTxns);
+        setNotifications(sample.notifications);
+        setCategories(defaultCategories);
+        setSettings(defaultSettings);
+
+        setLocal('accounts', sample.accounts);
+        setLocal('transactions', sample.transactions);
+        setLocal('journalEntries', sample.journalEntries);
+        setLocal('goals', sample.goals);
+        setLocal('debts', sample.debts);
+        setLocal('chitFunds', sample.chitFunds);
+        setLocal('recurringTxns', sample.recurringTxns);
+        setLocal('notifications', sample.notifications);
+        setLocal('categories', defaultCategories);
+        setLocal('settings', defaultSettings);
+      } else {
+        setAccounts(cachedAccounts);
+        setTransactions(getLocal('transactions', []));
+        setJournalEntries(getLocal('journalEntries', []));
+        setGoals(getLocal('goals', []));
+        setDebts(getLocal('debts', []));
+        setChitFunds(getLocal('chitFunds', []));
+        setRecurringTxns(getLocal('recurringTxns', []));
+        setBudgets(getLocal('budgets', []));
+        setCategories(getLocal('categories', []));
+        setSettings(getLocal('settings', null));
+        setNotifications(getLocal('notifications', []));
+      }
+      setLoading(false);
+      return;
+    }
+
+    // REAL USER PATH: load from cloud, or start completely clean starting today
     let supabaseLoaded = false;
     try {
       const [accts, txns, entries, cats, gls, dts, chts, recs, bdgs, sttgs, notifs] = await Promise.allSettled([
@@ -97,12 +158,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         supabase.from('user_notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
       ]);
 
-      if (accts.status === 'fulfilled' && accts.value.data && accts.value.data.length > 0) {
+      if (accts.status === 'fulfilled' && accts.value.data) {
         setAccounts(accts.value.data);
         setLocal('accounts', accts.value.data);
         supabaseLoaded = true;
       }
-      if (txns.status === 'fulfilled' && txns.value.data && txns.value.data.length > 0) {
+      if (txns.status === 'fulfilled' && txns.value.data) {
         setTransactions(txns.value.data);
         setLocal('transactions', txns.value.data);
         supabaseLoaded = true;
@@ -147,77 +208,79 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.warn('Supabase fetch notice, falling back to local storage:', err);
     }
 
-    // Seed defaults if empty
-    const currentAccounts = getLocal<Account[]>('accounts', []);
-    if (!supabaseLoaded && currentAccounts.length === 0) {
-      const sample = getSampleSeedData(userId);
-      const defaultCategories = SEED_CATEGORIES.map(c => ({ ...c, user_id: userId }));
-      const defaultSettings: UserSettings = {
-        user_id: userId,
-        currency: 'INR',
-        theme_mode: 'DARK',
-        mask_amounts: false,
-        user_name: 'WealthOS User',
-        phone_number: user?.phone || '+91 98765 43210',
-        basis_income_minor: 9500000,
-        needs_pct: 50,
-        wants_pct: 30,
-        savings_pct: 20,
-        daily_reminder_enabled: true,
-        daily_reminder_hour: 21,
-        updated_at: Date.now(),
-      };
+    // Default categories & settings fallback
+    const defaultCategories = SEED_CATEGORIES.map(c => ({ ...c, user_id: userId }));
+    const fallbackName = user?.user_metadata?.name || (user?.email ? user.email.split('@')[0] : 'My Vault');
+    const defaultSettings: UserSettings = {
+      user_id: userId,
+      currency: 'INR',
+      theme_mode: 'DARK',
+      mask_amounts: false,
+      user_name: fallbackName,
+      phone_number: user?.phone || '',
+      basis_income_minor: 0,
+      needs_pct: 50,
+      wants_pct: 30,
+      savings_pct: 20,
+      daily_reminder_enabled: true,
+      daily_reminder_hour: 21,
+      updated_at: Date.now(),
+    };
+    const welcomeNotification: AppNotification = {
+      id: `notif_welcome_${Date.now()}`,
+      user_id: userId,
+      title: 'Welcome to WealthOS',
+      message: 'Your sovereign financial vault is ready starting today. Add your first bank account or vault to get started.',
+      category: 'SYSTEM',
+      action_type: null,
+      payload: null,
+      read: false,
+      created_at: Date.now(),
+    };
 
-      setAccounts(sample.accounts);
-      setTransactions(sample.transactions);
-      setJournalEntries(sample.journalEntries);
-      setGoals(sample.goals);
-      setDebts(sample.debts);
-      setChitFunds(sample.chitFunds);
-      setRecurringTxns(sample.recurringTxns);
-      setNotifications(sample.notifications);
-      setCategories(defaultCategories);
-      setSettings(defaultSettings);
-
-      setLocal('accounts', sample.accounts);
-      setLocal('transactions', sample.transactions);
-      setLocal('journalEntries', sample.journalEntries);
-      setLocal('goals', sample.goals);
-      setLocal('debts', sample.debts);
-      setLocal('chitFunds', sample.chitFunds);
-      setLocal('recurringTxns', sample.recurringTxns);
-      setLocal('notifications', sample.notifications);
-      setLocal('categories', defaultCategories);
-      setLocal('settings', defaultSettings);
-    } else if (!supabaseLoaded && currentAccounts.length > 0) {
-      // Ensure Axis Bank is available in existing session cache
-      const hasAxis = currentAccounts.some(a =>
-        a.name.toLowerCase().includes('axis') || (a.institution && a.institution.toLowerCase().includes('axis'))
-      );
-      if (!hasAxis) {
-        const axisAccount: Account = {
-          id: 'acc_axis_salary',
-          user_id: userId,
-          name: 'Axis Bank Priority Account',
-          type: 'BANK',
-          institution: 'Axis Bank',
-          last_four: '6512',
-          opening_balance_minor: 18500000,
-          currency: 'INR',
-          include_in_net_worth: true,
-          include_in_stats: true,
-          archived: false,
-          created_at: Date.now() - 95 * 86400000,
-          updated_at: Date.now(),
-        };
-        const updated = [axisAccount, ...currentAccounts];
-        setAccounts(updated);
-        setLocal('accounts', updated);
-      }
+    if (!supabaseLoaded) {
+      // Offline fallback: load from user-scoped local storage
+      const cachedAccounts = getLocal<Account[]>('accounts', []);
+      setAccounts(cachedAccounts);
+      setTransactions(getLocal('transactions', []));
+      setJournalEntries(getLocal('journalEntries', []));
+      setGoals(getLocal('goals', []));
+      setDebts(getLocal('debts', []));
+      setChitFunds(getLocal('chitFunds', []));
+      setRecurringTxns(getLocal('recurringTxns', []));
+      setBudgets(getLocal('budgets', []));
+      setCategories(getLocal('categories', defaultCategories));
+      setSettings(getLocal('settings', defaultSettings));
+      setNotifications(getLocal('notifications', [welcomeNotification]));
+    } else {
+      // Supabase is active: Ensure default categories, settings, and welcome notification if new
+      setCategories(prev => {
+        if (prev.length === 0) {
+          setLocal('categories', defaultCategories);
+          supabase.from('user_categories').upsert(defaultCategories).then(() => {}, () => {});
+          return defaultCategories;
+        }
+        return prev;
+      });
+      setSettings(prev => {
+        if (!prev) {
+          setLocal('settings', defaultSettings);
+          supabase.from('user_settings').upsert(defaultSettings).then(() => {}, () => {});
+          return defaultSettings;
+        }
+        return prev;
+      });
+      setNotifications(prev => {
+        if (prev.length === 0) {
+          setLocal('notifications', [welcomeNotification]);
+          return [welcomeNotification];
+        }
+        return prev;
+      });
     }
 
     setLoading(false);
-  }, [userId, user?.phone]);
+  }, [userId, isDemo, user, getLocal, setLocal]);
 
   // Subscribe to real-time changes
   useEffect(() => {
