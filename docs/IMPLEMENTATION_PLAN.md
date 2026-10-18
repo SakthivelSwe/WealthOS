@@ -43,10 +43,11 @@
 
 ---
 
-### Phase P2: Valuable Product Enhancements (NEXT STAGE)
-- [ ] **P2-1: Web Client Encrypted Backup (.wosenc) Export & Import**
-  - Port PBKDF2 + AES-GCM-128 cryptographic envelope decryption to WebAssembly / Web Crypto API to enable full client-side encrypted backup portability between Android and Web.
-  - Dependencies: Web Crypto API (`SubtleCrypto`).
+### Phase P2: Valuable Product Enhancements (ACTIVE STAGE)
+- [x] **P2-1: Web Client Encrypted Backup (.wosenc) Export & Import** (COMPLETED)
+  - Implemented PBKDF2 + AES-GCM-128 cryptographic envelope in Web Crypto API with SHA-256 integrity verification.
+  - Enabled seamless bi-directional .wosenc vault portability between Android and Web.
+  - Files: `wealthos-web/src/lib/backupCrypto.ts`, `SettingsPage.tsx`.
 - [ ] **P2-2: Custom SMTP Gateway Configuration for Supabase**
   - Configure production transactional email provider (Resend, AWS SES) in Supabase Dashboard to remove the 3-4 OTP emails/hour limit on the free tier.
 - [ ] **P2-3: Chit Fund / ROSCA Dashboard on Web**

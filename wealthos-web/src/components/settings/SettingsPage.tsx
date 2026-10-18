@@ -3,11 +3,12 @@ import { useData } from '../../hooks/useData';
 import { useAuth } from '../../hooks/useAuth';
 import { formatMoney, parseMoney, CURRENCIES, type ThemeMode, type UserSettings } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { User, Shield, Palette, Database, Download, Upload, LogOut, Eye, EyeOff, Phone, Save, Check, RefreshCw, CheckCircle2, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
+import { User, Shield, Palette, Database, Download, Upload, LogOut, Eye, EyeOff, Phone, Save, Check, RefreshCw, CheckCircle2, Sparkles, Trash2, AlertTriangle, Lock } from 'lucide-react';
 import { SUPABASE_URL_VALUE } from '../../lib/supabase';
+import { createEncryptedBackupEnvelope, decryptBackupEnvelope } from '../../lib/backupCrypto';
 
 export function SettingsPage() {
-  const { settings, updateSettings, accounts, transactions, goals, debts, chitFunds, recurringTxns, importAllData, refresh } = useData();
+  const { settings, updateSettings, accounts, categories, transactions, goals, debts, chitFunds, recurringTxns, importAllData, refresh } = useData();
   const { user, signOut, deleteAllUserData } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
   const [saved, setSaved] = useState(false);
@@ -49,6 +50,34 @@ export function SettingsPage() {
     document.documentElement.setAttribute('data-theme', themeMode.toLowerCase());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleExportEncryptedBackup = async () => {
+    try {
+      const pin = prompt('Enter a vault passphrase to protect your encrypted .wosenc backup:') ?? '';
+      const payload = {
+        accounts,
+        categories: categories || [],
+        txns: transactions,
+        journal_entries: [],
+        goals,
+        debts,
+        chits: chitFunds,
+        recurring: recurringTxns,
+      };
+      const envelope = await createEncryptedBackupEnvelope(payload, pin);
+      const blob = new Blob([envelope.buffer as ArrayBuffer], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `wealthos-backup-${new Date().toISOString().slice(0, 10)}.wosenc`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setImportStatus('Encrypted .wosenc vault exported successfully!');
+      setTimeout(() => setImportStatus(null), 4000);
+    } catch (err: any) {
+      setImportStatus('Backup creation failed: ' + err.message);
+    }
   };
 
   const handleExportJSON = () => {
@@ -94,13 +123,22 @@ export function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
+      let parsed: any;
+      if (file.name.endsWith('.wosenc')) {
+        const buffer = await file.arrayBuffer();
+        const pin = prompt('Enter the vault passphrase for this .wosenc backup:') ?? '';
+        const { metadata, payload } = await decryptBackupEnvelope(new Uint8Array(buffer), pin);
+        parsed = payload;
+        setImportStatus(`Verified encrypted .wosenc backup (${metadata.txnCount} txns, ${metadata.accountCount} accounts). Ingesting...`);
+      } else {
+        const text = await file.text();
+        parsed = JSON.parse(text);
+      }
       const res = await importAllData(parsed);
       if (res.success) {
         setImportStatus(`Successfully ingested ${res.count} records from ${file.name}!`);
       } else {
-        setImportStatus('Invalid JSON format. Please verify file.');
+        setImportStatus('Invalid format. Please verify file.');
       }
     } catch (err: any) {
       setImportStatus('Import failed: ' + err.message);
@@ -389,12 +427,16 @@ export function SettingsPage() {
 
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()} style={{ flex: '1 1 200px' }}>
-                    <Upload size={16} /> Import Mobile / JSON Backup
+                    <Upload size={16} /> Import Backup (.wosenc / JSON)
                   </button>
-                  <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} style={{ display: 'none' }} />
+                  <input ref={fileInputRef} type="file" accept=".wosenc,.json" onChange={handleFileChange} style={{ display: 'none' }} />
+
+                  <button className="btn btn-secondary" onClick={handleExportEncryptedBackup} style={{ flex: '1 1 200px' }}>
+                    <Lock size={16} /> Export Encrypted Vault (.wosenc)
+                  </button>
 
                   <button className="btn btn-secondary" onClick={handleExportJSON} style={{ flex: 1 }}>
-                    <Download size={16} /> Export All (JSON)
+                    <Download size={16} /> Export JSON
                   </button>
                 </div>
 
@@ -410,8 +452,8 @@ export function SettingsPage() {
             <div>
               <div className="cyber-header">
                 <div className="cyber-title-group">
-                  <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
-                    <Phone size={18} />
+                  <div className="cyber-icon-badge" style={{ background: 'var(--semantic-income-bg)', color: 'var(--semantic-income)' }}>
+                    <User size={18} />
                   </div>
                   <div>
                     <div className="cyber-title">Session Lifecycle</div>
@@ -422,9 +464,9 @@ export function SettingsPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Active Mobile Number</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95rem', color: 'var(--neon-cyan)', marginTop: 4 }}>
-                    {user?.phone || 'Guest / Demo Active'}
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Active Account Email</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95rem', color: 'var(--accent-forest)', marginTop: 4 }}>
+                    {user?.email || user?.phone || 'Guest / Demo Active'}
                   </div>
                 </div>
 
