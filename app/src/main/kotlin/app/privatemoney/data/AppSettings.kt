@@ -82,6 +82,10 @@ class AppSettings(context: Context) {
         }
         set(value) = prefs.edit().putString(KEY_SUPABASE_ANON_KEY, value.trim()).apply()
 
+    var supabaseUserId: String?
+        get() = prefs.getString(KEY_SUPABASE_USER_ID, null)
+        set(value) = prefs.edit().putString(KEY_SUPABASE_USER_ID, value?.trim()).apply()
+
     var autoVaultKey: String
         get() {
             val saved = prefs.getString(KEY_AUTO_VAULT_KEY, null)
@@ -159,6 +163,7 @@ class AppSettings(context: Context) {
         private const val KEY_BLOCK_SCREENSHOTS = "block_screenshots"
         private const val KEY_SUPABASE_URL = "supabase_url"
         private const val KEY_SUPABASE_ANON_KEY = "supabase_anon_key"
+        private const val KEY_SUPABASE_USER_ID = "supabase_user_id"
         private const val KEY_AUTO_VAULT_KEY = "auto_vault_key"
         private const val KEY_LAST_BACKUP_TIME = "last_backup_time"
         private const val KEY_LAST_BACKUP_STATUS = "last_backup_status"

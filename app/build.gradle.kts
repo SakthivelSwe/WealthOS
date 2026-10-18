@@ -93,6 +93,7 @@ dependencies {
     implementation(libs.supabase.storage)
     implementation(libs.ktor.client.android)
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     testImplementation(libs.kotlin.test)
 
     androidTestImplementation(libs.androidx.test.ext.junit)

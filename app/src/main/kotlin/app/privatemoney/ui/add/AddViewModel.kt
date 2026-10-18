@@ -166,6 +166,7 @@ class AddViewModel(
                         localDate = dateStr,
                         localTime = timeStr,
                         merchant = s.merchant.trim().ifEmpty { null },
+                        description = s.merchant.trim().ifEmpty { null },
                         notes = s.note.trim().ifEmpty { null },
                         needWant = catNeedWant,
                     ),

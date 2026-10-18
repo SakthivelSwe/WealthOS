@@ -310,8 +310,9 @@ class CloudSyncService(
                     supabaseKey = anonKey,
                 ) { install(Storage) }
 
+                val userId = settings.supabaseUserId?.ifBlank { null } ?: "vault"
                 val fileName = "backup_${metadata.timestamp}.wosenc"
-                val path = "vault/$fileName"
+                val path = "$userId/$fileName"
 
                 supabase.storage.from("backups").upload(
                     path = path,

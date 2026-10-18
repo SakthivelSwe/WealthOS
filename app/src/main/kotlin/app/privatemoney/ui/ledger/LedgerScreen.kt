@@ -258,8 +258,13 @@ fun LedgerRoute(viewModel: LedgerViewModel) {
                 isEditing = isEditing,
                 onStartEdit = { isEditing = true },
                 onCancelEdit = { isEditing = false },
-                onSaveEdit = { newMerchant, newNotes ->
-                    viewModel.update(txn.id, newMerchant, newNotes)
+                onSaveEdit = { newMerchant, newDescription, newNotes ->
+                    viewModel.update(
+                        id = txn.id,
+                        merchant = newMerchant.trim().ifEmpty { null },
+                        description = newDescription.trim().ifEmpty { null },
+                        notes = newNotes.trim().ifEmpty { null },
+                    )
                     Toast.makeText(context, "Transaction updated!", Toast.LENGTH_SHORT).show()
                     isEditing = false
                     selectedTxn = null
@@ -309,11 +314,12 @@ private fun TransactionDetailSheet(
     isEditing: Boolean,
     onStartEdit: () -> Unit,
     onCancelEdit: () -> Unit,
-    onSaveEdit: (String, String) -> Unit,
+    onSaveEdit: (String, String, String) -> Unit,
     onDelete: () -> Unit,
 ) {
     val finance = LocalFinanceColors.current
-    var editMerchant by remember(txn) { mutableStateOf(txn.merchant ?: txn.description ?: "") }
+    var editMerchant by remember(txn) { mutableStateOf(txn.merchant ?: "") }
+    var editDescription by remember(txn) { mutableStateOf(txn.description ?: "") }
     var editNotes by remember(txn) { mutableStateOf(txn.notes ?: "") }
 
     Column(
@@ -366,7 +372,14 @@ private fun TransactionDetailSheet(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    DetailLine("Title / Merchant", txn.merchant ?: txn.description ?: "None")
+                    if (!txn.merchant.isNullOrBlank()) {
+                        DetailLine("Merchant", txn.merchant)
+                    }
+                    if (!txn.description.isNullOrBlank()) {
+                        DetailLine("Description", txn.description)
+                    } else if (txn.merchant.isNullOrBlank()) {
+                        DetailLine("Description", "None")
+                    }
                     DetailLine("Category", txn.categoryName ?: "Uncategorized")
                     DetailLine("Date", dateLabel(txn.date))
                     if (!txn.notes.isNullOrBlank()) {
@@ -407,7 +420,15 @@ private fun TransactionDetailSheet(
             OutlinedTextField(
                 value = editMerchant,
                 onValueChange = { editMerchant = it },
-                label = { Text("Merchant / Description") },
+                label = { Text("Merchant / Payee") },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = editDescription,
+                onValueChange = { editDescription = it },
+                label = { Text("Description / Purpose") },
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -433,7 +454,7 @@ private fun TransactionDetailSheet(
                 }
 
                 Button(
-                    onClick = { onSaveEdit(editMerchant, editNotes) },
+                    onClick = { onSaveEdit(editMerchant, editDescription, editNotes) },
                     modifier = Modifier.weight(1f).height(48.dp),
                     shape = RoundedCornerShape(14.dp),
                 ) {

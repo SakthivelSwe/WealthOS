@@ -220,15 +220,15 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
 };
 
 export const ACCOUNT_TYPE_COLORS: Record<AccountType, string> = {
-  BANK: 'var(--neon-cyan)',
-  CASH: 'var(--neon-emerald)',
-  UPI_WALLET: 'var(--neon-indigo)',
-  SAVINGS: 'var(--neon-cyan)',
-  CREDIT_CARD: 'var(--neon-amber)',
-  INVESTMENT: 'var(--neon-purple)',
-  LOAN: 'var(--neon-rose)',
-  OTHER_ASSET: 'var(--neon-cyan)',
-  OTHER_LIABILITY: 'var(--neon-rose)',
+  BANK: 'var(--accent-blue)',
+  CASH: 'var(--accent-green)',
+  UPI_WALLET: 'var(--accent-purple)',
+  SAVINGS: 'var(--accent-forest)',
+  CREDIT_CARD: 'var(--accent-orange)',
+  INVESTMENT: 'var(--accent-purple)',
+  LOAN: 'var(--accent-red)',
+  OTHER_ASSET: 'var(--accent-blue)',
+  OTHER_LIABILITY: 'var(--accent-red)',
 };
 
 // Popular Indian Bank Institutions with authentic brand accents
@@ -262,7 +262,7 @@ export function getBankColor(institution: string | null | undefined, accountType
     const bank = POPULAR_BANKS.find(b => lower.includes(b.id) || lower.includes(b.code.toLowerCase()) || lower.includes(b.name.toLowerCase()));
     if (bank) return bank.color;
   }
-  return accountType && ACCOUNT_TYPE_COLORS[accountType] ? ACCOUNT_TYPE_COLORS[accountType] : 'var(--neon-cyan)';
+  return accountType && ACCOUNT_TYPE_COLORS[accountType] ? ACCOUNT_TYPE_COLORS[accountType] : 'var(--accent-forest)';
 }
 
 export function formatAccountLabel(acc: Account): string {

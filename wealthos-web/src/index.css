@@ -1,53 +1,77 @@
 /* ============================================================
-   WealthOS Cyber-Luxury Design System 2.0
-   Next-Gen 3D FinTech Experience
+   WealthOS "Quiet Wealth" Editorial Design System
+   Restrained, Editorial, High-Integrity Personal Finance
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Color Canvas — Deep Obsidian Cosmos */
-  --bg-cosmos: #06080e;
-  --bg-primary: #080c16;
-  --bg-secondary: #0d1322;
-  --bg-tertiary: #131c31;
-  --bg-elevated: #1a2540;
+  /* Color Canvas — Deep Graphite & Obsidian (Dark Mode) */
+  --bg-cosmos: #090c10;
+  --bg-primary: #0d1117;
+  --bg-secondary: #131922;
+  --bg-tertiary: #18202c;
+  --bg-elevated: #202b3b;
 
-  /* Glassmorphism 2.0 Layers */
-  --glass-surface: rgba(13, 19, 34, 0.68);
-  --glass-surface-hover: rgba(19, 28, 49, 0.82);
-  --glass-surface-active: rgba(26, 37, 64, 0.9);
+  /* Surfaces & Structural Borders */
+  --surface-base: #131922;
+  --surface-elevated: #18202c;
+  --surface-hover: #202b3b;
+  --surface-active: #28364a;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  /* Quiet Editorial Surfaces (Legacy Glassmorphism Aliases) */
+  --glass-surface: rgba(19, 25, 34, 0.88);
+  --glass-surface-hover: rgba(24, 32, 44, 0.94);
+  --glass-surface-active: rgba(32, 43, 59, 0.98);
   --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-bright: rgba(255, 255, 255, 0.16);
-  --glass-border-glow: rgba(99, 102, 241, 0.35);
+  --glass-border-bright: rgba(255, 255, 255, 0.14);
+  --glass-border-glow: rgba(16, 185, 129, 0.18);
 
-  /* Cyber Neons */
-  --neon-cyan: #06b6d4;
-  --neon-cyan-glow: rgba(6, 182, 212, 0.25);
+  /* "Quiet Wealth" Primary Accent — Deep Forest Emerald */
+  --accent-forest: #10b981;
+  --accent-forest-hover: #059669;
+  --accent-forest-fg: #ffffff;
+  --accent-forest-dim: rgba(16, 185, 129, 0.12);
+
+  /* Semantic UI Tokens — Accessible, Muted, Restrained */
+  --semantic-income: #10b981;
+  --semantic-income-bg: rgba(16, 185, 129, 0.12);
+  --semantic-expense: #f43f5e;
+  --semantic-expense-bg: rgba(244, 63, 94, 0.12);
+  --semantic-warning: #f59e0b;
+  --semantic-warning-bg: rgba(245, 158, 11, 0.12);
+  --semantic-info: #0ea5e9;
+  --semantic-info-bg: rgba(14, 165, 233, 0.12);
+
+  /* Legacy Neon Aliases Mapped to Quiet Restrained Palette */
+  --neon-cyan: #0d9488;
+  --neon-cyan-glow: rgba(13, 148, 136, 0.15);
   --neon-indigo: #6366f1;
-  --neon-indigo-glow: rgba(99, 102, 241, 0.3);
-  --neon-purple: #a855f7;
-  --neon-purple-glow: rgba(168, 85, 247, 0.25);
+  --neon-indigo-glow: rgba(99, 102, 241, 0.15);
+  --neon-purple: #8b5cf6;
+  --neon-purple-glow: rgba(139, 92, 246, 0.15);
   --neon-emerald: #10b981;
-  --neon-emerald-glow: rgba(16, 185, 129, 0.25);
+  --neon-emerald-glow: rgba(16, 185, 129, 0.15);
   --neon-rose: #f43f5e;
-  --neon-rose-glow: rgba(244, 63, 94, 0.25);
+  --neon-rose-glow: rgba(244, 63, 94, 0.15);
   --neon-amber: #f59e0b;
-  --neon-amber-glow: rgba(245, 158, 11, 0.25);
+  --neon-amber-glow: rgba(245, 158, 11, 0.15);
 
-  /* Semantic UI Tokens */
   --accent-blue: var(--neon-cyan);
   --accent-blue-dim: var(--neon-cyan-glow);
-  --accent-green: var(--neon-emerald);
-  --accent-green-dim: var(--neon-emerald-glow);
-  --accent-red: var(--neon-rose);
-  --accent-red-dim: var(--neon-rose-glow);
+  --accent-green: var(--semantic-income);
+  --accent-green-dim: var(--semantic-income-bg);
+  --accent-red: var(--semantic-expense);
+  --accent-red-dim: var(--semantic-expense-bg);
   --accent-purple: var(--neon-purple);
   --accent-purple-dim: var(--neon-purple-glow);
-  --accent-orange: var(--neon-amber);
-  --accent-orange-dim: var(--neon-amber-glow);
+  --accent-orange: var(--semantic-warning);
+  --accent-orange-dim: var(--semantic-warning-bg);
 
-  /* Typography Colors */
+  /* Typography Colors — High Contrast, Natural Legibility */
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-tertiary: #64748b;
@@ -58,48 +82,73 @@
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Volumetric 3D Shadows */
-  --shadow-3d-sm: 0 4px 12px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--glass-border);
-  --shadow-3d-md: 0 12px 28px -4px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--glass-border);
-  --shadow-3d-lg: 0 24px 48px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--glass-border-bright);
-  --shadow-holo: 0 20px 50px -10px rgba(99, 102, 241, 0.25), 0 0 30px rgba(6, 182, 212, 0.15);
+  /* Restrained, Crisp Shadows */
+  --shadow-3d-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35), 0 0 0 1px var(--border-subtle);
+  --shadow-3d-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border-subtle);
+  --shadow-3d-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-default);
+  --shadow-holo: 0 4px 16px -2px rgba(16, 185, 129, 0.15), 0 0 0 1px var(--border-subtle);
 
   /* Radii */
-  --radius-xs: 6px;
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --radius-xl: 32px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-pill: 9999px;
 }
 
-/* Light Theme Mode */
+/* Light Theme Mode — Warm Paper Alabaster & Editorial Balance */
 [data-theme="light"] {
-  --bg-cosmos: #f1f5f9;
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
+  --bg-cosmos: #f8fafc;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
   --bg-tertiary: #e2e8f0;
   --bg-elevated: #cbd5e1;
 
-  --glass-surface: rgba(255, 255, 255, 0.85);
-  --glass-surface-hover: rgba(255, 255, 255, 0.95);
+  --surface-base: #ffffff;
+  --surface-elevated: #f8fafc;
+  --surface-hover: #f1f5f9;
+  --surface-active: #e2e8f0;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  --glass-surface: rgba(255, 255, 255, 0.94);
+  --glass-surface-hover: #ffffff;
   --glass-border: rgba(0, 0, 0, 0.08);
   --glass-border-bright: rgba(0, 0, 0, 0.14);
+
+  --accent-forest: #059669;
+  --accent-forest-hover: #047857;
+  --accent-forest-fg: #ffffff;
+  --accent-forest-dim: rgba(5, 150, 105, 0.1);
+
+  --semantic-income: #059669;
+  --semantic-income-bg: rgba(5, 150, 105, 0.1);
+  --semantic-expense: #e11d48;
+  --semantic-expense-bg: rgba(225, 29, 72, 0.1);
+  --semantic-warning: #d97706;
+  --semantic-warning-bg: rgba(217, 119, 6, 0.1);
 
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-tertiary: #64748b;
   --text-muted: #94a3b8;
+
+  --shadow-3d-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05), 0 0 0 1px var(--border-subtle);
+  --shadow-3d-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border-subtle);
+  --shadow-3d-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--border-default);
+  --shadow-holo: 0 4px 12px -2px rgba(5, 150, 105, 0.12);
 }
 
 /* Midnight OLED Mode */
 [data-theme="midnight"] {
   --bg-cosmos: #000000;
-  --bg-primary: #020204;
-  --bg-secondary: #08080c;
-  --bg-tertiary: #101018;
-  --glass-surface: rgba(8, 8, 12, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.06);
+  --bg-primary: #040608;
+  --bg-secondary: #0a0d12;
+  --bg-tertiary: #10151c;
+  --glass-surface: rgba(10, 13, 18, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.07);
 }
 
 /* ============================================================
@@ -168,16 +217,15 @@ html, body {
   padding: 8px 16px;
   background: var(--glass-surface);
   backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid var(--glass-border-bright);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
-  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.65), 0 0 25px rgba(99, 102, 241, 0.12);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s ease;
 }
 
 .floating-nav-island:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 20px 42px -4px rgba(0, 0, 0, 0.75), 0 0 32px rgba(6, 182, 212, 0.18);
+  border-color: var(--border-strong);
+  box-shadow: 0 14px 36px -4px rgba(0, 0, 0, 0.5);
 }
 
 /* Brand Emblem */
@@ -200,11 +248,12 @@ html, body {
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-indigo) 100%);
+  background: var(--accent-forest);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 18px var(--neon-cyan-glow);
+  box-shadow: 0 2px 8px var(--accent-forest-dim);
 }
 .logo-letter {
   font-family: var(--font-outfit);
@@ -214,13 +263,7 @@ html, body {
   z-index: 2;
 }
 .orb-glow {
-  position: absolute;
-  inset: -4px;
-  border-radius: 14px;
-  background: inherit;
-  filter: blur(8px);
-  opacity: 0.6;
-  z-index: 1;
+  display: none;
 }
 
 .brand-text-container {
@@ -369,26 +412,27 @@ html, body {
   box-shadow: 0 0 10px var(--neon-rose);
 }
 
-/* Add Transaction Button */
+/* Add Transaction Button — Quiet Wealth Restrained Accent */
 .btn-futuristic-add {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-indigo) 100%);
-  border: none;
+  background: var(--accent-forest);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
   font-family: var(--font-outfit);
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 18px var(--neon-cyan-glow), inset 0 1px 1px rgba(255, 255, 255, 0.35);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px var(--accent-forest-dim);
+  transition: all 0.2s ease;
 }
 .btn-futuristic-add:hover {
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  background: var(--accent-forest-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-forest-dim);
 }
 
 /* User Avatar Dropdown */
@@ -690,15 +734,7 @@ html, body {
 }
 
 .cyber-card-glow {
-  position: absolute;
-  top: -80px;
-  right: -80px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.15;
-  pointer-events: none;
+  display: none;
 }
 
 /* Card Header */
@@ -1078,4 +1114,14 @@ select option {
 
 .animate-float {
   animation: float3d 5s ease-in-out infinite;
+}
+
+/* Accessibility & Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

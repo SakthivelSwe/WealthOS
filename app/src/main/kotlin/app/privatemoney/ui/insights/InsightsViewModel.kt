@@ -243,8 +243,8 @@ class InsightsViewModel(
                 else -> 0
             }
 
-            val isOverExpense = (spentThisWeek > spentLastWeek && spentThisWeek > 0) ||
-                (dailyAvg * 7 > spentLastWeek * 1.15 && spentLastWeek > 0)
+            val isOverExpense = (spentLastWeek > 0L && spentThisWeek > spentLastWeek) ||
+                (spentLastWeek > 0L && dailyAvg * 7 > (spentLastWeek * 1.15).toLong())
 
             val trendMap = mutableMapOf<String, InsightMonthTrendUi>()
             spendData.monthlyRows.forEach { row ->
@@ -256,7 +256,11 @@ class InsightsViewModel(
                 }
             }
 
-            val totalSavingsMinor = goals.sumOf { it.currentAmountMinor }
+            // Planned monthly savings contribution aligns with monthly cash flow breakdown,
+            // avoiding distortion from lifetime accumulated savings balances.
+            val totalSavingsMinor = goals
+                .filter { it.currentAmountMinor < it.targetAmountMinor }
+                .sumOf { minOf(it.targetAmountMinor - it.currentAmountMinor, it.plannedMonthlyContributionMinor) }
             val totalEmisMinor = debts.sumOf { it.expectedMonthlyPaymentMinor }
 
             InsightsUiState(

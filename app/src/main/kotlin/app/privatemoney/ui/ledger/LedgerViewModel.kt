@@ -70,7 +70,7 @@ class LedgerViewModel(
         viewModelScope.launch { ledger.delete(id) }
     }
 
-    fun update(id: String, merchant: String?, notes: String?) {
-        viewModelScope.launch { ledger.updateDetails(id, merchant, merchant, notes) }
+    fun update(id: String, merchant: String?, description: String?, notes: String?) {
+        viewModelScope.launch { ledger.updateDetails(id, merchant, description, notes) }
     }
 }

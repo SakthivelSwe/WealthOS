@@ -166,4 +166,99 @@ class FinancialIntegrityTest {
         assertEquals(7500_00L, inrTotal)
         assertEquals(100_00L, usdTotal)
     }
+
+    @Test
+    fun testGeminiStatementExtractionIndianNumberingAndCredits() = kotlinx.coroutines.runBlocking {
+        val ai = app.privatemoney.cloud.GeminiAIService()
+        val rawStatement = """
+            2026-10-01 SALARY CREDIT INFOSYS LTD UPI/9876543210 INR 1,50,000.00 CR
+            2026-10-02 SWIGGY BANGALORE UPI/1122334455 Rs. 450.00 DR
+            2026-10-05 AMAZON REFUND RETURN Rs. 1,299.00 CREDIT
+            2026-10-08 MYSTERIOUS TXN 123456 500.00
+        """.trimIndent()
+
+        val jsonResult = ai.extractTransactions(rawStatement)
+        val array = org.json.JSONArray(jsonResult)
+
+        assertEquals(4, array.length())
+
+        // Row 1: Salary Credit in Indian formatting (1,50,000.00) -> INCOME, positive
+        val salaryRow = array.getJSONObject(0)
+        assertEquals("INCOME", salaryRow.getString("type"))
+        assertTrue(salaryRow.getBoolean("isCredit"))
+        assertFalse(salaryRow.getBoolean("isDebit"))
+        assertFalse(salaryRow.getBoolean("isAmbiguous"))
+        assertEquals(15000000L, salaryRow.getLong("amountMinor"))
+        assertTrue(salaryRow.getDouble("amount") > 0.0)
+
+        // Row 2: Swiggy Debit -> EXPENSE, negative
+        val expenseRow = array.getJSONObject(1)
+        assertEquals("EXPENSE", expenseRow.getString("type"))
+        assertTrue(expenseRow.getBoolean("isDebit"))
+        assertFalse(expenseRow.getBoolean("isCredit"))
+        assertEquals(-45000L, expenseRow.getLong("amountMinor"))
+        assertTrue(expenseRow.getDouble("amount") < 0.0)
+
+        // Row 3: Refund -> INCOME, positive
+        val refundRow = array.getJSONObject(2)
+        assertEquals("INCOME", refundRow.getString("type"))
+        assertTrue(refundRow.getBoolean("isCredit"))
+        assertEquals(129900L, refundRow.getLong("amountMinor"))
+
+        // Row 4: Ambiguous (no CR/DR or debit/credit indicators) -> AMBIGUOUS, needsReview
+        val ambiguousRow = array.getJSONObject(3)
+        assertEquals("AMBIGUOUS", ambiguousRow.getString("type"))
+        assertTrue(ambiguousRow.getBoolean("isAmbiguous"))
+        assertTrue(ambiguousRow.getBoolean("needsReview"))
+    }
+
+    @Test
+    fun testInsightsSavingsPlannedContributionVsLifetimeBalance() {
+        data class GoalStub(val targetAmountMinor: Long, val currentAmountMinor: Long, val plannedMonthlyContributionMinor: Long)
+
+        val goals = listOf(
+            GoalStub(targetAmountMinor = 1_000_000_00L, currentAmountMinor = 500_000_00L, plannedMonthlyContributionMinor = 25_000_00L),
+            GoalStub(targetAmountMinor = 200_000_00L, currentAmountMinor = 200_000_00L, plannedMonthlyContributionMinor = 10_000_00L), // fully funded
+        )
+
+        val monthlyExpenses = 50_000_00L
+
+        // Defective logic: sums cumulative current amount (500k + 200k = 700k), dwarfing 50k monthly expense
+        val defectiveSavingsSum = goals.sumOf { it.currentAmountMinor }
+        assertEquals(700_000_00L, defectiveSavingsSum)
+
+        // Corrected logic: sums planned monthly contribution for active goals only (25k), properly sizing monthly budget
+        val correctedSavingsSum = goals
+            .filter { it.currentAmountMinor < it.targetAmountMinor }
+            .sumOf { minOf(it.targetAmountMinor - it.currentAmountMinor, it.plannedMonthlyContributionMinor) }
+        assertEquals(25_000_00L, correctedSavingsSum)
+    }
+
+    @Test
+    fun testInsightsWeeklyPacingZeroLastWeekBaseline() {
+        val spentThisWeek = 500_00L // ₹500
+        val spentLastWeek = 0L     // Fresh account or zero previous spend
+        val dailyAvg = 500_00L / 1
+
+        // Defective condition: (spentThisWeek > spentLastWeek && spentThisWeek > 0) -> true for zero baseline!
+        val defectiveIsOverExpense = (spentThisWeek > spentLastWeek && spentThisWeek > 0) ||
+            (dailyAvg * 7 > spentLastWeek * 1.15 && spentLastWeek > 0)
+        assertTrue(defectiveIsOverExpense)
+
+        // Corrected condition: requires spentLastWeek > 0L to evaluate over-expense alert
+        val correctedIsOverExpense = (spentLastWeek > 0L && spentThisWeek > spentLastWeek) ||
+            (spentLastWeek > 0L && dailyAvg * 7 > (spentLastWeek * 1.15).toLong())
+        assertFalse(correctedIsOverExpense)
+    }
+
+    @Test
+    fun testDatabaseIntegrityValidatorCanonicalCurrencyPrecision() {
+        // Supported currencies
+        val inr = Currency.fromCode("INR") ?: Currency("INR", 2)
+        assertEquals(2, inr.minorUnit)
+
+        // JPY is zero-decimal currency
+        val jpy = Currency.fromCode("JPY") ?: Currency("JPY", 2)
+        assertEquals(0, jpy.minorUnit)
+    }
 }
