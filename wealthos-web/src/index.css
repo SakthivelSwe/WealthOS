@@ -896,14 +896,14 @@ html, body {
 }
 
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-default);
   color: var(--text-secondary);
 }
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--surface-hover);
   color: var(--text-primary);
-  border-color: var(--glass-border-bright);
+  border-color: var(--border-strong);
 }
 
 .btn-danger {

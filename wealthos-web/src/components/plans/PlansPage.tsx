@@ -435,121 +435,173 @@ export function PlansPage() {
 
       {/* Goals Tab */}
       {activeTab === 'goals' && (
-        <div className="responsive-grid-cards">
-          {goals.map(goal => {
-            const pct = goal.target_amount_minor > 0 ? Math.min((goal.current_amount_minor / goal.target_amount_minor) * 100, 100) : 0;
-            const remaining = goal.target_amount_minor - goal.current_amount_minor;
+        goals.length > 0 ? (
+          <div className="responsive-grid-cards">
+            {goals.map(goal => {
+              const pct = goal.target_amount_minor > 0 ? Math.min((goal.current_amount_minor / goal.target_amount_minor) * 100, 100) : 0;
+              const remaining = goal.target_amount_minor - goal.current_amount_minor;
 
-            return (
-              <Tilt3DCard key={goal.id}>
-                <div className="cyber-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                      <span className="badge badge-cyan">GOAL</span>
-                      <span style={{ fontFamily: 'var(--font-outfit)', fontWeight: 800, fontSize: '1.2rem', color: pct >= 100 ? 'var(--neon-emerald)' : 'var(--neon-cyan)' }}>
-                        {pct.toFixed(0)}%
-                      </span>
+              return (
+                <Tilt3DCard key={goal.id}>
+                  <div className="cyber-card" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                        <span className="badge badge-cyan">GOAL</span>
+                        <span style={{ fontFamily: 'var(--font-outfit)', fontWeight: 800, fontSize: '1.2rem', color: pct >= 100 ? 'var(--neon-emerald)' : 'var(--neon-cyan)' }}>
+                          {pct.toFixed(0)}%
+                        </span>
+                      </div>
+
+                      <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {goal.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>Target Date: {goal.target_date}</div>
+
+                      <div className="cyber-progress-track" style={{ height: 10, margin: '16px 0 10px 0' }}>
+                        <div className="cyber-progress-fill" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--neon-cyan), var(--neon-emerald))' }} />
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        <span style={{ fontWeight: 700, color: '#f8fafc' }}>{formatMoney(goal.current_amount_minor, currency, masked)}</span>
+                        <span>of {formatMoney(goal.target_amount_minor, currency, masked)}</span>
+                      </div>
                     </div>
 
-                    <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      {goal.name}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>Target Date: {goal.target_date}</div>
-
-                    <div className="cyber-progress-track" style={{ height: 10, margin: '16px 0 10px 0' }}>
-                      <div className="cyber-progress-fill" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--neon-cyan), var(--neon-emerald))' }} />
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                      <span style={{ fontWeight: 700, color: '#f8fafc' }}>{formatMoney(goal.current_amount_minor, currency, masked)}</span>
-                      <span>of {formatMoney(goal.target_amount_minor, currency, masked)}</span>
+                    <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--glass-border)', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+                      Remaining: <span style={{ color: 'var(--neon-cyan)', fontWeight: 600 }}>{formatMoney(Math.max(0, remaining), currency, masked)}</span>
                     </div>
                   </div>
-
-                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--glass-border)', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-                    Remaining: <span style={{ color: 'var(--neon-cyan)', fontWeight: 600 }}>{formatMoney(Math.max(0, remaining), currency, masked)}</span>
-                  </div>
-                </div>
-              </Tilt3DCard>
-            );
-          })}
-        </div>
+                </Tilt3DCard>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="cyber-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
+            <Target size={36} style={{ margin: '0 auto 12px auto', color: 'var(--neon-cyan)', opacity: 0.8 }} />
+            <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>No Financial Goals Set Yet</div>
+            <p style={{ fontSize: '0.85rem', marginTop: 4, maxWidth: 440, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20 }}>
+              Set milestone targets for emergency reserves, major acquisitions, travel, or retirement horizons to track your progress automatically.
+            </p>
+            <button className="btn btn-primary btn-md" onClick={() => setShowGoalModal(true)}>
+              <Plus size={16} /> Create Your First Goal
+            </button>
+          </div>
+        )
       )}
 
       {/* Debts Tab */}
       {activeTab === 'debts' && (
-        <div className="responsive-grid-cards">
-          {debts.map(debt => (
-            <Tilt3DCard key={debt.id}>
-              <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-rose)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <span className="badge badge-rose">LOAN / DEBT</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--neon-amber)' }}>{debt.annual_percent}% p.a.</span>
-                </div>
+        debts.length > 0 ? (
+          <div className="responsive-grid-cards">
+            {debts.map(debt => (
+              <Tilt3DCard key={debt.id}>
+                <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-rose)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span className="badge badge-rose">LOAN / DEBT</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--neon-amber)' }}>{debt.annual_percent}% p.a.</span>
+                  </div>
 
-                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.15rem', fontWeight: 800 }}>{debt.name}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  Monthly EMI: {formatMoney(debt.expected_monthly_payment_minor, currency, masked)}
-                </div>
+                  <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.15rem', fontWeight: 800 }}>{debt.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    Monthly EMI: {formatMoney(debt.expected_monthly_payment_minor, currency, masked)}
+                  </div>
 
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Current Balance</div>
-                  <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--neon-rose)' }}>
-                    {formatMoney(debt.current_balance_minor, currency, masked)}
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Current Balance</div>
+                    <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--neon-rose)' }}>
+                      {formatMoney(debt.current_balance_minor, currency, masked)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Tilt3DCard>
-          ))}
-        </div>
+              </Tilt3DCard>
+            ))}
+          </div>
+        ) : (
+          <div className="cyber-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
+            <CreditCard size={36} style={{ margin: '0 auto 12px auto', color: 'var(--neon-rose)', opacity: 0.8 }} />
+            <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>No Debt Obligations Recorded</div>
+            <p style={{ fontSize: '0.85rem', marginTop: 4, maxWidth: 440, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20 }}>
+              Track loans, mortgage EMIs, vehicle financing, or credit balances to monitor remaining principal and interest payoff timelines.
+            </p>
+            <button className="btn btn-primary btn-md" onClick={() => setShowDebtModal(true)}>
+              <Plus size={16} /> Record Debt or Loan
+            </button>
+          </div>
+        )
       )}
 
       {/* Chit Funds Tab */}
       {activeTab === 'chits' && (
-        <div className="responsive-grid-cards">
-          {chitFunds.map(chit => (
-            <Tilt3DCard key={chit.id}>
-              <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-amber)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <span className="badge badge-amber">CHIT FUND</span>
-                  <span className="badge badge-green">Active</span>
-                </div>
-                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.15rem', fontWeight: 800 }}>{chit.name}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>Duration: {chit.total_months} months • Start: {chit.start_month}</div>
+        chitFunds.length > 0 ? (
+          <div className="responsive-grid-cards">
+            {chitFunds.map(chit => (
+              <Tilt3DCard key={chit.id}>
+                <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-amber)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span className="badge badge-amber">CHIT FUND</span>
+                    <span className="badge badge-green">Active</span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.15rem', fontWeight: 800 }}>{chit.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>Duration: {chit.total_months} months • Start: {chit.start_month}</div>
 
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Monthly Installment</div>
-                  <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--neon-amber)' }}>
-                    {formatMoney(chit.monthly_contribution_minor, currency, masked)}
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Monthly Installment</div>
+                    <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--neon-amber)' }}>
+                      {formatMoney(chit.monthly_contribution_minor, currency, masked)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Tilt3DCard>
-          ))}
-        </div>
+              </Tilt3DCard>
+            ))}
+          </div>
+        ) : (
+          <div className="cyber-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
+            <Coins size={36} style={{ margin: '0 auto 12px auto', color: 'var(--neon-amber)', opacity: 0.8 }} />
+            <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>No Chit Fund Schemes Added</div>
+            <p style={{ fontSize: '0.85rem', marginTop: 4, maxWidth: 440, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20 }}>
+              Chit Funds (KSFE, registered, or community ROSCAs) combine disciplined monthly savings with borrowing flexibility. Track tenure, installments, and auctions here.
+            </p>
+            <button className="btn btn-primary btn-md" onClick={() => setShowChitModal(true)}>
+              <Plus size={16} /> Add Chit Fund Scheme
+            </button>
+          </div>
+        )
       )}
 
       {/* Recurring Tab */}
       {activeTab === 'recurring' && (
-        <div className="responsive-grid-cards">
-          {recurringTxns.map(rec => (
-            <Tilt3DCard key={rec.id}>
-              <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-purple)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                  <span className="badge badge-purple">{rec.frequency}</span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Next: {rec.next_run_date}</span>
-                </div>
-                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.15rem', fontWeight: 800 }}>{rec.description || 'Subscription'}</div>
+        recurringTxns.length > 0 ? (
+          <div className="responsive-grid-cards">
+            {recurringTxns.map(rec => (
+              <Tilt3DCard key={rec.id}>
+                <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-purple)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span className="badge badge-purple">{rec.frequency}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Next: {rec.next_run_date}</span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.15rem', fontWeight: 800 }}>{rec.description || 'Subscription'}</div>
 
-                <div style={{ marginTop: 20 }}>
-                  <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--neon-purple)' }}>
-                    {formatMoney(rec.amount_minor, currency, masked)}
+                  <div style={{ marginTop: 20 }}>
+                    <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 900, color: 'var(--neon-purple)' }}>
+                      {formatMoney(rec.amount_minor, currency, masked)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Tilt3DCard>
-          ))}
-        </div>
+              </Tilt3DCard>
+            ))}
+          </div>
+        ) : (
+          <div className="cyber-card" style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)' }}>
+            <Repeat size={36} style={{ margin: '0 auto 12px auto', color: 'var(--neon-purple)', opacity: 0.8 }} />
+            <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>No Recurring Subscriptions</div>
+            <p style={{ fontSize: '0.85rem', marginTop: 4, maxWidth: 440, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20 }}>
+              Never get caught off guard by recurring charges. Keep track of SaaS tools, entertainment subscriptions, gym memberships, and rent payments.
+            </p>
+            <button className="btn btn-primary btn-md" onClick={() => setShowRecurringModal(true)}>
+              <Plus size={16} /> Add Recurring Subscription
+            </button>
+          </div>
+        )
       )}
 
       {showGoalModal && <GoalModal onClose={() => setShowGoalModal(false)} />}
