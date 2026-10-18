@@ -404,15 +404,15 @@ class CloudSyncService(
             val o = categoriesArray.getJSONObject(i)
             categoryEntities.add(
                 CategoryEntity(
-                    id = o.getString("id"),
-                    parentId = o.optNullableString("parentId"),
-                    name = o.getString("name"),
-                    kind = o.getString("kind"),
-                    needWant = o.optNullableString("needWant"),
-                    icon = o.optString("icon", "category"),
-                    color = o.optLong("color", 0xFF8E8E96),
-                    archived = o.optBoolean("archived", false),
-                    sortOrder = o.optInt("sortOrder", 0),
+                    id = o.optStringLenient("id", "id"),
+                    parentId = o.optNullableStringLenient("parentId", "parent_id"),
+                    name = o.optStringLenient("name", "name"),
+                    kind = o.optStringLenient("kind", "kind", "EXPENSE"),
+                    needWant = o.optNullableStringLenient("needWant", "need_want"),
+                    icon = o.optStringLenient("icon", "icon", "category"),
+                    color = o.optLongLenient("color", "color", 0xFF8E8E96),
+                    archived = o.optBooleanLenient("archived", "archived", false),
+                    sortOrder = o.optIntLenient("sortOrder", "sort_order", 0),
                 )
             )
         }
@@ -422,18 +422,18 @@ class CloudSyncService(
             val o = accountsArray.getJSONObject(i)
             accountEntities.add(
                 AccountEntity(
-                    id = o.getString("id"),
-                    name = o.getString("name"),
-                    type = o.getString("type"),
-                    institution = o.optNullableString("institution"),
-                    lastFour = o.optNullableString("lastFour"),
-                    openingBalanceMinor = o.getLong("openingBalanceMinor"),
-                    currency = o.getString("currency"),
-                    includeInNetWorth = o.optBoolean("includeInNetWorth", true),
-                    includeInStats = o.optBoolean("includeInStats", true),
-                    archived = o.optBoolean("archived", false),
-                    createdAt = o.getLong("createdAt"),
-                    updatedAt = o.getLong("updatedAt"),
+                    id = o.optStringLenient("id", "id"),
+                    name = o.optStringLenient("name", "name"),
+                    type = o.optStringLenient("type", "type", "CHECKING"),
+                    institution = o.optNullableStringLenient("institution", "institution"),
+                    lastFour = o.optNullableStringLenient("lastFour", "last_four"),
+                    openingBalanceMinor = o.optLongLenient("openingBalanceMinor", "opening_balance_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    includeInNetWorth = o.optBooleanLenient("includeInNetWorth", "include_in_net_worth", true),
+                    includeInStats = o.optBooleanLenient("includeInStats", "include_in_stats", true),
+                    archived = o.optBooleanLenient("archived", "archived", false),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
                 )
             )
         }
@@ -441,26 +441,27 @@ class CloudSyncService(
         val txnEntities = mutableListOf<TxnEntity>()
         for (i in 0 until txnsArray.length()) {
             val o = txnsArray.getJSONObject(i)
+            val dateStr = o.optStringLenient("localDate", "local_date", o.optStringLenient("date", "date"))
             txnEntities.add(
                 TxnEntity(
-                    id = o.getString("id"),
-                    type = o.getString("type"),
-                    amountMinor = o.getLong("amountMinor"),
-                    currency = o.getString("currency"),
-                    localDate = o.getString("localDate"),
-                    localTime = o.optString("localTime", "00:00"),
-                    accountId = o.getString("accountId"),
-                    toAccountId = o.optNullableString("toAccountId"),
-                    categoryId = o.optNullableString("categoryId"),
-                    merchant = o.optNullableString("merchant"),
-                    description = o.optNullableString("description"),
-                    notes = o.optNullableString("notes"),
-                    paymentMethod = o.optNullableString("paymentMethod"),
-                    needWant = o.optNullableString("needWant"),
-                    imported = o.optBoolean("imported", false),
-                    source = o.optString("source", "RESTORE"),
-                    createdAt = o.getLong("createdAt"),
-                    updatedAt = o.getLong("updatedAt"),
+                    id = o.optStringLenient("id", "id"),
+                    type = o.optStringLenient("type", "type", "EXPENSE"),
+                    amountMinor = o.optLongLenient("amountMinor", "amount_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    localDate = if (dateStr.length >= 10) dateStr.substring(0, 10) else dateStr,
+                    localTime = o.optStringLenient("localTime", "local_time", "00:00"),
+                    accountId = o.optStringLenient("accountId", "account_id"),
+                    toAccountId = o.optNullableStringLenient("toAccountId", "to_account_id"),
+                    categoryId = o.optNullableStringLenient("categoryId", "category_id"),
+                    merchant = o.optNullableStringLenient("merchant", "merchant"),
+                    description = o.optNullableStringLenient("description", "description"),
+                    notes = o.optNullableStringLenient("notes", "notes"),
+                    paymentMethod = o.optNullableStringLenient("paymentMethod", "payment_method"),
+                    needWant = o.optNullableStringLenient("needWant", "need_want"),
+                    imported = o.optBooleanLenient("imported", "imported", false),
+                    source = o.optStringLenient("source", "source", "RESTORE"),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
                     deletedAt = null,
                 )
             )
@@ -471,10 +472,10 @@ class CloudSyncService(
             val o = entriesArray.getJSONObject(i)
             journalEntities.add(
                 JournalEntryEntity(
-                    txnId = o.getString("txnId"),
-                    accountId = o.optNullableString("accountId"),
-                    categoryId = o.optNullableString("categoryId"),
-                    amountMinor = o.getLong("amountMinor"),
+                    txnId = o.optStringLenient("txnId", "txn_id"),
+                    accountId = o.optNullableStringLenient("accountId", "account_id"),
+                    categoryId = o.optNullableStringLenient("categoryId", "category_id"),
+                    amountMinor = o.optLongLenient("amountMinor", "amount_minor", 0L),
                 )
             )
         }
@@ -484,16 +485,16 @@ class CloudSyncService(
             val o = goalsArray.getJSONObject(i)
             goalEntities.add(
                 GoalEntity(
-                    id = o.getString("id"),
-                    name = o.getString("name"),
-                    targetAmountMinor = o.getLong("targetAmountMinor"),
-                    currentAmountMinor = o.getLong("currentAmountMinor"),
-                    plannedMonthlyContributionMinor = o.getLong("plannedMonthlyContributionMinor"),
-                    currency = o.getString("currency"),
-                    targetDate = o.getString("targetDate"),
-                    archived = o.optBoolean("archived", false),
-                    createdAt = o.getLong("createdAt"),
-                    updatedAt = o.getLong("updatedAt"),
+                    id = o.optStringLenient("id", "id"),
+                    name = o.optStringLenient("name", "name"),
+                    targetAmountMinor = o.optLongLenient("targetAmountMinor", "target_amount_minor", 0L),
+                    currentAmountMinor = o.optLongLenient("currentAmountMinor", "current_amount_minor", 0L),
+                    plannedMonthlyContributionMinor = o.optLongLenient("plannedMonthlyContributionMinor", "planned_monthly_contribution_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    targetDate = o.optStringLenient("targetDate", "target_date"),
+                    archived = o.optBooleanLenient("archived", "archived", false),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
                 )
             )
         }
@@ -503,16 +504,16 @@ class CloudSyncService(
             val o = debtsArray.getJSONObject(i)
             debtEntities.add(
                 DebtEntity(
-                    id = o.getString("id"),
-                    name = o.getString("name"),
-                    principalMinor = o.getLong("principalMinor"),
-                    currentBalanceMinor = o.getLong("currentBalanceMinor"),
-                    annualPercent = o.getString("annualPercent"),
-                    expectedMonthlyPaymentMinor = o.getLong("expectedMonthlyPaymentMinor"),
-                    currency = o.getString("currency"),
-                    archived = o.optBoolean("archived", false),
-                    createdAt = o.getLong("createdAt"),
-                    updatedAt = o.getLong("updatedAt"),
+                    id = o.optStringLenient("id", "id"),
+                    name = o.optStringLenient("name", "name"),
+                    principalMinor = o.optLongLenient("principalMinor", "principal_minor", 0L),
+                    currentBalanceMinor = o.optLongLenient("currentBalanceMinor", "current_balance_minor", 0L),
+                    annualPercent = o.optStringLenient("annualPercent", "annual_percent", "0"),
+                    expectedMonthlyPaymentMinor = o.optLongLenient("expectedMonthlyPaymentMinor", "expected_monthly_payment_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    archived = o.optBooleanLenient("archived", "archived", false),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
                 )
             )
         }
@@ -522,15 +523,15 @@ class CloudSyncService(
             val o = chitsArray.getJSONObject(i)
             chitEntities.add(
                 ChitFundEntity(
-                    id = o.getString("id"),
-                    name = o.getString("name"),
-                    totalMonths = o.getInt("totalMonths"),
-                    startMonth = o.getString("startMonth"),
-                    monthlyContributionMinor = o.getLong("monthlyContributionMinor"),
-                    currency = o.getString("currency"),
-                    active = o.optBoolean("active", true),
-                    createdAt = o.getLong("createdAt"),
-                    updatedAt = o.getLong("updatedAt"),
+                    id = o.optStringLenient("id", "id"),
+                    name = o.optStringLenient("name", "name"),
+                    totalMonths = o.optIntLenient("totalMonths", "total_months", 0),
+                    startMonth = o.optStringLenient("startMonth", "start_month"),
+                    monthlyContributionMinor = o.optLongLenient("monthlyContributionMinor", "monthly_contribution_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    active = o.optBooleanLenient("active", "active", true),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
                 )
             )
         }
@@ -540,19 +541,19 @@ class CloudSyncService(
             val o = recurringArray.getJSONObject(i)
             recurringEntities.add(
                 RecurringTxnEntity(
-                    id = o.getString("id"),
-                    type = o.getString("type"),
-                    amountMinor = o.getLong("amountMinor"),
-                    currency = o.getString("currency"),
-                    accountId = o.getString("accountId"),
-                    categoryId = o.optNullableString("categoryId"),
-                    description = o.optNullableString("description"),
-                    frequency = o.getString("frequency"),
-                    nextRunDate = o.getString("nextRunDate"),
-                    active = o.optBoolean("active", true),
-                    createdAt = o.getLong("createdAt"),
-                    updatedAt = o.getLong("updatedAt"),
-                    autoPost = o.optBoolean("autoPost", false),
+                    id = o.optStringLenient("id", "id"),
+                    type = o.optStringLenient("type", "type", "EXPENSE"),
+                    amountMinor = o.optLongLenient("amountMinor", "amount_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    accountId = o.optStringLenient("accountId", "account_id"),
+                    categoryId = o.optNullableStringLenient("categoryId", "category_id"),
+                    description = o.optNullableStringLenient("description", "description"),
+                    frequency = o.optStringLenient("frequency", "frequency", "MONTHLY"),
+                    nextRunDate = o.optStringLenient("nextRunDate", "next_run_date"),
+                    active = o.optBooleanLenient("active", "active", true),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
+                    autoPost = o.optBooleanLenient("autoPost", "auto_post", false),
                 )
             )
         }
@@ -713,6 +714,69 @@ class CloudSyncService(
             val v = optString(name)
             if (v == "null") null else v
         } else null
+
+    private fun JSONObject.optStringLenient(camel: String, snake: String, default: String = ""): String {
+        return when {
+            has(camel) && !isNull(camel) -> optString(camel, default)
+            has(snake) && !isNull(snake) -> optString(snake, default)
+            else -> default
+        }
+    }
+
+    private fun JSONObject.optNullableStringLenient(camel: String, snake: String): String? {
+        val v = when {
+            has(camel) && !isNull(camel) -> optString(camel)
+            has(snake) && !isNull(snake) -> optString(snake)
+            else -> null
+        }
+        return if (v == null || v == "null" || v.isBlank()) null else v
+    }
+
+    private fun JSONObject.optLongLenient(camel: String, snake: String, default: Long = 0L): Long {
+        if (has(camel) && !isNull(camel)) {
+            val v = opt(camel)
+            if (v is Number) return v.toLong()
+            if (v is String) return v.toLongOrNull() ?: parseTimestampOrNull(v) ?: default
+        }
+        if (has(snake) && !isNull(snake)) {
+            val v = opt(snake)
+            if (v is Number) return v.toLong()
+            if (v is String) return v.toLongOrNull() ?: parseTimestampOrNull(v) ?: default
+        }
+        return default
+    }
+
+    private fun JSONObject.optIntLenient(camel: String, snake: String, default: Int = 0): Int {
+        if (has(camel) && !isNull(camel)) {
+            val v = opt(camel)
+            if (v is Number) return v.toInt()
+            if (v is String) return v.toIntOrNull() ?: default
+        }
+        if (has(snake) && !isNull(snake)) {
+            val v = opt(snake)
+            if (v is Number) return v.toInt()
+            if (v is String) return v.toIntOrNull() ?: default
+        }
+        return default
+    }
+
+    private fun JSONObject.optBooleanLenient(camel: String, snake: String, default: Boolean = false): Boolean {
+        if (has(camel) && !isNull(camel)) return optBoolean(camel, default)
+        if (has(snake) && !isNull(snake)) return optBoolean(snake, default)
+        return default
+    }
+
+    private fun parseTimestampOrNull(str: String): Long? {
+        return try {
+            java.time.Instant.parse(str).toEpochMilli()
+        } catch (_: Exception) {
+            try {
+                java.time.LocalDate.parse(str).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
 
     companion object {
         const val SUPABASE_URL = "https://zahzagnindkkttdpmqii.supabase.co"

@@ -636,8 +636,8 @@ private fun GoalCard(
 
             // Linear Progress Track
             LinearProgressModern(
-                progress = pct.toFloat(),
-                brush = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF38BDF8))),
+                progress = pct,
+                brush = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669))),
                 height = 5.dp,
             )
 

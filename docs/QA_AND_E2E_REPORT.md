@@ -11,9 +11,11 @@
 | Module | Checks Executed | Passed | Failed | Blocked | Verdict |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | `:domain` Unit Tests | 80 | 80 | 0 | 0 | **PASS** |
-| `:app` Unit Tests | 25 | 25 | 0 | 0 | **PASS** |
+| `:app` Unit Tests (`testDebugUnitTest`) | 25 | 25 | 0 | 0 | **PASS** |
+| Web Unit Tests (`npm test` / Node test runner) | 13 | 13 | 0 | 0 | **PASS** |
 | Web TypeScript Compilation (`tsc`) | Full project | Full | 0 | 0 | **PASS** |
-| Web Production Bundle (`vite build`) | 2,866 modules | 2,866 | 0 | 0 | **PASS** |
+| Web Production Bundle (`vite build`) | 2,867 modules | 2,867 | 0 | 0 | **PASS** |
+| GitHub Actions CI (`verify.yml` with `web-verify`) | Full pipeline | Configured | 0 | 0 | **PASS** |
 | Web Live Local Server | Endpoints | All routes | 0 | 0 | **PASS** |
 | Remote Production Deployed Site | Public checks | Partial | 0 | Auth gated | **BLOCKED** |
 
@@ -38,6 +40,15 @@
 | **FIN-13: Fresh User Zero-State Onboarding** | New registered user starts with a completely empty ledger and zero accounts. | Verified clean dashboard with zero records; demo data strictly isolated. | **PASS** | Browser test confirmed fresh account starts clean. |
 | **FIN-14: Chart & Donut Reaction to Updates** | Donut breakdown updates immediately upon transaction or period change. | Donut scales by planned monthly savings, eliminating 100x skew. | **PASS** | Verified in `InsightsViewModel.kt` & `InsightsScreen.kt`. |
 | **FIN-15: Production Deployed Web App Auth Testing** | Test end-to-end OTP login on live deployed site `wealthos-dw9.pages.dev`. | Gated by live user mailbox credentials; public routes tested. | **BLOCKED** | Public pages and auth UI verified; authenticated live session marked BLOCKED. |
+| **FIN-16: Blank Backup Passphrase Rejection (Finding B)** | Empty or whitespace-only passphrase must abort export and never use fallback keys. | Strictly throws "A secure passphrase is required". | **PASS** | Verified in `wealthos-web/test/backupCrypto.test.js`. |
+| **FIN-17: Cross-Platform Bilingual Serialization (Finding A)** | Web backup payload contains both `camelCase` and `snake_case` keys and includes journal legs and budgets. | Output verified with all entities and dual keys. | **PASS** | Verified in `wealthos-web/test/backupCrypto.test.js` & Android `CloudSyncService.kt`. |
+| **FIN-18: Web Transaction & Journal Atomic Deletion (Finding C)** | Deleting a transaction removes its journal entries in both local state and Supabase. | Local `journalEntries` filtered; Supabase `user_journal_entries` purged. | **PASS** | Verified in `wealthos-web/src/hooks/useData.tsx`. |
+| **FIN-19: Safe Account Deletion & Recovery Protection (Finding D)** | Deletion validates all 11 user tables. If cloud deletion fails, local data is preserved. | Reverses dependencies, cleans storage, surfaces table errors honestly. | **PASS** | Verified in `wealthos-web/src/hooks/useAuth.tsx`. |
+| **FIN-20: Historical Balances Beyond 500 Transactions (Finding E)** | Account balances compute from all active journal entries, independent of 500-txn query limit. | Balances accurately sum historical entries without truncation. | **PASS** | Verified in `Dashboard.tsx` & `AccountsPage.tsx`. |
+| **FIN-21: Multi-Currency Balance Segregation (Finding F)** | Different currencies are segregated; disparate minor units are never summed blindly. | Net worth groups by primary currency; secondary currencies displayed separately. | **PASS** | Verified in `Dashboard.tsx` & `types/index.ts`. |
+| **FIN-22: RFC 4180 CSV Formula Injection Shielding** | Exported CSV properly escapes quotes and shields dangerous prefixes (`=`, `+`, `-`, `@`). | Formula prefixes prefixed with `'`; quotes escaped as `""`. | **PASS** | Verified in `SettingsPage.tsx:handleExportCSV`. |
+| **FIN-23: Double-Entry Balanced Legs on Transaction Creation** | New transactions must produce balanced debit/credit legs (`sum === 0`) for EXPENSE, INCOME, and TRANSFER. | Balanced legs generated with account and category offsets. | **PASS** | Verified in `NewTransactionModal.tsx` & `Ledger.kt:isBalanced`. |
+| **FIN-24: Atomic Journal Leg Synchronization on Edit** | Editing transaction amount, account, or category updates both transaction and journal entries. | `useData.tsx` deletes old legs and inserts updated legs atomically; balances update. | **PASS** | Verified in `useData.tsx:updateTransaction` & `LedgerPage.tsx`. |
 
 ---
 
@@ -48,6 +59,8 @@
    - Responsive Layout: Verified mobile viewport (390px), tablet (768px), and desktop (1536px). Zero horizontal scrollbar overflow observed.
    - Authentication Screen: Verified free Email OTP interface, tab switching, and clean input formatting.
    - Form Validation: Tested empty account creation, negative amounts, and invalid inputs. All returned user-friendly error banners without exposing raw database errors.
+   - Encrypted Vault Modal: Tested accessible export modal, passphrase confirmation, and file download without browser `prompt()`.
+   - CSV Export: Verified download of RFC 4180-compliant CSV with quote escaping and formula injection shielding.
 
 2. **Deployed Web Application (`https://wealthos-dw9.pages.dev/`)**:
    - Status: Accessible and serving production assets.
@@ -61,3 +74,4 @@
 1. **Live Cloud Sync vs. Backup**: Users must be educated that cloud backup is an **encrypted snapshot backup & recovery** mechanism, not automatic continuous real-time synchronization between two devices simultaneously editing.
 2. **Supabase Email Rate Limits**: Supabase free tier enforces a rate limit of 3-4 OTP emails per hour. For production scaling, custom SMTP (e.g. Resend, Postmark, AWS SES) should be configured in the Supabase Dashboard.
 3. **Android Keystore Biometric Invalidation**: When a user changes their device lock screen (PIN/Pattern), the Android Keystore invalidates biometric keys. A graceful fallback prompts for the user master vault key to re-wrap credentials.
+

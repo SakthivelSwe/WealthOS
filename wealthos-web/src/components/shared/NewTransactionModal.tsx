@@ -40,9 +40,11 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
 
     const journalEntries = [];
     if (type === 'EXPENSE') {
-      journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: categoryId || null, amount_minor: -amountMinor });
+      journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: null, amount_minor: -amountMinor });
+      journalEntries.push({ txn_id: txnId, account_id: null, category_id: categoryId || null, amount_minor: amountMinor });
     } else if (type === 'INCOME') {
-      journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: categoryId || null, amount_minor: amountMinor });
+      journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: null, amount_minor: amountMinor });
+      journalEntries.push({ txn_id: txnId, account_id: null, category_id: categoryId || null, amount_minor: -amountMinor });
     } else if (type === 'TRANSFER') {
       journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: null, amount_minor: -amountMinor });
       if (toAccountId) {
@@ -89,9 +91,9 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
         {/* Transaction Type Selector */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 18 }}>
           {[
-            { id: 'EXPENSE', label: 'Expense', icon: TrendingDown, color: 'var(--neon-rose)' },
-            { id: 'INCOME', label: 'Income', icon: TrendingUp, color: 'var(--neon-emerald)' },
-            { id: 'TRANSFER', label: 'Transfer', icon: ArrowRightLeft, color: 'var(--neon-cyan)' },
+            { id: 'EXPENSE', label: 'Expense', icon: TrendingDown, color: 'var(--semantic-expense, #f43f5e)' },
+            { id: 'INCOME', label: 'Income', icon: TrendingUp, color: 'var(--semantic-income, #10b981)' },
+            { id: 'TRANSFER', label: 'Transfer', icon: ArrowRightLeft, color: 'var(--semantic-info, #0ea5e9)' },
           ].map(item => {
             const Icon = item.icon;
             const isSelected = type === item.id;
@@ -108,7 +110,7 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
                   padding: '10px 8px',
                   borderRadius: 'var(--radius-md)',
                   background: isSelected ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                  border: isSelected ? `1px solid ${item.color}` : '1px solid var(--glass-border)',
+                  border: isSelected ? `1px solid ${item.color}` : '1px solid var(--border-subtle)',
                   color: isSelected ? item.color : 'var(--text-secondary)',
                   cursor: 'pointer',
                   fontWeight: 700,
@@ -138,7 +140,7 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
                 fontSize: '1.4rem',
                 fontFamily: 'var(--font-outfit)',
                 fontWeight: 800,
-                color: type === 'EXPENSE' ? 'var(--neon-rose)' : type === 'INCOME' ? 'var(--neon-emerald)' : 'var(--neon-cyan)',
+                color: type === 'EXPENSE' ? 'var(--semantic-expense, #f43f5e)' : type === 'INCOME' ? 'var(--semantic-income, #10b981)' : 'var(--semantic-info, #0ea5e9)',
               }}
             />
           </div>
@@ -284,9 +286,9 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
               <label className="form-label">50/30/20 Classification</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 {[
-                  { id: 'NEED', label: 'Need (50%)', color: 'var(--neon-cyan)' },
-                  { id: 'WANT', label: 'Want (30%)', color: 'var(--neon-purple)' },
-                  { id: 'SAVING', label: 'Saving (20%)', color: 'var(--neon-emerald)' },
+                  { id: 'NEED', label: 'Need (50%)', color: 'var(--semantic-info, #0ea5e9)' },
+                  { id: 'WANT', label: 'Want (30%)', color: '#a855f7' },
+                  { id: 'SAVING', label: 'Saving (20%)', color: 'var(--semantic-income, #10b981)' },
                 ].map(item => (
                   <button
                     key={item.id}
@@ -296,7 +298,7 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
                       padding: '8px',
                       borderRadius: 'var(--radius-sm)',
                       background: needWant === item.id ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                      border: needWant === item.id ? `1px solid ${item.color}` : '1px solid var(--glass-border)',
+                      border: needWant === item.id ? `1px solid ${item.color}` : '1px solid var(--border-subtle)',
                       color: needWant === item.id ? item.color : 'var(--text-tertiary)',
                       fontSize: '0.78rem',
                       fontWeight: 700,
@@ -310,7 +312,7 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
             </div>
           )}
 
-          {error && <div style={{ color: 'var(--neon-rose)', fontSize: '0.82rem', marginBottom: 12 }}>{error}</div>}
+          {error && <div style={{ color: 'var(--semantic-expense, #f43f5e)', fontSize: '0.82rem', marginBottom: 12 }}>{error}</div>}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
             <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>

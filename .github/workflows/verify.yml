@@ -55,3 +55,26 @@ jobs:
             domain/build/reports
             app/build/reports
           retention-days: 14
+
+  web-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: wealthos-web
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: wealthos-web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run web unit tests
+        run: npm test
+      - name: TypeScript typecheck and production build
+        run: npm run build
+

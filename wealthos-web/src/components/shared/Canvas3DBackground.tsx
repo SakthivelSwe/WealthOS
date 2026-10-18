@@ -20,6 +20,23 @@ export function Canvas3DBackground() {
     };
     window.addEventListener('resize', handleResize);
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isMobile = window.innerWidth < 768;
+
+    if (prefersReducedMotion || isMobile) {
+      // Draw static calm vignette without expensive continuous requestAnimationFrame loop
+      ctx.fillStyle = '#06080e';
+      ctx.fillRect(0, 0, width, height);
+      const gradient = ctx.createRadialGradient(width / 2, height / 3, 50, width / 2, height / 2, Math.max(width, height) * 0.7);
+      gradient.addColorStop(0, 'rgba(16, 185, 129, 0.05)');
+      gradient.addColorStop(1, 'rgba(6, 8, 14, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      return () => {
+        window.removeEventListener('resize', handleResize);
+      };
+    }
+
     // Mouse coordinates with smoothing
     const mouse = { x: width / 2, y: height / 2, targetX: width / 2, targetY: height / 2 };
     const handleMouseMove = (e: MouseEvent) => {
@@ -28,25 +45,24 @@ export function Canvas3DBackground() {
     };
     window.addEventListener('mousemove', handleMouseMove);
 
-    // Glowing 3D Particles
-    const PARTICLE_COUNT = 45;
+    // Glowing 3D Particles - restrained Quiet Wealth count and palette
+    const PARTICLE_COUNT = 24;
     const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
       z: Math.random() * 800 + 200, // 3D depth
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: (Math.random() - 0.5) * 0.4,
-      radius: Math.random() * 2 + 1,
-      color: ['rgba(99, 179, 237, ', 'rgba(183, 148, 244, ', 'rgba(79, 209, 197, ', 'rgba(244, 63, 94, '][Math.floor(Math.random() * 4)],
-      alpha: Math.random() * 0.4 + 0.1,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: (Math.random() - 0.5) * 0.25,
+      radius: Math.random() * 1.5 + 0.8,
+      color: ['rgba(16, 185, 129, ', 'rgba(52, 211, 153, ', 'rgba(148, 163, 184, '][Math.floor(Math.random() * 3)],
+      alpha: Math.random() * 0.25 + 0.05,
     }));
 
-    // Floating Aurora Orbs
+    // Floating subtle ambient orbs
     const orbs = [
-      { x: width * 0.25, y: height * 0.2, radius: 280, color: 'rgba(99, 102, 241, 0.14)', vx: 0.3, vy: 0.2, phase: 0 },
-      { x: width * 0.75, y: height * 0.3, radius: 320, color: 'rgba(139, 92, 246, 0.12)', vx: -0.2, vy: 0.3, phase: Math.PI / 2 },
-      { x: width * 0.5, y: height * 0.8, radius: 300, color: 'rgba(6, 182, 212, 0.12)', vx: 0.2, vy: -0.2, phase: Math.PI },
-      { x: width * 0.85, y: height * 0.7, radius: 260, color: 'rgba(16, 185, 129, 0.1)', vx: -0.3, vy: -0.2, phase: Math.PI * 1.5 },
+      { x: width * 0.25, y: height * 0.2, radius: 260, color: 'rgba(16, 185, 129, 0.06)', vx: 0.15, vy: 0.1, phase: 0 },
+      { x: width * 0.75, y: height * 0.3, radius: 280, color: 'rgba(5, 150, 105, 0.05)', vx: -0.1, vy: 0.15, phase: Math.PI / 2 },
+      { x: width * 0.5, y: height * 0.8, radius: 240, color: 'rgba(15, 118, 110, 0.05)', vx: 0.1, vy: -0.1, phase: Math.PI },
     ];
 
     let t = 0;

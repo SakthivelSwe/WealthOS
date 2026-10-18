@@ -108,13 +108,13 @@ export function LoginPage() {
         style={{
           width: '100%',
           maxWidth: 460,
-          background: 'rgba(13, 19, 34, 0.90)',
-          backdropFilter: 'blur(36px) saturate(200%)',
-          WebkitBackdropFilter: 'blur(36px) saturate(200%)',
-          border: '1px solid var(--glass-border-bright)',
+          background: 'var(--bg-secondary, #131922)',
+          backdropFilter: 'blur(36px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(36px) saturate(180%)',
+          border: '1px solid var(--border-default, rgba(255, 255, 255, 0.12))',
           borderRadius: 'var(--radius-xl)',
           padding: '40px 32px',
-          boxShadow: '0 30px 70px -15px rgba(0, 0, 0, 0.85), 0 0 35px var(--neon-indigo-glow)',
+          boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border-subtle)',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -127,8 +127,8 @@ export function LoginPage() {
             left: '20%',
             right: '20%',
             height: 2,
-            background: 'linear-gradient(90deg, transparent, var(--neon-cyan), transparent)',
-            boxShadow: '0 0 12px var(--neon-cyan)',
+            background: 'linear-gradient(90deg, transparent, var(--accent-forest, #10b981), transparent)',
+            boxShadow: '0 0 8px rgba(16, 185, 129, 0.3)',
           }}
         />
 
@@ -139,12 +139,12 @@ export function LoginPage() {
               width: 58,
               height: 58,
               borderRadius: 18,
-              background: 'linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-indigo) 100%)',
+              background: 'linear-gradient(135deg, var(--accent-forest, #10b981) 0%, #059669 100%)',
               margin: '0 auto 16px auto',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 25px var(--neon-cyan-glow)',
+              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.25)',
               position: 'relative',
             }}
           >
@@ -159,7 +159,7 @@ export function LoginPage() {
               fontSize: '1.75rem',
               fontWeight: 800,
               letterSpacing: '-0.02em',
-              background: 'linear-gradient(135deg, #ffffff 40%, #a5f3fc 100%)',
+              background: 'linear-gradient(135deg, #ffffff 40%, #e2e8f0 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
             }}
@@ -167,7 +167,7 @@ export function LoginPage() {
             WealthOS
           </h1>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
-            Private Money Manager • Realtime Cloud Sync
+            Private Money Manager • Encrypted Snapshot Backup
           </p>
         </div>
 
@@ -179,7 +179,7 @@ export function LoginPage() {
 
             <div className="form-group" style={{ marginBottom: 20 }}>
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Mail size={14} style={{ color: 'var(--neon-cyan)' }} /> Email Address
+                <Mail size={14} style={{ color: 'var(--accent-forest, #10b981)' }} /> Email Address
               </label>
               <input
                 type="email"
@@ -197,7 +197,7 @@ export function LoginPage() {
             </div>
 
             {error && (
-              <div style={{ color: 'var(--neon-rose)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'var(--neon-rose-glow)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(244, 63, 94, 0.3)' }}>
+              <div style={{ color: 'var(--semantic-expense, #f43f5e)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'rgba(244, 63, 94, 0.1)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(244, 63, 94, 0.3)' }}>
                 {error}
               </div>
             )}
@@ -212,8 +212,8 @@ export function LoginPage() {
             </button>
 
             <div style={{ position: 'relative', margin: '20px 0', textAlign: 'center' }}>
-              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'var(--glass-border)' }} />
-              <span style={{ position: 'relative', background: '#0e1424', padding: '0 12px', fontSize: '0.72rem', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'var(--border-subtle)' }} />
+              <span style={{ position: 'relative', background: 'var(--bg-secondary, #131922)', padding: '0 12px', fontSize: '0.72rem', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
                 OR EXPLORE INSTANTLY
               </span>
             </div>
@@ -221,9 +221,9 @@ export function LoginPage() {
             <button
               className="btn btn-secondary btn-lg"
               onClick={loginAsDemo}
-              style={{ width: '100%', marginBottom: 24, borderColor: 'var(--neon-purple)', color: '#f1f5f9' }}
+              style={{ width: '100%', marginBottom: 24, borderColor: 'var(--border-default)', color: '#f1f5f9' }}
             >
-              <Sparkles size={16} style={{ color: 'var(--neon-purple)' }} /> Launch Instant Demo Mode
+              <Sparkles size={16} style={{ color: 'var(--accent-forest, #10b981)' }} /> Launch Instant Demo Mode
             </button>
 
             <div
@@ -234,12 +234,12 @@ export function LoginPage() {
                 padding: '12px 14px',
                 background: 'rgba(255, 255, 255, 0.02)',
                 borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--glass-border)',
+                border: '1px solid var(--border-subtle)',
               }}
             >
-              <Shield size={18} style={{ color: 'var(--neon-emerald)', flexShrink: 0 }} />
+              <Shield size={18} style={{ color: 'var(--semantic-income, #10b981)', flexShrink: 0 }} />
               <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
-                100% Free Supabase authentication. End-to-end encrypted ledger starting clean today.
+                100% Free Supabase authentication. Zero-knowledge encrypted ledger starting clean today.
               </span>
             </div>
           </>
@@ -251,13 +251,13 @@ export function LoginPage() {
                   width: 52,
                   height: 52,
                   borderRadius: 16,
-                  background: 'var(--neon-cyan-glow)',
-                  border: '1px solid rgba(6, 182, 212, 0.4)',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 12px auto',
-                  color: 'var(--neon-cyan)',
+                  color: 'var(--accent-forest, #10b981)',
                 }}
               >
                 <CheckCircle2 size={26} />
@@ -274,9 +274,9 @@ export function LoginPage() {
                   marginTop: 6,
                   padding: '4px 14px',
                   borderRadius: 'var(--radius-pill)',
-                  background: 'rgba(6, 182, 212, 0.1)',
-                  border: '1px solid rgba(6, 182, 212, 0.3)',
-                  color: 'var(--neon-cyan)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  color: 'var(--accent-forest, #10b981)',
                   fontWeight: 700,
                   fontSize: '0.85rem',
                   fontFamily: 'var(--font-mono)',
@@ -289,14 +289,14 @@ export function LoginPage() {
             {/* Instruction Card explaining the email received */}
             <div
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid var(--glass-border-bright)',
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid var(--border-subtle)',
                 borderRadius: 'var(--radius-md)',
                 padding: '16px',
                 marginBottom: 16,
               }}
             >
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--neon-cyan)', marginBottom: 8, letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-forest, #10b981)', marginBottom: 8, letterSpacing: '0.04em' }}>
                 HOW TO SIGN IN:
               </div>
               <ol style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0, paddingLeft: 18, lineHeight: 1.6 }}>
@@ -313,7 +313,7 @@ export function LoginPage() {
                   border: '1px solid rgba(16, 185, 129, 0.25)',
                   borderRadius: 8,
                   fontSize: '0.75rem',
-                  color: 'var(--neon-emerald)',
+                  color: 'var(--semantic-income, #10b981)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
@@ -324,8 +324,8 @@ export function LoginPage() {
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    background: 'var(--neon-emerald)',
-                    boxShadow: '0 0 8px var(--neon-emerald)',
+                    background: 'var(--semantic-income, #10b981)',
+                    boxShadow: '0 0 8px rgba(16, 185, 129, 0.4)',
                     display: 'inline-block',
                     flexShrink: 0,
                   }}
@@ -338,7 +338,7 @@ export function LoginPage() {
                   type="button"
                   className="btn btn-primary btn-sm"
                   onClick={() => verifyOtp(email.trim(), '123456', true)}
-                  style={{ width: '100%', marginTop: 12, background: 'linear-gradient(135deg, #06b6d4, #6366f1)', fontSize: '0.8rem' }}
+                  style={{ width: '100%', marginTop: 12, background: 'var(--accent-forest, #10b981)', fontSize: '0.8rem' }}
                 >
                   ⚡ Localhost Dev: Click to Simulate Email Link Sign-in
                 </button>
@@ -363,7 +363,7 @@ export function LoginPage() {
                   padding: '4px 8px',
                 }}
               >
-                <KeyRound size={13} style={{ color: 'var(--neon-cyan)' }} />
+                <KeyRound size={13} style={{ color: 'var(--accent-forest, #10b981)' }} />
                 <span>Received a 6-digit verification code instead?</span>
                 {showCodeInput ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               </button>
@@ -389,8 +389,8 @@ export function LoginPage() {
                           fontFamily: 'var(--font-outfit)',
                           fontWeight: 800,
                           background: 'rgba(255, 255, 255, 0.05)',
-                          border: digit ? '1px solid var(--neon-cyan)' : '1px solid var(--glass-border-bright)',
-                          boxShadow: digit ? '0 0 12px var(--neon-cyan-glow)' : 'none',
+                          border: digit ? '1px solid var(--accent-forest, #10b981)' : '1px solid var(--border-default)',
+                          boxShadow: digit ? '0 0 8px rgba(16, 185, 129, 0.2)' : 'none',
                           borderRadius: 'var(--radius-md)',
                           color: '#fff',
                         }}
@@ -402,7 +402,7 @@ export function LoginPage() {
                     className="btn btn-secondary btn-sm"
                     onClick={handleVerifyOtp}
                     disabled={loading || otp.some(d => !d)}
-                    style={{ width: '100%', borderColor: 'var(--neon-cyan)', color: 'var(--neon-cyan)' }}
+                    style={{ width: '100%', borderColor: 'var(--accent-forest, #10b981)', color: 'var(--accent-forest, #10b981)' }}
                   >
                     {loading ? <Loader2 size={16} className="spinner" /> : <><KeyRound size={14} /> Verify 6-Digit Code</>}
                   </button>
@@ -411,7 +411,7 @@ export function LoginPage() {
             </div>
 
             {error && (
-              <div style={{ color: 'var(--neon-rose)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'var(--neon-rose-glow)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(244, 63, 94, 0.3)' }}>
+              <div style={{ color: 'var(--semantic-expense, #f43f5e)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'rgba(244, 63, 94, 0.1)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(244, 63, 94, 0.3)' }}>
                 {error}
               </div>
             )}

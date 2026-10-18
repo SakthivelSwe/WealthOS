@@ -36,14 +36,18 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
     const id = txn?.id || ('txn_' + Date.now());
 
     if (txn) {
+      const updatedEntries = [
+        { txn_id: txn.id, account_id: accountId, category_id: null, amount_minor: type === 'INCOME' ? amountMinor : -amountMinor },
+        { txn_id: txn.id, account_id: type === 'TRANSFER' ? toAccountId : null, category_id: categoryId || null, amount_minor: type === 'INCOME' ? -amountMinor : amountMinor },
+      ];
       await updateTransaction(txn.id, {
         type, amount_minor: amountMinor, local_date: date, local_time: time,
-        account_id: accountId, to_account_id: toAccountId || null,
-        category_id: categoryId || null, merchant: merchant || null,
+        account_id: accountId, to_account_id: type === 'TRANSFER' ? toAccountId : null,
+        category_id: type !== 'TRANSFER' ? (categoryId || null) : null, merchant: merchant || null,
         description: description || null, notes: null,
-        payment_method: paymentMethod || null, need_want: needWant as NeedWant || null,
+        payment_method: paymentMethod || null, need_want: type === 'EXPENSE' ? (needWant as NeedWant || null) : null,
         updated_at: now,
-      });
+      }, updatedEntries);
     } else {
       await addTransaction({
         id, type, amount_minor: amountMinor, currency,
@@ -76,7 +80,7 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
         </div>
 
         <form onSubmit={handleSubmit}>
-          {error && <div style={{ color: 'var(--neon-rose)', fontSize: '0.82rem', marginBottom: 14 }}>{error}</div>}
+          {error && <div style={{ color: 'var(--semantic-expense, #f43f5e)', fontSize: '0.82rem', marginBottom: 14 }}>{error}</div>}
 
           {/* Type Selector */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
@@ -89,8 +93,8 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
                   padding: '10px 8px',
                   borderRadius: 'var(--radius-md)',
                   background: type === t ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                  border: type === t ? '1px solid var(--neon-cyan)' : '1px solid var(--glass-border)',
-                  color: type === t ? 'var(--neon-cyan)' : 'var(--text-secondary)',
+                  border: type === t ? '1px solid var(--border-default)' : '1px solid var(--border-subtle)',
+                  color: type === t ? 'var(--text-primary)' : 'var(--text-secondary)',
                   fontWeight: 700,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
@@ -114,7 +118,7 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
                 fontFamily: 'var(--font-outfit)',
                 fontSize: '1.35rem',
                 fontWeight: 800,
-                color: type === 'EXPENSE' ? 'var(--neon-rose)' : type === 'INCOME' ? 'var(--neon-emerald)' : 'var(--neon-cyan)',
+                color: type === 'EXPENSE' ? 'var(--semantic-expense, #f43f5e)' : type === 'INCOME' ? 'var(--semantic-income, #10b981)' : 'var(--semantic-info, #0ea5e9)',
               }}
             />
           </div>

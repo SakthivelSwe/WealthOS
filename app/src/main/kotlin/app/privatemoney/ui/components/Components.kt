@@ -142,7 +142,7 @@ fun GlassCard(
 fun LinearProgressModern(
     progress: Float,
     modifier: Modifier = Modifier,
-    brush: Brush = Brush.horizontalGradient(listOf(Color(0xFF00E599), Color(0xFF38BDF8))),
+    brush: Brush = Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669))),
     trackColor: Color = LocalFinanceColors.current.hairline,
     height: Dp = 8.dp,
 ) {

@@ -101,7 +101,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onDone: () -> Unit) {
                     .clip(RoundedCornerShape(18.dp))
                     .background(
                         Brush.linearGradient(
-                            listOf(Color(0xFF00E599), Color(0xFF38BDF8), Color(0xFFF59E0B)),
+                            listOf(Color(0xFF10B981), Color(0xFF059669)),
                         ),
                     ),
                 contentAlignment = Alignment.Center,
@@ -109,7 +109,7 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onDone: () -> Unit) {
                 Icon(
                     imageVector = Icons.Default.Shield,
                     contentDescription = null,
-                    tint = Color.Black,
+                    tint = Color.White,
                     modifier = Modifier.size(32.dp),
                 )
             }

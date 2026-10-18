@@ -1,20 +1,45 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useData } from '../../hooks/useData';
 import { useAuth } from '../../hooks/useAuth';
-import { formatMoney, parseMoney, CURRENCIES, type ThemeMode, type UserSettings } from '../../types';
-import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { User, Shield, Palette, Database, Download, Upload, LogOut, Eye, EyeOff, Phone, Save, Check, RefreshCw, CheckCircle2, Sparkles, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { formatMoney, parseMoney, getCurrencyInfo, CURRENCIES, type ThemeMode, type UserSettings } from '../../types';
+import { User, Shield, Database, Download, Upload, LogOut, Eye, EyeOff, Phone, Save, Check, RefreshCw, CheckCircle2, Trash2, AlertTriangle, Lock, X, FileText, CheckCircle } from 'lucide-react';
 import { SUPABASE_URL_VALUE } from '../../lib/supabase';
 import { createEncryptedBackupEnvelope, decryptBackupEnvelope } from '../../lib/backupCrypto';
 
 export function SettingsPage() {
-  const { settings, updateSettings, accounts, categories, transactions, goals, debts, chitFunds, recurringTxns, importAllData, refresh } = useData();
+  const { settings, updateSettings, accounts, categories, transactions, journalEntries, goals, debts, chitFunds, recurringTxns, budgets, importAllData, refresh } = useData();
   const { user, signOut, deleteAllUserData } = useAuth();
   const [activeSection, setActiveSection] = useState('profile');
   const [saved, setSaved] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Accessible Export Modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportPassphrase, setExportPassphrase] = useState('');
+  const [exportPassphraseConfirm, setExportPassphraseConfirm] = useState('');
+  const [showExportPassphrase, setShowExportPassphrase] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Accessible Import Modal state
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [showImportPassphraseModal, setShowImportPassphraseModal] = useState(false);
+  const [importPassphrase, setImportPassphrase] = useState('');
+  const [showImportPassphrase, setShowImportPassphrase] = useState(false);
+  const [importPassphraseError, setImportPassphraseError] = useState('');
+  const [isDecrypting, setIsDecrypting] = useState(false);
+
+  // Import Preview Modal state
+  const [importPreviewData, setImportPreviewData] = useState<{
+    metadata?: any;
+    payload: any;
+    filename: string;
+    summary: { accounts: number; txns: number; entries: number; goals: number; debts: number; chits: number; recs: number; budgets: number };
+  } | null>(null);
+  const [isIngesting, setIsIngesting] = useState(false);
+
   // Delete account state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -35,6 +60,23 @@ export function SettingsPage() {
   const [maskAmounts, setMaskAmounts] = useState(settings?.mask_amounts || false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(settings?.theme_mode || 'DARK');
 
+  // Hydrate settings asynchronously when loaded from cloud
+  useEffect(() => {
+    if (settings) {
+      if (settings.user_name) setUserName(settings.user_name);
+      if (settings.currency) setCurrency(settings.currency);
+      if (settings.basis_income_minor !== undefined) setIncomeStr(String(settings.basis_income_minor / 100));
+      if (settings.needs_pct !== undefined) setNeedsPct(settings.needs_pct);
+      if (settings.wants_pct !== undefined) setWantsPct(settings.wants_pct);
+      if (settings.savings_pct !== undefined) setSavingsPct(settings.savings_pct);
+      if (settings.mask_amounts !== undefined) setMaskAmounts(settings.mask_amounts);
+      if (settings.theme_mode) {
+        setThemeMode(settings.theme_mode);
+        document.documentElement.setAttribute('data-theme', settings.theme_mode.toLowerCase());
+      }
+    }
+  }, [settings]);
+
   const handleSave = async () => {
     const updates: Partial<UserSettings> = {
       user_name: userName,
@@ -47,25 +89,43 @@ export function SettingsPage() {
       theme_mode: themeMode,
     };
     await updateSettings(updates);
+    localStorage.setItem('wealthos_theme', themeMode.toLowerCase());
     document.documentElement.setAttribute('data-theme', themeMode.toLowerCase());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleExportEncryptedBackup = async () => {
+  const executeExport = async () => {
+    const trimmedPin = exportPassphrase.trim();
+    if (!trimmedPin) {
+      setExportError('Vault passphrase cannot be empty.');
+      return;
+    }
+    if (trimmedPin.length < 4) {
+      setExportError('Passphrase must be at least 4 characters long.');
+      return;
+    }
+    if (trimmedPin !== exportPassphraseConfirm.trim()) {
+      setExportError('Passphrases do not match. Please verify.');
+      return;
+    }
+
+    setIsExporting(true);
+    setExportError('');
+
     try {
-      const pin = prompt('Enter a vault passphrase to protect your encrypted .wosenc backup:') ?? '';
       const payload = {
         accounts,
         categories: categories || [],
         txns: transactions,
-        journal_entries: [],
+        journal_entries: journalEntries || [],
         goals,
         debts,
         chits: chitFunds,
         recurring: recurringTxns,
+        budgets: budgets || [],
       };
-      const envelope = await createEncryptedBackupEnvelope(payload, pin);
+      const envelope = await createEncryptedBackupEnvelope(payload, trimmedPin);
       const blob = new Blob([envelope.buffer as ArrayBuffer], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -73,10 +133,15 @@ export function SettingsPage() {
       a.download = `wealthos-backup-${new Date().toISOString().slice(0, 10)}.wosenc`;
       a.click();
       URL.revokeObjectURL(url);
+      setShowExportModal(false);
+      setExportPassphrase('');
+      setExportPassphraseConfirm('');
       setImportStatus('Encrypted .wosenc vault exported successfully!');
       setTimeout(() => setImportStatus(null), 4000);
     } catch (err: any) {
-      setImportStatus('Backup creation failed: ' + err.message);
+      setExportError('Backup creation failed: ' + err.message);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -85,12 +150,14 @@ export function SettingsPage() {
       accounts,
       transactions,
       txns: transactions,
+      journal_entries: journalEntries || [],
       goals,
       debts,
       chits: chitFunds,
       chitFunds,
       recurring: recurringTxns,
       recurringTxns,
+      budgets: budgets || [],
       exportedAt: new Date().toISOString(),
       version: '1.0',
     };
@@ -103,14 +170,41 @@ export function SettingsPage() {
     URL.revokeObjectURL(url);
   };
 
+  const sanitizeCsvCell = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) return '""';
+    let str = String(value);
+    // Mitigate CSV / spreadsheet formula injection
+    if (/^[=+\-@\t\r]/.test(str)) {
+      str = `'${str}`;
+    }
+    // RFC 4180 double-quote escaping: " becomes ""
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
   const handleExportCSV = () => {
     const headers = ['Date', 'Type', 'Amount', 'Currency', 'Merchant', 'Description', 'Account', 'Category', 'PaymentMethod', 'NeedWant'];
-    const rows = transactions.filter(t => !t.deleted_at).map(t => [
-      t.local_date, t.type, (t.amount_minor / 100).toFixed(2), t.currency,
-      t.merchant || '', t.description || '', t.account_id, t.category_id || '', t.payment_method || '', t.need_want || '',
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const rows = transactions.filter(t => !t.deleted_at).map(t => {
+      const cur = t.currency || currency;
+      const info = getCurrencyInfo(cur);
+      const formattedAmount = (t.amount_minor / Math.pow(10, info.minorUnit)).toFixed(info.minorUnit);
+      const acc = accounts.find(a => a.id === t.account_id);
+      return [
+        t.local_date,
+        t.type,
+        formattedAmount,
+        cur,
+        t.merchant || '',
+        t.description || '',
+        acc ? acc.name : t.account_id,
+        t.category_id || '',
+        t.payment_method || '',
+        t.need_want || '',
+      ];
+    });
+    const csv = [headers, ...rows]
+      .map(row => row.map(cell => sanitizeCsvCell(cell)).join(','))
+      .join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -122,29 +216,113 @@ export function SettingsPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      let parsed: any;
-      if (file.name.endsWith('.wosenc')) {
-        const buffer = await file.arrayBuffer();
-        const pin = prompt('Enter the vault passphrase for this .wosenc backup:') ?? '';
-        const { metadata, payload } = await decryptBackupEnvelope(new Uint8Array(buffer), pin);
-        parsed = payload;
-        setImportStatus(`Verified encrypted .wosenc backup (${metadata.txnCount} txns, ${metadata.accountCount} accounts). Ingesting...`);
-      } else {
+
+    if (file.name.endsWith('.wosenc')) {
+      setPendingImportFile(file);
+      setImportPassphrase('');
+      setImportPassphraseError('');
+      setShowImportPassphraseModal(true);
+    } else {
+      try {
         const text = await file.text();
-        parsed = JSON.parse(text);
+        const parsed = JSON.parse(text);
+        const accts = parsed.accounts || [];
+        const txs = parsed.txns || parsed.transactions || [];
+        const entries = parsed.journal_entries || parsed.journalEntries || [];
+        const gls = parsed.goals || [];
+        const dts = parsed.debts || [];
+        const chts = parsed.chits || parsed.chitFunds || [];
+        const recs = parsed.recurring || parsed.recurringTxns || [];
+        const bdgs = parsed.budgets || [];
+        setImportPreviewData({
+          payload: parsed,
+          filename: file.name,
+          summary: {
+            accounts: accts.length,
+            txns: txs.length,
+            entries: entries.length,
+            goals: gls.length,
+            debts: dts.length,
+            chits: chts.length,
+            recs: recs.length,
+            budgets: bdgs.length,
+          },
+        });
+      } catch (err: any) {
+        setImportStatus('JSON file parsing failed: ' + err.message);
+        setTimeout(() => setImportStatus(null), 4000);
       }
-      const res = await importAllData(parsed);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const executeDecryptImport = async () => {
+    if (!pendingImportFile) return;
+    const pin = importPassphrase.trim();
+    if (!pin) {
+      setImportPassphraseError('Please enter the vault passphrase.');
+      return;
+    }
+
+    setIsDecrypting(true);
+    setImportPassphraseError('');
+
+    try {
+      const buffer = await pendingImportFile.arrayBuffer();
+      const { metadata, payload } = await decryptBackupEnvelope(new Uint8Array(buffer), pin);
+      setShowImportPassphraseModal(false);
+      setImportPassphrase('');
+
+      const p: any = payload;
+      const accts = p.accounts || [];
+      const txs = p.txns || p.transactions || [];
+      const entries = p.journal_entries || p.journalEntries || [];
+      const gls = p.goals || [];
+      const dts = p.debts || [];
+      const chts = p.chits || p.chitFunds || [];
+      const recs = p.recurring || p.recurringTxns || [];
+      const bdgs = p.budgets || [];
+
+      setImportPreviewData({
+        metadata,
+        payload,
+        filename: pendingImportFile.name,
+        summary: {
+          accounts: accts.length,
+          txns: txs.length,
+          entries: entries.length,
+          goals: gls.length,
+          debts: dts.length,
+          chits: chts.length,
+          recs: recs.length,
+          budgets: bdgs.length,
+        },
+      });
+    } catch (err: any) {
+      setImportPassphraseError('Decryption failed: ' + (err.message || 'Incorrect passphrase or corrupted file.'));
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
+
+  const confirmIngest = async () => {
+    if (!importPreviewData) return;
+    setIsIngesting(true);
+    try {
+      const res = await importAllData(importPreviewData.payload);
       if (res.success) {
-        setImportStatus(`Successfully ingested ${res.count} records from ${file.name}!`);
+        setImportStatus(`Successfully ingested ${res.count} records from ${importPreviewData.filename}!`);
       } else {
-        setImportStatus('Invalid format. Please verify file.');
+        setImportStatus('Import failed: Invalid entity format.');
       }
     } catch (err: any) {
       setImportStatus('Import failed: ' + err.message);
+    } finally {
+      setIsIngesting(false);
+      setImportPreviewData(null);
+      setPendingImportFile(null);
+      setTimeout(() => setImportStatus(null), 5000);
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setTimeout(() => setImportStatus(null), 5000);
   };
 
   const handleManualSync = async () => {
@@ -431,7 +609,7 @@ export function SettingsPage() {
                   </button>
                   <input ref={fileInputRef} type="file" accept=".wosenc,.json" onChange={handleFileChange} style={{ display: 'none' }} />
 
-                  <button className="btn btn-secondary" onClick={handleExportEncryptedBackup} style={{ flex: '1 1 200px' }}>
+                  <button className="btn btn-secondary" onClick={() => { setShowExportModal(true); setExportPassphrase(''); setExportPassphraseConfirm(''); setExportError(''); }} style={{ flex: '1 1 200px' }}>
                     <Lock size={16} /> Export Encrypted Vault (.wosenc)
                   </button>
 
@@ -580,6 +758,260 @@ export function SettingsPage() {
           )}
         </div>
       </div>
+
+      {/* Accessible Export Vault Modal */}
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => !isExporting && setShowExportModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)', width: 36, height: 36 }}>
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>
+                    Export Sovereign Vault
+                  </h2>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    AES-GCM-256 Encrypted Portable File (.wosenc)
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isExporting && setShowExportModal(false)}
+                className="btn-ghost"
+                style={{ padding: 6, borderRadius: '50%' }}
+                disabled={isExporting}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ padding: 12, background: 'rgba(6, 182, 212, 0.08)', border: '1px solid rgba(6, 182, 212, 0.3)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 16 }}>
+              <strong style={{ color: 'var(--neon-cyan)' }}>Zero-Knowledge Vault:</strong> Your data is client-side encrypted before export. Blank passphrases are strictly prohibited. Without your passphrase, this file cannot be recovered.
+            </div>
+
+            {exportError && (
+              <div style={{ padding: 10, background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', marginBottom: 14 }}>
+                {exportError}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Vault Passphrase *</span>
+                <button
+                  type="button"
+                  onClick={() => setShowExportPassphrase(!showExportPassphrase)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {showExportPassphrase ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showExportPassphrase ? 'Hide' : 'Show'}
+                </button>
+              </label>
+              <input
+                type={showExportPassphrase ? 'text' : 'password'}
+                placeholder="Enter a strong passphrase (min 4 characters)"
+                value={exportPassphrase}
+                onChange={e => setExportPassphrase(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Confirm Vault Passphrase *</label>
+              <input
+                type={showExportPassphrase ? 'text' : 'password'}
+                placeholder="Re-enter your passphrase"
+                value={exportPassphraseConfirm}
+                onChange={e => setExportPassphraseConfirm(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowExportModal(false)}
+                disabled={isExporting}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={executeExport}
+                disabled={isExporting}
+                style={{ flex: 2 }}
+              >
+                {isExporting ? 'Encrypting Vault...' : <><Download size={15} /> Encrypt & Export</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Accessible Decrypt Import Modal */}
+      {showImportPassphraseModal && (
+        <div className="modal-overlay" onClick={() => !isDecrypting && setShowImportPassphraseModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="cyber-icon-badge" style={{ background: 'var(--neon-emerald-glow)', color: 'var(--neon-emerald)', width: 36, height: 36 }}>
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>
+                    Unlock Encrypted Vault
+                  </h2>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    {pendingImportFile?.name}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isDecrypting && setShowImportPassphraseModal(false)}
+                className="btn-ghost"
+                style={{ padding: 6, borderRadius: '50%' }}
+                disabled={isDecrypting}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {importPassphraseError && (
+              <div style={{ padding: 10, background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', marginBottom: 14 }}>
+                {importPassphraseError}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Vault Passphrase *</span>
+                <button
+                  type="button"
+                  onClick={() => setShowImportPassphrase(!showImportPassphrase)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4 }}
+                >
+                  {showImportPassphrase ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showImportPassphrase ? 'Hide' : 'Show'}
+                </button>
+              </label>
+              <input
+                type={showImportPassphrase ? 'text' : 'password'}
+                placeholder="Enter the passphrase used for this backup"
+                value={importPassphrase}
+                onChange={e => setImportPassphrase(e.target.value)}
+                autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') executeDecryptImport(); }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => { setShowImportPassphraseModal(false); setPendingImportFile(null); }}
+                disabled={isDecrypting}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={executeDecryptImport}
+                disabled={isDecrypting}
+                style={{ flex: 2 }}
+              >
+                {isDecrypting ? 'Decrypting Vault...' : <><CheckCircle size={15} /> Decrypt & Preview</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Accessible Import Preview Modal */}
+      {importPreviewData && (
+        <div className="modal-overlay" onClick={() => !isIngesting && setImportPreviewData(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)', width: 36, height: 36 }}>
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>
+                    Vault Ingestion Preview
+                  </h2>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    {importPreviewData.filename}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isIngesting && setImportPreviewData(null)}
+                className="btn-ghost"
+                style={{ padding: 6, borderRadius: '50%' }}
+                disabled={isIngesting}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 16px 0' }}>
+              The file payload was successfully verified. Review the contents below before merging into your active ledger.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+              {[
+                { label: 'Accounts', count: importPreviewData.summary.accounts },
+                { label: 'Transactions', count: importPreviewData.summary.txns },
+                { label: 'Journal Legs', count: importPreviewData.summary.entries },
+                { label: 'Budgets', count: importPreviewData.summary.budgets },
+                { label: 'Financial Goals', count: importPreviewData.summary.goals },
+                { label: 'Debt Accounts', count: importPreviewData.summary.debts },
+                { label: 'Chit Funds', count: importPreviewData.summary.chits },
+                { label: 'Recurring Rules', count: importPreviewData.summary.recs },
+              ].map(item => (
+                <div key={item.label} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{item.label}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--neon-cyan)', fontSize: '0.9rem' }}>{item.count}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: 12, background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 18 }}>
+              <strong style={{ color: 'var(--semantic-income)' }}>Safe Non-Destructive Merge:</strong> Ingestion preserves existing records and deduplicates by entity identifier.
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setImportPreviewData(null)}
+                disabled={isIngesting}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmIngest}
+                disabled={isIngesting}
+                style={{ flex: 2 }}
+              >
+                {isIngesting ? 'Ingesting Records...' : <><CheckCircle2 size={16} /> Confirm & Ingest Vault</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

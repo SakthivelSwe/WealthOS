@@ -169,24 +169,22 @@ export function AccountsPage() {
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
 
+  const deletedTxnIds = useMemo(() => new Set(transactions.filter(t => t.deleted_at).map(t => t.id)), [transactions]);
+
   const computedAccounts = useMemo(() => accounts.map(acc => {
     const journalSum = journalEntries
-      .filter(je => je.account_id === acc.id)
-      .reduce((sum, je) => {
-        const txn = transactions.find(t => t.id === je.txn_id);
-        if (txn && !txn.deleted_at) return sum + je.amount_minor;
-        return sum;
-      }, 0);
+      .filter(je => je.account_id === acc.id && !deletedTxnIds.has(je.txn_id))
+      .reduce((sum, je) => sum + je.amount_minor, 0);
     return { ...acc, current_balance_minor: acc.opening_balance_minor + journalSum };
-  }), [accounts, journalEntries, transactions]);
+  }), [accounts, journalEntries, deletedTxnIds]);
 
   const totalAssets = useMemo(() => computedAccounts
-    .filter(a => a.include_in_net_worth && (a.current_balance_minor || 0) > 0)
-    .reduce((s, a) => s + (a.current_balance_minor || 0), 0), [computedAccounts]);
+    .filter(a => a.include_in_net_worth && (a.currency || currency) === currency && (a.current_balance_minor || 0) > 0)
+    .reduce((s, a) => s + (a.current_balance_minor || 0), 0), [computedAccounts, currency]);
 
   const totalLiabilities = useMemo(() => computedAccounts
-    .filter(a => a.include_in_net_worth && (a.current_balance_minor || 0) < 0)
-    .reduce((s, a) => s + (a.current_balance_minor || 0), 0), [computedAccounts]);
+    .filter(a => a.include_in_net_worth && (a.currency || currency) === currency && (a.current_balance_minor || 0) < 0)
+    .reduce((s, a) => s + (a.current_balance_minor || 0), 0), [computedAccounts, currency]);
 
   const netWorth = totalAssets + totalLiabilities;
 

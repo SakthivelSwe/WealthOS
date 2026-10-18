@@ -24,7 +24,7 @@ interface DataContextType {
   updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   addTransaction: (txn: Omit<Transaction, 'user_id'>, entries: Omit<JournalEntry, 'user_id'>[]) => Promise<void>;
-  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Transaction>, entries?: Omit<JournalEntry, 'user_id'>[]) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   addGoal: (goal: Omit<Goal, 'user_id'>) => Promise<void>;
   updateGoal: (id: string, updates: Partial<Goal>) => Promise<void>;
@@ -313,7 +313,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_accounts').insert(newAccount);
+      const { error } = await supabase.from('user_accounts').insert(newAccount);
+      if (error) {
+        console.warn('Supabase insert account failed, stored in local cache:', error.message);
+      }
     } catch (e) {
       console.warn('Saved to local storage, cloud sync pending:', e);
     }
@@ -326,7 +329,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_accounts').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      const { error } = await supabase.from('user_accounts').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) {
+        console.warn('Supabase update account failed:', error.message);
+      }
     } catch (e) {
       console.warn('Updated in local storage, cloud sync pending:', e);
     }
@@ -339,7 +345,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_accounts').update({ archived: true, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      const { error } = await supabase.from('user_accounts').update({ archived: true, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) {
+        console.warn('Supabase delete account failed:', error.message);
+      }
     } catch (e) {
       console.warn('Deleted locally, cloud sync pending:', e);
     }
@@ -363,23 +372,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await supabase.from('user_transactions').insert(newTxn);
+      const { error: txnErr } = await supabase.from('user_transactions').insert(newTxn);
+      if (txnErr) {
+        console.warn('Supabase insert transaction error:', txnErr.message);
+      }
       if (newEntries.length > 0) {
-        await supabase.from('user_journal_entries').insert(newEntries);
+        const { error: jeErr } = await supabase.from('user_journal_entries').insert(newEntries);
+        if (jeErr) {
+          console.warn('Supabase insert journal entries error:', jeErr.message);
+        }
       }
     } catch (e) {
       console.warn('Transaction stored locally:', e);
     }
   }, [userId]);
 
-  const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
+  const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>, entries?: Omit<JournalEntry, 'user_id'>[]) => {
     setTransactions(prev => {
       const updated = prev.map(t => t.id === id ? { ...t, ...updates, updated_at: Date.now() } : t);
       setLocal('transactions', updated);
       return updated;
     });
+
+    if (entries && entries.length > 0) {
+      setJournalEntries(prev => {
+        const filtered = prev.filter(je => je.txn_id !== id);
+        const updated = [...filtered, ...entries.map(e => ({ ...e, user_id: userId }))];
+        setLocal('journalEntries', updated);
+        return updated;
+      });
+    }
+
     try {
-      await supabase.from('user_transactions').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      const { error } = await supabase.from('user_transactions').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) {
+        console.warn('Supabase update transaction error:', error.message);
+      }
+      if (entries && entries.length > 0) {
+        const { error: delErr } = await supabase.from('user_journal_entries').delete().eq('txn_id', id).eq('user_id', userId);
+        if (delErr) console.warn('Supabase delete old journal entries error:', delErr.message);
+        const { error: insErr } = await supabase.from('user_journal_entries').insert(entries.map(e => ({ ...e, user_id: userId })));
+        if (insErr) console.warn('Supabase insert new journal entries error:', insErr.message);
+      }
     } catch (e) {
       console.warn('Transaction updated locally:', e);
     }
@@ -391,8 +425,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setLocal('transactions', updated);
       return updated;
     });
+    setJournalEntries(prev => {
+      const updated = prev.filter(je => je.txn_id !== id);
+      setLocal('journalEntries', updated);
+      return updated;
+    });
     try {
-      await supabase.from('user_transactions').update({ deleted_at: Date.now(), updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      const { error: txnErr } = await supabase.from('user_transactions').update({ deleted_at: Date.now(), updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (txnErr) {
+        console.warn('Supabase soft-delete transaction error:', txnErr.message);
+      }
+      const { error: jeErr } = await supabase.from('user_journal_entries').delete().eq('txn_id', id).eq('user_id', userId);
+      if (jeErr) {
+        console.warn('Supabase delete journal entries error:', jeErr.message);
+      }
     } catch (e) {
       console.warn('Transaction deleted locally:', e);
     }
@@ -406,7 +452,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_goals').insert(newGoal);
+      const { error } = await supabase.from('user_goals').insert(newGoal);
+      if (error) console.warn('Supabase insert goal error:', error.message);
     } catch (e) {
       console.warn('Goal saved locally:', e);
     }
@@ -419,7 +466,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_goals').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      const { error } = await supabase.from('user_goals').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase update goal error:', error.message);
     } catch (e) {
       console.warn('Goal updated locally:', e);
     }
@@ -433,7 +481,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_debts').insert(newDebt);
+      const { error } = await supabase.from('user_debts').insert(newDebt);
+      if (error) console.warn('Supabase insert debt error:', error.message);
     } catch (e) {
       console.warn('Debt saved locally:', e);
     }
@@ -446,7 +495,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_debts').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      const { error } = await supabase.from('user_debts').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase update debt error:', error.message);
     } catch (e) {
       console.warn('Debt updated locally:', e);
     }
@@ -460,7 +510,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_chit_funds').insert(newChit);
+      const { error } = await supabase.from('user_chit_funds').insert(newChit);
+      if (error) console.warn('Supabase insert chit fund error:', error.message);
     } catch (e) {
       console.warn('Chit fund saved locally:', e);
     }
@@ -474,7 +525,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_recurring_transactions').insert(newRec);
+      const { error } = await supabase.from('user_recurring_transactions').insert(newRec);
+      if (error) console.warn('Supabase insert recurring txn error:', error.message);
     } catch (e) {
       console.warn('Recurring txn saved locally:', e);
     }
@@ -488,7 +540,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_budgets').insert(newBudget);
+      const { error } = await supabase.from('user_budgets').insert(newBudget);
+      if (error) console.warn('Supabase insert budget error:', error.message);
     } catch (e) {
       console.warn('Budget saved locally:', e);
     }
@@ -516,7 +569,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_settings').upsert({ ...updates, user_id: userId, updated_at: Date.now() });
+      const { error } = await supabase.from('user_settings').upsert({ ...updates, user_id: userId, updated_at: Date.now() });
+      if (error) console.warn('Supabase upsert settings error:', error.message);
     } catch (e) {
       console.warn('Settings updated locally:', e);
     }
@@ -529,7 +583,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_notifications').update({ read: true }).eq('id', id).eq('user_id', userId);
+      const { error } = await supabase.from('user_notifications').update({ read: true }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase mark notification read error:', error.message);
     } catch (e) {
       console.warn('Notification marked read locally:', e);
     }
@@ -542,7 +597,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
     try {
-      await supabase.from('user_notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+      const { error } = await supabase.from('user_notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
+      if (error) console.warn('Supabase mark all notifications read error:', error.message);
     } catch (e) {
       console.warn('All notifications marked read locally:', e);
     }
@@ -553,10 +609,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const incomingAccounts: Account[] = data.accounts || [];
       const incomingTxns: Transaction[] = data.txns || data.transactions || [];
+      const incomingEntries: JournalEntry[] = data.journal_entries || data.journalEntries || [];
       const incomingGoals: Goal[] = data.goals || [];
       const incomingDebts: Debt[] = data.debts || [];
       const incomingChits: ChitFund[] = data.chits || data.chitFunds || [];
       const incomingRecs: RecurringTransaction[] = data.recurring || data.recurringTxns || [];
+      const incomingBudgets: Budget[] = data.budgets || [];
 
       if (incomingAccounts.length > 0) {
         setAccounts(prev => {
@@ -578,6 +636,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
           return combined;
         });
         count += incomingTxns.length;
+      }
+
+      if (incomingEntries.length > 0) {
+        setJournalEntries(prev => {
+          const combined = [...prev, ...incomingEntries.map(e => ({ ...e, user_id: userId }))];
+          setLocal('journalEntries', combined);
+          return combined;
+        });
+        count += incomingEntries.length;
       }
 
       if (incomingGoals.length > 0) {
@@ -624,12 +691,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
         count += incomingRecs.length;
       }
 
+      if (incomingBudgets.length > 0) {
+        setBudgets(prev => {
+          const map = new Map(prev.map(b => [b.id, b]));
+          incomingBudgets.forEach(b => map.set(b.id, { ...b, user_id: userId }));
+          const combined = Array.from(map.values());
+          setLocal('budgets', combined);
+          return combined;
+        });
+        count += incomingBudgets.length;
+      }
+
       // Try uploading to Supabase if connected
       try {
-        if (incomingAccounts.length > 0) await supabase.from('user_accounts').upsert(incomingAccounts.map(a => ({ ...a, user_id: userId })));
-        if (incomingTxns.length > 0) await supabase.from('user_transactions').upsert(incomingTxns.map(t => ({ ...t, user_id: userId })));
-        if (incomingGoals.length > 0) await supabase.from('user_goals').upsert(incomingGoals.map(g => ({ ...g, user_id: userId })));
-        if (incomingDebts.length > 0) await supabase.from('user_debts').upsert(incomingDebts.map(d => ({ ...d, user_id: userId })));
+        if (incomingAccounts.length > 0) {
+          const { error } = await supabase.from('user_accounts').upsert(incomingAccounts.map(a => ({ ...a, user_id: userId })));
+          if (error) console.warn('Supabase upsert imported accounts warning:', error.message);
+        }
+        if (incomingTxns.length > 0) {
+          const { error } = await supabase.from('user_transactions').upsert(incomingTxns.map(t => ({ ...t, user_id: userId })));
+          if (error) console.warn('Supabase upsert imported transactions warning:', error.message);
+        }
+        if (incomingEntries.length > 0) {
+          const { error } = await supabase.from('user_journal_entries').upsert(incomingEntries.map(e => ({ ...e, user_id: userId })));
+          if (error) console.warn('Supabase upsert imported journal entries warning:', error.message);
+        }
+        if (incomingGoals.length > 0) {
+          const { error } = await supabase.from('user_goals').upsert(incomingGoals.map(g => ({ ...g, user_id: userId })));
+          if (error) console.warn('Supabase upsert imported goals warning:', error.message);
+        }
+        if (incomingDebts.length > 0) {
+          const { error } = await supabase.from('user_debts').upsert(incomingDebts.map(d => ({ ...d, user_id: userId })));
+          if (error) console.warn('Supabase upsert imported debts warning:', error.message);
+        }
+        if (incomingBudgets.length > 0) {
+          const { error } = await supabase.from('user_budgets').upsert(incomingBudgets.map(b => ({ ...b, user_id: userId })));
+          if (error) console.warn('Supabase upsert imported budgets warning:', error.message);
+        }
       } catch (e) {
         console.warn('Cloud sync of imported items pending:', e);
       }

@@ -106,19 +106,83 @@ The audit verified and corrected 6 critical (P0/P1) architectural and financial 
 
 ---
 
-### Defect F (CRITICAL P0): Cloud Backup Storage Path Violated Supabase Storage RLS
-- **Severity**: P0 (Remote Backup Upload Blocked)
-- **Affected File**: `app/src/main/kotlin/app/privatemoney/cloud/CloudSyncService.kt:314`
-- **Symptom**: Android cloud backup upload threw RLS permission denied errors against Supabase Storage bucket `backups`.
-- **Root Cause**: The Supabase Storage RLS policy (`20261007000000_init.sql:108`) enforces:
-  ```sql
-  create policy "backups_objects_insert_own" on storage.objects for insert to authenticated
-    with check (bucket_id = 'backups' and (storage.foldername(name))[1] = (select auth.uid())::text);
-  ```
-  `CloudSyncService.kt` uploaded to hardcoded `"vault/$fileName"` instead of `"<userId>/$fileName"`.
+### Defect G (CRITICAL P0 - Finding A & B): Encrypted Backup Interoperability & Passphrase Security
+- **Severity**: P0 (Cryptographic Vulnerability & Cross-Platform Restore Incompatibility)
+- **Affected Files**: `wealthos-web/src/lib/backupCrypto.ts`, `app/src/main/kotlin/app/privatemoney/cloud/CloudSyncService.kt`, `wealthos-web/src/components/settings/SettingsPage.tsx`
+- **Root Cause**:
+  1. `backupCrypto.ts` derived AES keys using a deterministic fallback string (`wealthos_default_vault_key`) when the passphrase was empty or cancelled via browser prompt.
+  2. Web backup exports passed an empty array for `journal_entries: []` and omitted `budgets`.
+  3. Web stored data in `snake_case` (`amount_minor`, `account_id`, `opening_balance_minor`), whereas Android Room JSON parser expected `camelCase` (`amountMinor`, `accountId`, `openingBalanceMinor`).
 - **Resolution**:
-  1. Added `supabaseUserId` persistence in `AppSettings.kt`.
-  2. Updated `CloudSyncService.kt` upload path to `"$userId/$fileName"`, matching the mandatory RLS folder scoping convention.
+  1. Eradicated deterministic key fallback. Blank or missing passphrases now strictly abort with a descriptive error.
+  2. Replaced raw browser `prompt()` with accessible modal dialogs with passphrase confirmation, strength checks, and pre-import review.
+  3. Implemented canonical bilingual serialization (`normalizePayloadForExport`) generating both `camelCase` and `snake_case` keys for every entity (`accounts`, `categories`, `txns`, `journal_entries`, `goals`, `debts`, `chits`, `recurring`, `budgets`).
+  4. Updated Android `CloudSyncService.kt` to use lenient property helpers (`optStringLenient`, `optLongLenient`, `optBooleanLenient`, timestamp parsing) supporting both camelCase and snake_case representations.
+  5. Added automated regression test suite (`wealthos-web/test/backupCrypto.test.js`) verifying wire framing, AEAD AAD header authentication, ciphertext tampering rejection, and round-trip decryption.
+
+---
+
+### Defect H (HIGH P1 - Finding C): Incomplete Web Database Error Handling & Journal Deletion
+- **Severity**: P1 (Silent Data Persistence Failure & Ghost Journal Legs)
+- **Affected File**: `wealthos-web/src/hooks/useData.tsx`
+- **Root Cause**:
+  1. Awaited Supabase operations inside `try/catch` without checking the returned `{ error }` property. Because Supabase client does not throw JavaScript exceptions on HTTP or RLS errors, failures were silently reported as successes.
+  2. `deleteTransaction` only set `deleted_at` on `user_transactions`, omitting deletion of corresponding `user_journal_entries` rows in both local state and cloud database.
+- **Resolution**:
+  1. Added explicit `{ error }` checks across all CRUD methods in `useData.tsx` (`addAccount`, `updateAccount`, `deleteAccount`, `addTransaction`, `updateTransaction`, `deleteTransaction`, goals, debts, chits, recurring, budgets, settings).
+  2. Updated `deleteTransaction` to purge corresponding journal entries from `user_journal_entries` and local `journalEntries` state.
+  3. Expanded `importAllData` to ingest and persist `journal_entries` and `budgets`.
+
+---
+
+### Defect I (HIGH P1 - Finding D): Incomplete Cloud Deletion Reporting in Web Auth
+- **Severity**: P1 (Privacy Violation & Destructive Local State Wiping)
+- **Affected File**: `wealthos-web/src/hooks/useAuth.tsx:248-287`
+- **Root Cause**:
+  1. `deleteAllUserData` attempted browser-side `supabase.auth.admin.deleteUser()` (which requires a `service_role` key unavailable on the client).
+  2. It iterated through tables while swallowing errors, and unconditionally wiped local storage even if 100% of cloud tables failed to delete, reporting success to the user.
+- **Resolution**:
+  1. Enforced strict table deletion result inspection across all 11 user tables in reverse dependency order.
+  2. Added storage cleanup purging encrypted backup files in the `backups` bucket under `<userId>/`.
+  3. If cloud deletion encounters any failure, local storage is preserved and an explicit error list is surfaced so the user does not suffer unrecoverable data loss.
+
+---
+
+### Defect J (HIGH P1 - Finding E & F): Historical Truncation & Multi-Currency Summation
+- **Severity**: P1 (Financial Calculation Inaccuracy)
+- **Affected Files**: `wealthos-web/src/components/dashboard/Dashboard.tsx`, `wealthos-web/src/components/accounts/AccountsPage.tsx`
+- **Root Cause**:
+  1. `Dashboard.tsx` and `AccountsPage.tsx` joined `journalEntries` against `transactions.find(t => t.id === je.txn_id)`. Because `useData.tsx` loaded transactions with `.limit(500)`, all journal entries older than 500 transactions were silently dropped from live account balances.
+  2. `netWorth` and `liquidBalance` summed raw integer minor units across disparate currencies (e.g., INR 1,50,000 + USD 500 = 150500), creating invalid financial aggregations.
+- **Resolution**:
+  1. Decoupled account balance calculation from the 500-transaction pagination window by computing `journalSum` from active journal entries filtered only against explicitly deleted transaction IDs (`!deletedTxnIds.has(je.txn_id)`).
+  2. Segregated account balances and net worth by currency (`balancesByCurrency`). Net worth displays the authoritative total in the user's primary currency, with separate breakdowns for secondary currencies.
+  3. Relabeled the simple monthly surplus metric to **"Monthly Net Surplus"** with transparent pacing explanation instead of misrepresenting it as an advanced safe-to-spend engine.
+  4. Added canonical global currency definitions (`JPY` 0 decimals, `AED`, `SGD`, `AUD`, `CAD`) to `types/index.ts`.
+
+---
+
+### Defect K (MEDIUM P2 - Finding G, H, I): Design System, Hydration, and CI/CD Verification
+- **Severity**: P2 (Visual Alignment, Hydration Glitches, and CI Automation Gap)
+- **Affected Files**: `wealthos-web/src/components/shared/Canvas3DBackground.tsx`, `wealthos-web/src/components/shared/Tilt3DCard.tsx`, `wealthos-web/src/components/shared/HoloCard3D.tsx`, `wealthos-web/src/components/auth/LoginPage.tsx`, `app/src/main/kotlin/app/privatemoney/ui/theme/Theme.kt`, `.github/workflows/verify.yml`
+- **Resolution**:
+  1. **Quiet Wealth Motion Restraint**: Added `prefers-reduced-motion` detection and mobile detection in `Canvas3DBackground.tsx`, `Tilt3DCard.tsx`, and `HoloCard3D.tsx`. When active, expensive 60fps loops and 3D tilts are replaced with static calm gradients.
+  2. **Android Theme Alignment**: Updated Android `primary` color from neon green (`0xFF00E599`) to Quiet Wealth Forest Emerald (`0xFF10B981`), harmonizing mobile with web semantic tokens.
+  3. **Settings Hydration & Login Redesign**: Added asynchronous `useEffect` in `SettingsPage.tsx` to populate forms when cloud settings load, unified `wealthos_theme` with `theme_mode`, and updated `LoginPage.tsx` to Quiet Wealth styling with accurate architecture labels (Encrypted Snapshot Backup).
+  4. **CI/CD Web Verification**: Added `web-verify` job to `.github/workflows/verify.yml` running Node.js 20, `npm ci`, `npm test` (7 automated tests), and `npm run build`.
+
+---
+
+### Defect L (HIGH P1): Unbalanced Double-Entry Legs on New Transaction & Missing Journal Update on Edit
+- **Severity**: P1 (Financial Accounting Invariant Violation & Ledger Discrepancy)
+- **Affected Files**: `wealthos-web/src/components/shared/NewTransactionModal.tsx`, `wealthos-web/src/components/ledger/LedgerPage.tsx`, `wealthos-web/src/hooks/useData.tsx`
+- **Root Cause**:
+  1. `NewTransactionModal.tsx` generated only a single journal leg for EXPENSE and INCOME (`journalEntries.push({ account_id, amount_minor: -amountMinor })`), violating double-entry invariants where transaction legs must sum to 0.
+  2. `useData.tsx`'s `updateTransaction` only updated `user_transactions`, leaving old journal entries unchanged when amounts, accounts, or categories were edited, causing ledger balances to drift.
+- **Resolution**:
+  1. Updated `NewTransactionModal.tsx` to generate balanced debit/credit legs for EXPENSE, INCOME, and TRANSFER, guaranteeing that `legs.reduce((acc, e) => acc + e.amount_minor, 0) === 0`.
+  2. Updated `useData.tsx`'s `updateTransaction` to accept updated journal entries and replace corresponding `user_journal_entries` rows both in local state and Supabase.
+  3. Updated `LedgerPage.tsx` to pass updated balanced journal legs when saving an edited transaction.
 
 ---
 
@@ -128,21 +192,21 @@ The audit verified and corrected 6 critical (P0/P1) architectural and financial 
 | :--- | :--- | :--- |
 | **Local Database Encryption** | SQLCipher 4.6.1 with AES-256 in CBC mode, HMAC-SHA512 per page, 256,000 PBKDF2 iterations. | **PASS** |
 | **Keystore Key Storage** | Android KeyStore (`MasterKeys`/`KeyGenParameterSpec`) wraps SQLCipher passphrases in hardware-backed TEE/StrongBox. | **PASS** |
-| **Backup Encryption** | AES-GCM-128 authenticated encryption with 100,000 PBKDF2 iterations, 16-byte random salt, 12-byte IV, 16-byte GCM tag. | **PASS** |
-| **Tamper Protection** | Full payload checksum verification before restore staging. Restores to temporary validation model before committing. | **PASS** |
+| **Backup Encryption** | AES-GCM-256 authenticated encryption with 100,000 PBKDF2 iterations, 16-byte random salt, 12-byte IV, 16-byte GCM tag. | **PASS** |
+| **Tamper Protection** | Full payload SHA-256 checksum and AEAD AAD binding. Header alteration invalidates auth tag. | **PASS** |
 | **Supabase RLS Policies** | Every user table (`user_accounts`, `user_transactions`, `user_categories`) enforces `auth.uid() = user_id`. | **PASS** |
 | **API Secret Hygiene** | No client-side Gemini or Supabase service_role keys in mobile or web source trees. | **PASS** |
 | **Authentication Transport** | 100% Free Supabase Email OTP with secure time-limited tokens and magic link redirection. | **PASS** |
+| **Formula Injection Shielding** | CSV exporter prefixes dangerous spreadsheet formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) with `'`. | **PASS** |
 
 ---
 
 ## 5. UI/UX Design System Evolution: "Quiet Wealth"
 
-The web application was previously styled using high-saturation cyber-luxury elements (`--neon-cyan`, `--neon-purple`, high-blur radial gradients, and heavy glowing box-shadows).
-
-Under Phase 7, the interface transitioned to the **Quiet Wealth** editorial standard:
+The application has fully transitioned across both Android and Web to the **Quiet Wealth** editorial standard:
 - **Dark Mode**: Deep graphite/obsidian canvas (`#090c10`), restrained elevated surfaces (`#131922`, `#18202c`), and fine 1px borders (`rgba(255, 255, 255, 0.08)`).
 - **Light Mode**: Warm paper alabaster surfaces (`#f8fafc`, `#ffffff`) with crisp typography and subtle borders (`rgba(0, 0, 0, 0.08)`).
-- **Primary Accent**: Single refined forest-emerald (`#10b981` in dark mode, `#059669` in light mode).
-- **Semantic Restraint**: Muted, high-contrast income green, crimson expense, and warm amber warnings.
-- **Motion & Accessibility**: Removed jarring glow filters and infinite rainbow animations; implemented strict `@media (prefers-reduced-motion: reduce)` support.
+- **Primary Accent**: Single refined forest-emerald (`#10b981` in dark mode, `#059669` in light mode; Android `0xFF10B981`).
+- **Semantic Restraint**: High-contrast income emerald, crimson expense, and warm amber warnings.
+- **Motion & Accessibility**: Removed jarring glow filters, infinite rainbow loops, and 3D tilts for users with `prefers-reduced-motion`.
+

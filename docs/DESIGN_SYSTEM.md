@@ -182,3 +182,26 @@ The **Quiet Wealth** design aesthetic enforces:
    - Primary text (`#f8fafc`) on dark canvas (`#090c10`) achieves an **18.2:1 contrast ratio**, well exceeding the 7:1 WCAG AAA requirement.
    - Primary text (`#0f172a`) on light canvas (`#f8fafc`) achieves a **15.4:1 contrast ratio**.
    - Semantic badges use tinted background pills (`12% opacity`) with high-contrast foreground text to ensure accessibility without overwhelming the eye.
+
+---
+
+## 6. Cross-Platform Alignment & Verified Audits
+
+### 6.1 Android Jetpack Compose (`app.privatemoney.ui.theme.Theme.kt`)
+- **Primary Accent Alignment**: Updated Android `primary` from neon cyber green (`0xFF00E599`) to Quiet Wealth Forest Emerald (`0xFF10B981`), with subdued surface glows (`0x3310B981`).
+- **Surface Tone**: Material 3 dark color scheme utilizes Obsidian/Graphite surfaces (`0xFF0D1117`, `0xFF131922`, `0xFF18202C`) matching web `--bg-primary` and `--bg-secondary`.
+- **Typography**: Numeric weights use tabular numbers with aligned decimal points.
+
+### 6.2 Motion Restraint in Web (`Canvas3DBackground.tsx`, `Tilt3DCard.tsx`)
+- **Canvas3DBackground**:
+  - Respects `window.matchMedia('(prefers-reduced-motion: reduce)')` and mobile viewports (`window.innerWidth < 768`).
+  - When active, the continuous 60fps Three.js animation loop is cancelled; a static, calm ambient canvas is rendered with zero CPU/GPU overhead.
+- **Tilt3DCard**:
+  - Evaluates `prefers-reduced-motion` and touch devices. 3D transform perspectives and holographic gleams are disabled to ensure calm, stable rendering.
+
+### 6.3 Accessible Modal Dialogs vs Browser Prompts (`SettingsPage.tsx`)
+- Completely eliminated raw browser `window.prompt()` for backup export and vault unlock.
+- **Export Vault Modal**: Accessible dialog with explicit passphrase input, confirmation field, strength validation, and clear zero-knowledge notice.
+- **Unlock Vault Modal**: Secure in-memory passphrase entry with show/hide password toggle.
+- **Ingestion Preview Modal**: Pre-import staging preview displaying verified counts of accounts, transactions, journal legs, budgets, goals, debts, and recurring items before applying changes.
+- **WCAG Compliance**: All modals trap focus, provide explicit ARIA roles (`role="dialog"`, `aria-modal="true"`), support `Escape` key dismissal, and offer high-contrast touch targets (min 44x44px).

@@ -186,17 +186,23 @@ export const CURRENCIES: CurrencyInfo[] = [
   { code: 'USD', symbol: '$', name: 'US Dollar', minorUnit: 2 },
   { code: 'EUR', symbol: '€', name: 'Euro', minorUnit: 2 },
   { code: 'GBP', symbol: '£', name: 'British Pound', minorUnit: 2 },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen', minorUnit: 0 },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar', minorUnit: 2 },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham', minorUnit: 2 },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', minorUnit: 2 },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', minorUnit: 2 },
 ];
 
 export function getCurrencyInfo(code: string): CurrencyInfo {
-  return CURRENCIES.find(c => c.code === code) || CURRENCIES[0];
+  return CURRENCIES.find(c => c.code === code) || { code, symbol: code + ' ', name: code, minorUnit: 2 };
 }
 
 export function formatMoney(amountMinor: number, currencyCode: string = 'INR', masked: boolean = false): string {
   if (masked) return '••••••';
   const info = getCurrencyInfo(currencyCode);
   const amount = amountMinor / Math.pow(10, info.minorUnit);
-  return `${info.symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: info.minorUnit, maximumFractionDigits: info.minorUnit })}`;
+  const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
+  return `${info.symbol}${amount.toLocaleString(locale, { minimumFractionDigits: info.minorUnit, maximumFractionDigits: info.minorUnit })}`;
 }
 
 export function parseMoney(text: string, currencyCode: string = 'INR'): number {

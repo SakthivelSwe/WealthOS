@@ -44,34 +44,52 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
   const currentMonthStart = format(startOfMonth(now), 'yyyy-MM-dd');
   const currentMonthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
 
-  // Compute live account balances
+  // Retain all historical journal entries; only exclude explicitly deleted transactions
+  const deletedTxnIds = useMemo(() => new Set(transactions.filter(t => t.deleted_at).map(t => t.id)), [transactions]);
+
+  // Compute live account balances authoritatively across full journal history
   const computedAccounts = useMemo(() => accounts.map(acc => {
     const journalSum = journalEntries
-      .filter(je => je.account_id === acc.id)
-      .reduce((sum, je) => {
-        const txn = transactions.find(t => t.id === je.txn_id);
-        if (txn && !txn.deleted_at) return sum + je.amount_minor;
-        return sum;
-      }, 0);
+      .filter(je => je.account_id === acc.id && !deletedTxnIds.has(je.txn_id))
+      .reduce((sum, je) => sum + je.amount_minor, 0);
     return { ...acc, current_balance_minor: acc.opening_balance_minor + journalSum };
-  }), [accounts, journalEntries, transactions]);
+  }), [accounts, journalEntries, deletedTxnIds]);
 
-  const liquidTypes = ['BANK', 'CASH', 'UPI_WALLET', 'SAVINGS'];
-  const liquidBalance = computedAccounts
-    .filter(a => liquidTypes.includes(a.type))
-    .reduce((s, a) => s + (a.current_balance_minor || 0), 0);
+  const liquidTypes = useMemo(() => ['BANK', 'CASH', 'UPI_WALLET', 'SAVINGS'], []);
 
-  const netWorth = computedAccounts
-    .filter(a => a.include_in_net_worth)
-    .reduce((s, a) => s + (a.current_balance_minor || 0), 0);
+  // Multi-currency aware balance aggregation - prevents invalid raw summing of disparate currencies
+  const balancesByCurrency = useMemo(() => {
+    const map = new Map<string, { netWorth: number; liquid: number; count: number }>();
+    computedAccounts.forEach(a => {
+      const cur = a.currency || currency;
+      const existing = map.get(cur) || { netWorth: 0, liquid: 0, count: 0 };
+      if (a.include_in_net_worth) {
+        existing.netWorth += a.current_balance_minor || 0;
+      }
+      if (liquidTypes.includes(a.type)) {
+        existing.liquid += a.current_balance_minor || 0;
+      }
+      existing.count++;
+      map.set(cur, existing);
+    });
+    return map;
+  }, [computedAccounts, currency, liquidTypes]);
 
-  // Monthly totals
+  const primaryBalances = balancesByCurrency.get(currency) || { netWorth: 0, liquid: 0, count: 0 };
+  const netWorth = primaryBalances.netWorth;
+  const liquidBalance = primaryBalances.liquid;
+
+  const otherCurrencies = useMemo(() => {
+    return Array.from(balancesByCurrency.entries()).filter(([c]) => c !== currency);
+  }, [balancesByCurrency, currency]);
+
+  // Monthly totals (filtered to primary currency to maintain financial consistency)
   const monthlyExpense = transactions
-    .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
+    .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd && (!t.currency || t.currency === currency))
     .reduce((s, t) => s + t.amount_minor, 0);
 
   const monthlyIncome = transactions
-    .filter(t => t.type === 'INCOME' && !t.deleted_at && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
+    .filter(t => t.type === 'INCOME' && !t.deleted_at && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd && (!t.currency || t.currency === currency))
     .reduce((s, t) => s + t.amount_minor, 0);
 
   // 50/30/20 breakdown — compare against take-home income (falls back to settings income)
@@ -89,13 +107,12 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
     .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.need_want === 'SAVING' && t.local_date >= currentMonthStart && t.local_date <= currentMonthEnd)
     .reduce((s, t) => s + t.amount_minor, 0);
 
-  // Safe-to-spend: this month's income minus this month's total expenses
-  // (not liquid balance, which accumulates historical months)
+  // Monthly Net Surplus: this month's inflow minus outflow
   const monthNetSurplus = monthlyIncome - monthlyExpense;
-  const safeToSpend = monthNetSurplus > 0 ? monthNetSurplus : 0;
+  const surplusToPace = monthNetSurplus > 0 ? monthNetSurplus : 0;
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysRemaining = daysInMonth - now.getDate() + 1;
-  const dailyBudget = daysRemaining > 0 ? Math.floor(safeToSpend / daysRemaining) : 0;
+  const dailyBudget = daysRemaining > 0 ? Math.floor(surplusToPace / daysRemaining) : 0;
 
   // 6-month historical area trend
   const trendData = useMemo(() => {
@@ -245,21 +262,23 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               </div>
             </Tilt3DCard>
 
-            {/* Safe to Spend & Daily Velocity */}
+            {/* Monthly Net Surplus & Daily Velocity */}
             <Tilt3DCard>
               <div className="cyber-card" style={{ height: '100%' }}>
                 <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
                 <div className="stat-label">
-                  <span>Safe To Spend</span>
+                  <span>Monthly Net Surplus</span>
                   <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
                     <Zap size={18} />
                   </div>
                 </div>
-                <div className="stat-value" style={{ color: 'var(--neon-cyan)' }}>
-                  {formatMoney(safeToSpend, currency, masked)}
+                <div className="stat-value" style={{ color: monthNetSurplus >= 0 ? 'var(--neon-cyan)' : 'var(--neon-rose)' }}>
+                  {formatMoney(monthNetSurplus, currency, masked)}
                 </div>
                 <div className="stat-trend neutral">
-                  ≈ {formatMoney(dailyBudget, currency, masked)} / day ({daysRemaining} days left)
+                  {monthNetSurplus > 0
+                    ? `≈ ${formatMoney(dailyBudget, currency, masked)} / day pacing (${daysRemaining} days left)`
+                    : 'Outflow exceeds monthly inflow'}
                 </div>
               </div>
             </Tilt3DCard>
@@ -553,7 +572,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                       color,
                     }}
                   >
-                    {sign}{formatMoney(txn.amount_minor, currency, masked)}
+                    {sign}{formatMoney(txn.amount_minor, txn.currency || currency, masked)}
                   </div>
                 </div>
               );

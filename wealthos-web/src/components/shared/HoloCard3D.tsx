@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { formatMoney } from '../../types';
 import { Wifi, Eye, EyeOff, RotateCw, ShieldCheck } from 'lucide-react';
 
@@ -23,23 +23,40 @@ export function HoloCard3D({
   const cardRef = useRef<HTMLDivElement>(null);
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, glareX: 50, glareY: 50, glareOpacity: 0 });
 
+  const [reduceMotion, setReduceMotion] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches || window.innerWidth < 768;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleMedia = () => setReduceMotion(media.matches || window.innerWidth < 768);
+    media.addEventListener('change', handleMedia);
+    window.addEventListener('resize', handleMedia);
+    return () => {
+      media.removeEventListener('change', handleMedia);
+      window.removeEventListener('resize', handleMedia);
+    };
+  }, []);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
+    if (reduceMotion || !cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const cx = rect.width / 2;
     const cy = rect.height / 2;
 
-    const rx = ((y - cy) / cy) * -12;
-    const ry = ((x - cx) / cx) * 14;
+    const rx = ((y - cy) / cy) * -8;
+    const ry = ((x - cx) / cx) * 10;
 
     setTilt({
       rx,
       ry,
       glareX: (x / rect.width) * 100,
       glareY: (y / rect.height) * 100,
-      glareOpacity: 0.35,
+      glareOpacity: 0.25,
     });
   };
 
@@ -50,7 +67,7 @@ export function HoloCard3D({
   return (
     <div
       style={{
-        perspective: '1200px',
+        perspective: reduceMotion ? 'none' : '1200px',
         width: '100%',
         maxWidth: 440,
         margin: '0 auto',
@@ -66,22 +83,24 @@ export function HoloCard3D({
           height: 250,
           position: 'relative',
           transformStyle: 'preserve-3d',
-          transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry + (isFlipped ? 180 : 0)}deg) scale3d(1.02, 1.02, 1.02)`,
-          transition: 'transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease',
+          transform: reduceMotion
+            ? `rotateY(${isFlipped ? 180 : 0}deg)`
+            : `rotateX(${tilt.rx}deg) rotateY(${tilt.ry + (isFlipped ? 180 : 0)}deg) scale3d(1.01, 1.01, 1.01)`,
+          transition: reduceMotion ? 'transform 0.3s ease' : 'transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease',
           cursor: 'pointer',
         }}
       >
-        {/* Dynamic ambient card glow */}
+        {/* Dynamic ambient card glow - Quiet Wealth Emerald */}
         <div
           style={{
             position: 'absolute',
-            inset: -12,
-            borderRadius: 28,
-            background: 'radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, rgba(6, 182, 212, 0.2) 40%, transparent 70%)',
-            filter: 'blur(20px)',
-            opacity: 0.8,
+            inset: -8,
+            borderRadius: 24,
+            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, rgba(13, 17, 23, 0.1) 50%, transparent 75%)',
+            filter: 'blur(16px)',
+            opacity: 0.7,
             zIndex: 0,
-            transform: 'translateZ(-20px)',
+            transform: 'translateZ(-10px)',
           }}
         />
 
@@ -91,9 +110,9 @@ export function HoloCard3D({
             position: 'absolute',
             inset: 0,
             borderRadius: 20,
-            background: 'linear-gradient(135deg, #111422 0%, #090c15 50%, #151a2e 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.2)',
+            background: 'linear-gradient(135deg, #131922 0%, #0d1117 60%, #18202c 100%)',
+            border: '1px solid var(--border-default, rgba(255, 255, 255, 0.12))',
+            boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.12)',
             padding: 24,
             display: 'flex',
             flexDirection: 'column',
@@ -103,17 +122,19 @@ export function HoloCard3D({
             zIndex: 2,
           }}
         >
-          {/* Holographic Iridescent Shimmer Overlay */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255,255,255,${tilt.glareOpacity * 0.9}) 0%, rgba(6, 182, 212, ${tilt.glareOpacity * 0.7}) 20%, rgba(168, 85, 247, ${tilt.glareOpacity * 0.5}) 40%, transparent 65%)`,
-              mixBlendMode: 'color-dodge',
-              pointerEvents: 'none',
-              transition: 'opacity 0.15s ease',
-            }}
-          />
+          {/* Subtle Ambient Shimmer Overlay */}
+          {!reduceMotion && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255,255,255,${tilt.glareOpacity * 0.7}) 0%, rgba(16, 185, 129, ${tilt.glareOpacity * 0.4}) 30%, transparent 65%)`,
+                mixBlendMode: 'overlay',
+                pointerEvents: 'none',
+                transition: 'opacity 0.15s ease',
+              }}
+            />
+          )}
 
           {/* Holographic foil diagonal wave */}
           <div
@@ -136,21 +157,21 @@ export function HoloCard3D({
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #6366f1 100%)',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'white',
                   fontWeight: 900,
                   fontSize: '1rem',
-                  boxShadow: '0 0 15px rgba(6, 182, 212, 0.5)',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
                 }}
               >
                 W
               </div>
               <div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 800, letterSpacing: '0.08em', color: '#f8fafc', textTransform: 'uppercase' }}>
-                  WealthOS <span style={{ color: '#06b6d4', fontSize: '0.72rem', fontWeight: 600 }}>BLACK</span>
+                  WealthOS <span style={{ color: '#10b981', fontSize: '0.72rem', fontWeight: 700 }}>VAULT</span>
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', letterSpacing: '0.05em' }}>PRIVATE VAULT</div>
               </div>
@@ -213,7 +234,7 @@ export function HoloCard3D({
                 fontWeight: 900,
                 fontFamily: 'var(--font-outfit), sans-serif',
                 letterSpacing: '-0.02em',
-                background: 'linear-gradient(135deg, #ffffff 30%, #a5f3fc 100%)',
+                background: 'linear-gradient(135deg, #ffffff 40%, #e2e8f0 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
               }}
@@ -343,7 +364,7 @@ export function HoloCard3D({
                 <ShieldCheck size={14} /> PBKDF2 + AES-GCM Encrypted
               </div>
               <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>
-                Supabase Real-time Cloud Mirror Active
+                Zero-Knowledge Client-Side Vault Encryption
               </div>
             </div>
             <div style={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 600 }}>

@@ -44,10 +44,10 @@ val LocalPrivacyMask = compositionLocalOf { false }
 enum class ThemeMode { SYSTEM, LIGHT, DARK, MIDNIGHT }
 
 private val DarkScheme = darkColorScheme(
-    primary = Color(0xFF00E599),
+    primary = Color(0xFF10B981),
     onPrimary = Color(0xFF06140D),
-    primaryContainer = Color(0xFF003822),
-    onPrimaryContainer = Color(0xFF66FFBA),
+    primaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = Color(0xFFA7F3D0),
     secondary = Color(0xFF38BDF8),
     onSecondary = Color(0xFF042033),
     tertiary = Color(0xFFF59E0B),
@@ -65,10 +65,10 @@ private val DarkScheme = darkColorScheme(
 )
 
 private val MidnightScheme = darkColorScheme(
-    primary = Color(0xFF00E599),
+    primary = Color(0xFF10B981),
     onPrimary = Color(0xFF000000),
-    primaryContainer = Color(0xFF002919),
-    onPrimaryContainer = Color(0xFF66FFBA),
+    primaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = Color(0xFFA7F3D0),
     secondary = Color(0xFF38BDF8),
     onSecondary = Color(0xFF000000),
     tertiary = Color(0xFFF59E0B),
@@ -114,7 +114,7 @@ private val DarkFinance = FinanceColors(
     muted = Color(0xFF94A3B8),
     raised = Color(0xFF181F2E),
     hairline = Color(0xFF222B3D),
-    primaryGlow = Color(0x3300E599),
+    primaryGlow = Color(0x3310B981),
     cardGradientStart = Color(0xFF161F33),
     cardGradientEnd = Color(0xFF0F1524),
     accentCyan = Color(0xFF38BDF8),
@@ -131,7 +131,7 @@ private val MidnightFinance = FinanceColors(
     muted = Color(0xFF8B949E),
     raised = Color(0xFF12141A),
     hairline = Color(0xFF1B1F28),
-    primaryGlow = Color(0x4400E599),
+    primaryGlow = Color(0x4410B981),
     cardGradientStart = Color(0xFF12151D),
     cardGradientEnd = Color(0xFF08090D),
     accentCyan = Color(0xFF38BDF8),

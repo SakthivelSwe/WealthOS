@@ -124,7 +124,7 @@ export function FloatingNav({ onOpenCommand, onOpenNewTxn }: FloatingNavProps) {
               onClick={handleToggleMask}
               title={isMasked ? 'Reveal Balances' : 'Mask Balances'}
             >
-              {isMasked ? <EyeOff size={15} style={{ color: 'var(--neon-amber)' }} /> : <Eye size={15} />}
+              {isMasked ? <EyeOff size={15} style={{ color: 'var(--semantic-warning, #f59e0b)' }} /> : <Eye size={15} />}
             </button>
 
             {/* Action Button: New Transaction */}
@@ -156,7 +156,7 @@ export function FloatingNav({ onOpenCommand, onOpenNewTxn }: FloatingNavProps) {
                 <div className="profile-dropdown-glass animate-pop">
                   <div className="dropdown-user-info">
                     <div className="user-name">{settings?.user_name || 'WealthOS User'}</div>
-                    <div className="user-phone">{user?.phone || 'Connected Session'}</div>
+                    <div className="user-phone">{user?.email || 'Connected Session'}</div>
                   </div>
                   <div className="dropdown-divider" />
                   <button

@@ -248,8 +248,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const deleteAllUserData = useCallback(async () => {
     if (!session?.user?.id) return { error: new Error('Not authenticated') };
     const userId = session.user.id;
-    try {
-      // Delete all user data from Supabase in dependency order
+    const isDemoUser = session.user.id.startsWith('00000000-0000-') || session.user.id.startsWith('usr_');
+
+    const failedTables: string[] = [];
+
+    if (!isDemoUser) {
+      // Delete all user data from Supabase in reverse dependency order
       const tables = [
         'user_notifications',
         'user_journal_entries',
@@ -263,22 +267,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         'user_categories',
         'user_settings',
       ];
+
       for (const table of tables) {
         try {
-          await supabase.from(table).delete().eq('user_id', userId);
-        } catch (e) {
-          console.warn(`Could not delete from ${table}:`, e);
+          const { error } = await supabase.from(table).delete().eq('user_id', userId);
+          if (error) {
+            console.error(`Failed to delete from ${table}:`, error.message);
+            failedTables.push(`${table} (${error.message})`);
+          }
+        } catch (e: any) {
+          console.error(`Exception deleting from ${table}:`, e);
+          failedTables.push(`${table} (${e?.message || 'network error'})`);
         }
       }
-      // Delete auth user if using real Supabase auth
+
+      // Purge any encrypted backup objects stored in Supabase Storage for this user
       try {
-        await supabase.auth.admin?.deleteUser(userId);
-      } catch (_) {}
-    } catch (e: any) {
-      // Even if cloud deletion fails, clear local data
-      console.warn('Cloud deletion error:', e);
+        const { data: files } = await supabase.storage.from('backups').list(userId);
+        if (files && files.length > 0) {
+          const paths = files.map(f => `${userId}/${f.name}`);
+          const { error: storageErr } = await supabase.storage.from('backups').remove(paths);
+          if (storageErr) {
+            console.warn('Storage backup purge notice:', storageErr.message);
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Storage backup purge exception:', storageErr);
+      }
+
+      // If cloud deletion failed, preserve local data so user does not suffer unrecoverable data loss
+      if (failedTables.length > 0) {
+        return {
+          error: new Error(`Cloud deletion could not complete for: ${failedTables.join(', ')}. Local data preserved for recovery. Please retry.`),
+        };
+      }
     }
-    // Always clear all local storage
+
+    // Cloud records safely deleted (or demo user): now clear user-scoped local storage and sign out
+    try {
+      await supabase.auth.signOut();
+    } catch (_) {}
+
     const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('wealthos'));
     keysToRemove.forEach(k => localStorage.removeItem(k));
     setSession(null);
