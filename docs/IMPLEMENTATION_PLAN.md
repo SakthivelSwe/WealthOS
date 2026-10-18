@@ -70,8 +70,8 @@
   - Ingestion Preview Modal with pre-import entity counts.
 - [ ] **P2-2: Custom SMTP Gateway Configuration for Supabase**
   - Configure production transactional email provider (Resend, AWS SES) in Supabase Dashboard to remove the 3-4 OTP emails/hour limit on the free tier.
-- [ ] **P2-3: Chit Fund / ROSCA Dashboard on Web**
-  - Port the native Android Chit Fund tracker to the web React frontend to achieve feature parity for Indian financial instruments.
+- [x] **P2-3: Chit Fund / ROSCA Dashboard on Web** (COMPLETED)
+  - Port the native Android Chit Fund tracker to the web React frontend to achieve feature parity for Indian financial instruments. Integrated in `PlansPage.tsx` with full `.wosenc` backup interoperability.
 
 ---
 
