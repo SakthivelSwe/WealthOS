@@ -93,7 +93,7 @@
     <string name="lock_1_min">1 minute</string>
     <string name="lock_5_min">5 minutes</string>
     <string name="about">About</string>
-    <string name="about_body">Version 0.2.0. Screenshots and recent-apps previews are blocked.</string>
+    <string name="about_body">Version 0.2.1. Screenshots and recent-apps previews are blocked.</string>
     <string name="locked_title">Locked</string>
     <string name="locked_body">Authenticate to see your finances.</string>
     <string name="unlock">Unlock</string>

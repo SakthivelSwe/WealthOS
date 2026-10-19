@@ -9,7 +9,7 @@ import java.security.MessageDigest
  */
 data class BackupMetadata(
     val version: Int = 1,
-    val appVersion: String = "0.2.0",
+    val appVersion: String = "0.2.1",
     val timestamp: Long = System.currentTimeMillis(),
     val accountCount: Int = 0,
     val txnCount: Int = 0,
@@ -35,7 +35,7 @@ data class BackupMetadata(
     companion object {
         fun fromJson(json: JSONObject): BackupMetadata = BackupMetadata(
             version = json.optInt("version", 1),
-            appVersion = json.optString("appVersion", "0.2.0"),
+            appVersion = json.optString("appVersion", "0.2.1"),
             timestamp = json.optLong("timestamp", System.currentTimeMillis()),
             accountCount = json.optInt("accountCount", 0),
             txnCount = json.optInt("txnCount", 0),

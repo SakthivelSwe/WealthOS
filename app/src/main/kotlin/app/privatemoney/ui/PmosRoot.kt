@@ -710,7 +710,7 @@ private fun MoreHubScreen(
         SectionLabel("ABOUT WEALTHOS")
         GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("WealthOS v0.2.0 Prime", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text("WealthOS v0.2.1 Prime", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                 Text(
                     "Encrypted with SQLCipher AES-256 and wrapped with Android Keystore. Screenshot capture is permitted by default across all screens for your records.",
                     style = MaterialTheme.typography.bodySmall,

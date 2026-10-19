@@ -58,6 +58,6 @@ The following test suites are continuously verified locally and in CI:
 ---
 
 ## Next Steps for Production Deployment
-1. Tag release in Git (e.g., `git tag v0.2.0 && git push origin v0.2.0`) to trigger GitHub Actions release pipeline.
+1. Tag release in Git (e.g., `git tag v0.2.1 && git push origin v0.2.1`) or push to `main` to trigger GitHub Actions release pipeline.
 2. Ensure repository secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` are populated in GitHub Settings.
 3. Perform physical device run of `docs/RELEASE_CHECKLIST.md` prior to uploading AAB/APK to Google Play Console.

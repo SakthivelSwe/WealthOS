@@ -6,13 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "test": "node --test test/*.test.js",
+    "test": "tsx --test test/*.test.js",
     "preview": "vite preview",
     "db:migrate": "node scripts/migrate.js"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
     "postgres": "^3.4.9",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   },

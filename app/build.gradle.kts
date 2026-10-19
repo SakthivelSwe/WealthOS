@@ -24,8 +24,8 @@ android {
         applicationId = "app.privatemoney.os"
         minSdk = 31
         targetSdk = 36
-        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 3
-        versionName = System.getenv("VERSION_NAME") ?: "0.2.0"
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 4
+        versionName = System.getenv("VERSION_NAME") ?: "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SUPABASE_ANON_KEY_B64", "\"${b64AnonKey}\"")
         buildConfigField("String", "SUPABASE_URL", "\"${supabaseUrl}\"")

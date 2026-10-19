@@ -235,7 +235,7 @@ class CloudSyncService(
 
         val metadata = BackupMetadata(
             version = currentVersion,
-            appVersion = "0.2.0",
+            appVersion = "0.2.1",
             timestamp = System.currentTimeMillis(),
             accountCount = accounts.size,
             txnCount = txns.size,
