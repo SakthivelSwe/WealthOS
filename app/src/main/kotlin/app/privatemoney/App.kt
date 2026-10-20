@@ -36,6 +36,8 @@ class App : Application(), androidx.work.Configuration.Provider {
     val categories: CategoryRepository by lazy { CategoryRepository(database) }
     val planning: PlanningRepository by lazy { PlanningRepository(database) }
     val notifications: NotificationRepository by lazy { NotificationRepository(database) }
+    val authService: app.privatemoney.cloud.SupabaseAuthService by lazy { app.privatemoney.cloud.SupabaseAuthService(this, settings) }
+    val syncEngine: app.privatemoney.cloud.SupabaseSyncService by lazy { app.privatemoney.cloud.SupabaseSyncService(this, database, settings) }
 
     override val workManagerConfiguration: androidx.work.Configuration
         get() = androidx.work.Configuration.Builder()
@@ -48,11 +50,14 @@ class App : Application(), androidx.work.Configuration.Provider {
         app.privatemoney.notification.NightlyReminderScheduler.scheduleNightlyAlarms(this)
         scheduleWorkers()
 
-        // Background data health repair & initialization
+        // Background data health repair, initialization, and cloud sync
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 categories.seedDefaultsIfEmpty()
                 database.ledgerDao().backfillNeedWant()
+                if (authService.isLoggedIn()) {
+                    syncEngine.syncAll()
+                }
             } catch (_: Exception) {}
         }
     }

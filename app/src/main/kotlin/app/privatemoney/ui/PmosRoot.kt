@@ -116,10 +116,12 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.runtime.LaunchedEffect
 import app.privatemoney.notification.NotificationHub
+import app.privatemoney.ui.auth.SupabaseLoginSheet
 import app.privatemoney.ui.cloud.CloudBackupSheet
 import app.privatemoney.ui.imports.ImportViewModel
 import app.privatemoney.ui.notifications.CatchUpSheet
 import app.privatemoney.ui.notifications.NotificationCenterSheet
+import androidx.compose.material.icons.filled.CloudDone
 
 fun appViewModelFactory(app: App): ViewModelProvider.Factory = viewModelFactory {
     initializer { HomeViewModel(app.ledger, app.categories, app.settings, app.planning, app.accounts) }
@@ -160,7 +162,7 @@ fun PmosRoot(
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when {
                 locked -> ModernLockScreen(onUnlock)
-                !onboarded -> OnboardingScreen(viewModel(factory = factory), onDone = { onboarded = true })
+                !onboarded -> OnboardingScreen(app = app, viewModel = viewModel(factory = factory), onDone = { onboarded = true })
                 else -> MainShell(
                     app = app,
                     factory = factory,
@@ -257,6 +259,7 @@ private fun MainShell(
     var managingAccounts by rememberSaveable { mutableStateOf(false) }
     var importing by rememberSaveable { mutableStateOf(false) }
     var showBackupSheet by rememberSaveable { mutableStateOf(false) }
+    var showLoginSheet by rememberSaveable { mutableStateOf(false) }
     var showNotificationCenter by rememberSaveable { mutableStateOf(false) }
     var showCatchUpSheet by rememberSaveable { mutableStateOf(false) }
 
@@ -355,6 +358,7 @@ private fun MainShell(
                     onManageAccounts = { managingAccounts = true },
                     onImport = { importing = true },
                     onOpenBackup = { showBackupSheet = true },
+                    onOpenLogin = { showLoginSheet = true },
                     onOpenNotifications = { showNotificationCenter = true },
                     onOpenCatchUp = { showCatchUpSheet = true },
                     onSecureFlagChange = onSecureFlagChange,
@@ -363,6 +367,9 @@ private fun MainShell(
         }
     }
 
+    if (showLoginSheet) {
+        SupabaseLoginSheet(app = app, onDismiss = { showLoginSheet = false })
+    }
     if (showBackupSheet) {
         CloudBackupSheet(app = app, onDismiss = { showBackupSheet = false })
     }
@@ -489,6 +496,7 @@ private fun MoreHubScreen(
     onManageAccounts: () -> Unit,
     onImport: () -> Unit,
     onOpenBackup: () -> Unit,
+    onOpenLogin: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenCatchUp: () -> Unit,
     onSecureFlagChange: () -> Unit = {},
@@ -534,6 +542,61 @@ private fun MoreHubScreen(
                 Column(Modifier.weight(1f)) {
                     Text(app.settings.userName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("WealthOS Vault • Sovereign & Offline", style = MaterialTheme.typography.bodySmall, color = finance.muted)
+                }
+            }
+        }
+
+        // Web & Cloud Sync Card
+        val isCloudLoggedIn = app.authService.isLoggedIn()
+        val cloudUserEmail = app.authService.currentUserEmail()
+        SectionLabel("WEB & CLOUD SYNC")
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(if (isCloudLoggedIn) finance.positive.copy(alpha = 0.2f) else finance.primaryGlow),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = if (isCloudLoggedIn) Icons.Default.CloudDone else Icons.Default.CloudSync,
+                                contentDescription = null,
+                                tint = if (isCloudLoggedIn) finance.positive else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = if (isCloudLoggedIn) (cloudUserEmail ?: "Account Synced") else "Sync with Web Account",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            Text(
+                                text = if (isCloudLoggedIn) "Bi-directional real-time sync active" else "Log in with Web email to sync data",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = finance.muted,
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = onOpenLogin,
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text(if (isCloudLoggedIn) "Manage" else "Sign In")
+                    }
                 }
             }
         }

@@ -305,23 +305,13 @@ class CloudSyncService(
         // If Anon Key is present, attempt upload to Supabase Storage
         if (anonKey.isNotBlank()) {
             try {
-                val supabase: SupabaseClient = createSupabaseClient(
-                    supabaseUrl = url,
-                    supabaseKey = anonKey,
-                ) { install(Storage) }
-
                 val userId = settings.supabaseUserId?.ifBlank { null } ?: "vault"
                 val fileName = "backup_${metadata.timestamp}.wosenc"
-                val path = "$userId/$fileName"
-
-                supabase.storage.from("backups").upload(
-                    path = path,
-                    data = envelope,
-                    upsert = true,
-                )
+                val token = settings.supabaseAccessToken
+                uploadToSupabaseStorageHttp(url, anonKey, token, userId, fileName, envelope)
             } catch (e: Exception) {
                 val userMsg = when {
-                    e.message?.contains("code 0") == true || e.message?.contains("Queries can be performed") == true ->
+                    e.message?.contains("code 0") == true || e.message?.contains("401") == true || e.message?.contains("unauthenticated") == true ->
                         "Supabase API key invalid or unauthenticated. Saved locally."
                     e.message?.contains("bucket") == true || e.message?.contains("not found") == true ->
                         "Storage bucket 'backups' not found. Saved locally."
@@ -338,6 +328,36 @@ class CloudSyncService(
         settings.lastBackupStatus = "SUCCESS"
         settings.lastBackupError = null
         metadata
+    }
+
+    private fun uploadToSupabaseStorageHttp(
+        baseUrl: String,
+        anonKey: String,
+        token: String?,
+        userId: String,
+        fileName: String,
+        data: ByteArray,
+    ) {
+        val cleanUrl = baseUrl.trimEnd('/')
+        val targetUrl = java.net.URL("$cleanUrl/storage/v1/object/backups/$userId/$fileName")
+        val conn = (targetUrl.openConnection() as java.net.HttpURLConnection).apply {
+            requestMethod = "POST"
+            doOutput = true
+            setRequestProperty("apikey", anonKey)
+            if (!token.isNullOrBlank()) {
+                setRequestProperty("Authorization", "Bearer $token")
+            }
+            setRequestProperty("Content-Type", "application/octet-stream")
+            setRequestProperty("x-upsert", "true")
+            connectTimeout = 15000
+            readTimeout = 30000
+        }
+        conn.outputStream.use { it.write(data) }
+        val code = conn.responseCode
+        if (code !in 200..299) {
+            val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $code"
+            throw IllegalStateException("Storage upload failed ($code): $err")
+        }
     }
 
     /**

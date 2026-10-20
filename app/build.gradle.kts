@@ -1,4 +1,5 @@
 import java.util.Base64
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -14,11 +15,22 @@ android {
     namespace = "app.privatemoney"
     compileSdk = 37
 
-    val rawAnonKey = System.getenv("SUPABASE_ANON_KEY") ?: ""
+    val localProps = Properties().apply {
+        val f = rootProject.file("local.properties")
+        if (f.exists()) {
+            f.inputStream().use { stream -> this.load(stream) }
+        }
+    }
+    val rawAnonKey = System.getenv("SUPABASE_ANON_KEY")
+        ?: localProps.getProperty("SUPABASE_PUBLISHABLE_KEY")
+        ?: localProps.getProperty("SUPABASE_ANON_KEY")
+        ?: ""
     val b64AnonKey = if (rawAnonKey.isNotBlank()) {
         Base64.getEncoder().encodeToString(rawAnonKey.toByteArray(Charsets.UTF_8))
     } else ""
-    val supabaseUrl = System.getenv("SUPABASE_URL") ?: "https://zahzagnindkkttdpmqii.supabase.co"
+    val supabaseUrl = System.getenv("SUPABASE_URL")
+        ?: localProps.getProperty("SUPABASE_URL")
+        ?: "https://zahzagnindkkttdpmqii.supabase.co"
 
     defaultConfig {
         applicationId = "app.privatemoney.os"

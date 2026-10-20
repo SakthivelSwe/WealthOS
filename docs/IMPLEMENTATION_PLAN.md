@@ -72,6 +72,11 @@
   - Configure production transactional email provider (Resend, AWS SES) in Supabase Dashboard to remove the 3-4 OTP emails/hour limit on the free tier.
 - [x] **P2-3: Chit Fund / ROSCA Dashboard on Web** (COMPLETED)
   - Port the native Android Chit Fund tracker to the web React frontend to achieve feature parity for Indian financial instruments. Integrated in `PlansPage.tsx` with full `.wosenc` backup interoperability.
+- [x] **P2-4: Android Supabase Email OTP Login & Cloud Sync** (COMPLETED)
+  - Implemented `SupabaseAuthService` on Android with GoTrue Email OTP sign-in matching Web.
+  - Built `SupabaseSyncService` for bidirectional synchronization of accounts, transactions, journal entries, categories, goals, and debts with Supabase PostgreSQL tables.
+  - Added `SupabaseLoginSheet` accessible from both `OnboardingScreen` and the `MoreHubScreen` settings tab.
+  - Enabled authenticated Supabase Storage uploads bound to user ID (`auth.uid()`).
 
 ---
 

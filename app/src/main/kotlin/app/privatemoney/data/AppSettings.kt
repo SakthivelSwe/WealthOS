@@ -86,6 +86,22 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_SUPABASE_USER_ID, null)
         set(value) = prefs.edit().putString(KEY_SUPABASE_USER_ID, value?.trim()).apply()
 
+    var supabaseUserEmail: String?
+        get() = prefs.getString(KEY_SUPABASE_USER_EMAIL, null)
+        set(value) = prefs.edit().putString(KEY_SUPABASE_USER_EMAIL, value?.trim()).apply()
+
+    var supabaseAccessToken: String?
+        get() = prefs.getString(KEY_SUPABASE_ACCESS_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_SUPABASE_ACCESS_TOKEN, value?.trim()).apply()
+
+    var lastSyncTimestamp: Long
+        get() = prefs.getLong(KEY_LAST_SYNC_TIME, 0L)
+        set(value) = prefs.edit().putLong(KEY_LAST_SYNC_TIME, value).apply()
+
+    var lastSyncStatus: String
+        get() = prefs.getString(KEY_LAST_SYNC_STATUS, "IDLE") ?: "IDLE"
+        set(value) = prefs.edit().putString(KEY_LAST_SYNC_STATUS, value).apply()
+
     var autoVaultKey: String
         get() {
             val saved = prefs.getString(KEY_AUTO_VAULT_KEY, null)
@@ -164,6 +180,10 @@ class AppSettings(context: Context) {
         private const val KEY_SUPABASE_URL = "supabase_url"
         private const val KEY_SUPABASE_ANON_KEY = "supabase_anon_key"
         private const val KEY_SUPABASE_USER_ID = "supabase_user_id"
+        private const val KEY_SUPABASE_USER_EMAIL = "supabase_user_email"
+        private const val KEY_SUPABASE_ACCESS_TOKEN = "supabase_access_token"
+        private const val KEY_LAST_SYNC_TIME = "last_sync_time"
+        private const val KEY_LAST_SYNC_STATUS = "last_sync_status"
         private const val KEY_AUTO_VAULT_KEY = "auto_vault_key"
         private const val KEY_LAST_BACKUP_TIME = "last_backup_time"
         private const val KEY_LAST_BACKUP_STATUS = "last_backup_status"

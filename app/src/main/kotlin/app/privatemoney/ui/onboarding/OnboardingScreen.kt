@@ -57,24 +57,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.privatemoney.R
+import app.privatemoney.App
 import app.privatemoney.domain.model.AccountType
 import app.privatemoney.domain.model.Currency
 import app.privatemoney.security.BiometricAuth
+import app.privatemoney.ui.auth.SupabaseLoginSheet
 import app.privatemoney.ui.components.GlassCard
 import app.privatemoney.ui.components.Hairline
 import app.privatemoney.ui.components.SectionLabel
 import app.privatemoney.ui.theme.LocalFinanceColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val StartTypes = listOf(AccountType.BANK, AccountType.CASH, AccountType.UPI_WALLET, AccountType.SAVINGS)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OnboardingScreen(viewModel: OnboardingViewModel, onDone: () -> Unit) {
+fun OnboardingScreen(app: App, viewModel: OnboardingViewModel, onDone: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val lockAvailable = BiometricAuth.isAvailable(context)
     val finance = LocalFinanceColors.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
+    var showLoginSheet by rememberSaveable { mutableStateOf(false) }
     var currencyCode by rememberSaveable { mutableStateOf(Currency.INR.code) }
     var name by rememberSaveable { mutableStateOf("") }
     var typeName by rememberSaveable { mutableStateOf(AccountType.BANK.name) }
@@ -82,6 +89,25 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onDone: () -> Unit) {
     var enableLock by rememberSaveable { mutableStateOf(lockAvailable) }
 
     LaunchedEffect(state.done) { if (state.done) onDone() }
+
+    if (showLoginSheet) {
+        SupabaseLoginSheet(
+            app = app,
+            onDismiss = { showLoginSheet = false },
+            onLoginSuccess = {
+                showLoginSheet = false
+                scope.launch(Dispatchers.IO) {
+                    val accounts = app.database.accountDao().getAllForBackup()
+                    if (accounts.isNotEmpty()) {
+                        app.settings.onboarded = true
+                        withContext(Dispatchers.Main) {
+                            onDone()
+                        }
+                    }
+                }
+            },
+        )
+    }
 
     Column(
         Modifier
@@ -136,6 +162,48 @@ fun OnboardingScreen(viewModel: OnboardingViewModel, onDone: () -> Unit) {
             TrustPill("Offline 1st", Icons.Default.WifiOff, Modifier.weight(1f))
             TrustPill("Biometric", Icons.Default.Fingerprint, Modifier.weight(1f))
         }
+
+        // Option to Sign in with Web account
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Already use WealthOS Web?",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Sign in with your email to pull your accounts & balances immediately.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = finance.muted,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = { showLoginSheet = true },
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Text("Sign In")
+                }
+            }
+        }
+
+        Text(
+            text = "— OR SETUP AN OFFLINE ACCOUNT —",
+            style = MaterialTheme.typography.labelSmall,
+            color = finance.muted,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
 
         // Currency Selector
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
