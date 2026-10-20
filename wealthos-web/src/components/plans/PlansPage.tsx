@@ -22,7 +22,7 @@ const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'emergency',
     icon: '🛡️',
-    badge: 'Emergency Fund (அவசர நிதி)',
+    badge: 'Emergency Fund',
     name: 'Emergency Fund (6 Months Safety Net)',
     target: '300000',
     current: '25000',
@@ -33,7 +33,7 @@ const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'gold',
     icon: '🪙',
-    badge: 'Gold Savings (தங்கம்)',
+    badge: 'Gold Savings',
     name: 'Gold Jewelry & SGB Savings',
     target: '250000',
     current: '20000',
@@ -44,7 +44,7 @@ const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'house',
     icon: '🏠',
-    badge: 'House / Land (வீடு/மனை)',
+    badge: 'House / Land Plot',
     name: 'House Down Payment / Land Plot',
     target: '1000000',
     current: '100000',
@@ -55,7 +55,7 @@ const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'vehicle',
     icon: '🚗',
-    badge: 'Bike / Car (வாகனம்)',
+    badge: 'Bike / Car Purchase',
     name: 'New Two-Wheeler / Car Purchase',
     target: '150000',
     current: '15000',
@@ -66,7 +66,7 @@ const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'education',
     icon: '🎓',
-    badge: 'Child Education (படிப்பு)',
+    badge: 'Child Education',
     name: 'School Fees & College Fund',
     target: '500000',
     current: '50000',
@@ -77,13 +77,13 @@ const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'tour',
     icon: '✈️',
-    badge: 'Tour / Pilgrimage (சுற்றுலா)',
-    name: 'Family Tour / Temple Pilgrimage',
+    badge: 'Tour & Vacation',
+    name: 'Family Tour / Vacation Fund',
     target: '75000',
     current: '10000',
     monthly: '8000',
     months: 8,
-    tip: 'Stress-free annual holiday, hill station trip, or temple pilgrimage without taking credit card debt.',
+    tip: 'Stress-free annual holiday, hill station trip, or family travel without taking credit card debt.',
   },
 ];
 
@@ -313,7 +313,7 @@ function ChitFundModal({ onClose }: { onClose: () => void }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
             <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
-              🪙 Add Chit Fund Scheme (சீட்டு திட்டம்)
+              🪙 Add Chit Fund Scheme
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
               Track monthly chits, installments paid, and auction payouts
@@ -328,7 +328,7 @@ function ChitFundModal({ onClose }: { onClose: () => void }) {
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: '0.78rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
             <Sparkles size={13} style={{ color: 'var(--neon-amber)' }} />
-            <span>Popular Chit Schemes in Tamil Nadu & India:</span>
+            <span>Popular Chit Schemes:</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {CHIT_PRESETS.map((p, idx) => (
@@ -361,13 +361,13 @@ function ChitFundModal({ onClose }: { onClose: () => void }) {
         <div style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', marginBottom: 16, fontSize: '0.8rem', color: '#e2e8f0', lineHeight: 1.4 }}>
           <Info size={16} style={{ color: 'var(--neon-amber)', flexShrink: 0, marginTop: 2 }} />
           <div>
-            <strong>How Chit Funds (சீட்டு) work:</strong> You pay a fixed monthly installment with a group. Each month, members bid for the prize money or receive dividend discounts.
+            <strong>How Chit Funds work:</strong> You pay a fixed monthly installment with a group. Each month, members bid for the prize money or receive dividend discounts.
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Chit Scheme Name (சீட்டு பெயர்) *</label>
+            <label className="form-label">Chit Scheme Name *</label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
@@ -378,7 +378,7 @@ function ChitFundModal({ onClose }: { onClose: () => void }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Monthly Installment ({currency}) (மாத தவணை) *</label>
+              <label className="form-label">Monthly Installment ({currency}) *</label>
               <input
                 type="number"
                 step="any"
@@ -388,7 +388,7 @@ function ChitFundModal({ onClose }: { onClose: () => void }) {
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Total Tenure (மொத்த மாதங்கள்)</label>
+              <label className="form-label">Total Tenure (Months)</label>
               <input
                 type="number"
                 value={totalMonths}
@@ -399,7 +399,7 @@ function ChitFundModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Starting Month (துவங்கும் மாதம்)</label>
+            <label className="form-label">Starting Month</label>
             <input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)} />
           </div>
 
@@ -427,11 +427,11 @@ interface LoanPreset {
 }
 
 const LOAN_PRESETS: LoanPreset[] = [
-  { name: 'SBI / HDFC Home Loan (வீட்டு கடன்)', principal: '3500000', balance: '3200000', rate: '8.5', emi: '30375' },
-  { name: 'Car Loan (Tata / Hyundai - வாகன கடன்)', principal: '800000', balance: '550000', rate: '8.75', emi: '16500' },
-  { name: 'Two-Wheeler / Bike Loan (பைக் கடன்)', principal: '120000', balance: '85000', rate: '10.5', emi: '3800' },
-  { name: 'Jewel Loan / Gold Loan (நகை கடன்)', principal: '200000', balance: '180000', rate: '8.5', emi: '1450' },
-  { name: 'Personal Loan (தனிநபர் கடன்)', principal: '300000', balance: '220000', rate: '12.0', emi: '9900' },
+  { name: 'SBI / HDFC Home Loan', principal: '3500000', balance: '3200000', rate: '8.5', emi: '30375' },
+  { name: 'Car Loan (Tata / Hyundai)', principal: '800000', balance: '550000', rate: '8.75', emi: '16500' },
+  { name: 'Two-Wheeler / Bike Loan', principal: '120000', balance: '85000', rate: '10.5', emi: '3800' },
+  { name: 'Jewel Loan / Gold Loan', principal: '200000', balance: '180000', rate: '8.5', emi: '1450' },
+  { name: 'Personal Loan', principal: '300000', balance: '220000', rate: '12.0', emi: '9900' },
 ];
 
 function DebtModal({ onClose }: { onClose: () => void }) {
@@ -480,7 +480,7 @@ function DebtModal({ onClose }: { onClose: () => void }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div>
             <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
-              💳 Record Debt / Loan (கடன் / EMI)
+              💳 Record Debt / Loan (EMI)
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
               Track home loans, vehicle EMIs, gold loans, and credit repayments
@@ -741,7 +741,7 @@ export function PlansPage() {
             Financial Goals, Chit Funds & Loans
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
-            Track emergency funds, monthly chit schemes (சீட்டு), loan EMIs, and recurring bills in simple Indian rupees
+            Track emergency funds, monthly chit fund schemes, loan EMIs, and recurring bills in simple Indian rupees
           </p>
         </div>
 
@@ -766,7 +766,7 @@ export function PlansPage() {
               color: '#f8fafc',
             }}
           >
-            <Plus size={15} /> 🪙 Add Chit Fund (சீட்டு)
+            <Plus size={15} /> 🪙 Add Chit Fund
           </button>
           <button
             className="btn btn-sm btn-secondary"
@@ -876,7 +876,7 @@ export function PlansPage() {
             >
               <div className="cyber-card-glow" style={{ background: 'var(--neon-amber)' }} />
               <div className="stat-label">
-                <span>🪙 Chit Funds (சீட்டு திட்டம்)</span>
+                <span>🪙 Chit Funds</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-amber-glow)', color: 'var(--neon-amber)' }}>
                   <Coins size={18} />
                 </div>
@@ -946,8 +946,8 @@ export function PlansPage() {
       >
         {[
           { id: 'goals', label: '🎯 Savings Goals & Emergency Fund', count: goals.length },
-          { id: 'debts', label: '💳 Loans & EMI (கடன்கள்)', count: debts.length },
-          { id: 'chits', label: '🪙 Chit Funds (சீட்டு திட்டம்)', count: chitFunds.length },
+          { id: 'debts', label: '💳 Loans & EMIs', count: debts.length },
+          { id: 'chits', label: '🪙 Chit Funds', count: chitFunds.length },
           { id: 'recurring', label: '🔄 Monthly Subscriptions & Bills', count: recurringTxns.length },
         ].map(tab => (
           <button
@@ -1086,7 +1086,7 @@ export function PlansPage() {
               Track home loans, car loans, two-wheeler EMIs, jewel loans, or personal loans to know your exact payoff schedule.
             </p>
             <button className="btn btn-primary btn-md" onClick={() => setShowDebtModal(true)} style={{ background: 'var(--neon-rose)' }}>
-              <Plus size={16} /> Record Debt or Loan (கடன்)
+              <Plus size={16} /> Record Debt or Loan
             </button>
           </div>
         )
@@ -1103,7 +1103,7 @@ export function PlansPage() {
                 <Tilt3DCard key={chit.id}>
                   <div className="cyber-card" style={{ height: '100%', borderLeft: '3px solid var(--neon-amber)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                      <span className="badge badge-amber">🪙 CHIT FUND (சீட்டு)</span>
+                      <span className="badge badge-amber">🪙 CHIT FUND</span>
                       <span className="badge badge-green">Active</span>
                     </div>
 
@@ -1137,10 +1137,10 @@ export function PlansPage() {
           <div className="cyber-card" style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-tertiary)' }}>
             <Coins size={42} style={{ margin: '0 auto 12px auto', color: 'var(--neon-amber)', opacity: 0.85 }} />
             <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800, color: '#f1f5f9' }}>
-              No Chit Fund Schemes Added (சீட்டு திட்டம்)
+              No Chit Fund Schemes Added
             </div>
             <p style={{ fontSize: '0.88rem', marginTop: 4, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20, lineHeight: 1.5 }}>
-              Chit Funds (KSFE, Shriram Chits, or local community chits) are widely used in Tamil Nadu for disciplined monthly savings and auction lump sums.
+              Chit Funds (like KSFE, Shriram Chits, or local group chits) are widely used for disciplined monthly savings and lump sum payouts.
             </p>
 
             {/* Quick 1-Click Starter Chit Buttons */}
@@ -1166,7 +1166,7 @@ export function PlansPage() {
             </div>
 
             <button className="btn btn-primary btn-md" onClick={() => setShowChitModal(true)} style={{ background: 'var(--neon-amber)', color: '#000' }}>
-              <Plus size={16} /> Add Your First Chit Fund (சீட்டு சேர்க்க)
+              <Plus size={16} /> Add Your First Chit Fund
             </button>
           </div>
         )
