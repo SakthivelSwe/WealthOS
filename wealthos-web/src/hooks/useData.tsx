@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
 import type { Account, Transaction, JournalEntry, Goal, Debt, ChitFund, RecurringTransaction, Category, UserSettings, AppNotification, Budget } from '../types';
-import { DEFAULT_CATEGORIES as SEED_CATEGORIES } from '../types';
+import { DEFAULT_CATEGORIES as SEED_CATEGORIES, sanitizeCategories } from '../types';
 import { getSampleSeedData } from '../lib/mockData';
 
 interface DataContextType {
@@ -111,7 +111,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setChitFunds(sample.chitFunds);
         setRecurringTxns(sample.recurringTxns);
         setNotifications(sample.notifications);
-        setCategories(defaultCategories);
+        const sanitizedSeed = sanitizeCategories(defaultCategories);
+        setCategories(sanitizedSeed);
         setSettings(defaultSettings);
 
         setLocal('accounts', sample.accounts);
@@ -122,18 +123,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setLocal('chitFunds', sample.chitFunds);
         setLocal('recurringTxns', sample.recurringTxns);
         setLocal('notifications', sample.notifications);
-        setLocal('categories', defaultCategories);
+        setLocal('categories', sanitizedSeed);
         setLocal('settings', defaultSettings);
       } else {
         setAccounts(cachedAccounts);
-        setTransactions(getLocal('transactions', []));
-        setJournalEntries(getLocal('journalEntries', []));
+        const cachedTxns = getLocal<Transaction[]>('transactions', []);
+        const normalizedTxns = cachedTxns.map(t => t.category_id === 'cat_salary' ? { ...t, category_id: 'cat_income_0' } : t);
+        setTransactions(normalizedTxns);
+        const cachedEntries = getLocal<JournalEntry[]>('journalEntries', []);
+        const normalizedEntries = cachedEntries.map(e => e.category_id === 'cat_salary' ? { ...e, category_id: 'cat_income_0' } : e);
+        setJournalEntries(normalizedEntries);
         setGoals(getLocal('goals', []));
         setDebts(getLocal('debts', []));
         setChitFunds(getLocal('chitFunds', []));
         setRecurringTxns(getLocal('recurringTxns', []));
         setBudgets(getLocal('budgets', []));
-        setCategories(getLocal('categories', []));
+        const cachedCats = sanitizeCategories(getLocal('categories', []));
+        setCategories(cachedCats);
+        setLocal('categories', cachedCats);
         setSettings(getLocal('settings', null));
         setNotifications(getLocal('notifications', []));
       }
@@ -164,13 +171,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         supabaseLoaded = true;
       }
       if (txns.status === 'fulfilled' && txns.value.data) {
-        setTransactions(txns.value.data);
-        setLocal('transactions', txns.value.data);
+        const normalizedTxns = txns.value.data.map(t => t.category_id === 'cat_salary' ? { ...t, category_id: 'cat_income_0' } : t);
+        setTransactions(normalizedTxns);
+        setLocal('transactions', normalizedTxns);
         supabaseLoaded = true;
       }
       if (entries.status === 'fulfilled' && entries.value.data) {
-        setJournalEntries(entries.value.data);
-        setLocal('journalEntries', entries.value.data);
+        const normalizedEntries = entries.value.data.map(e => e.category_id === 'cat_salary' ? { ...e, category_id: 'cat_income_0' } : e);
+        setJournalEntries(normalizedEntries);
+        setLocal('journalEntries', normalizedEntries);
       }
       if (gls.status === 'fulfilled' && gls.value.data) {
         setGoals(gls.value.data);
@@ -201,8 +210,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setLocal('notifications', notifs.value.data);
       }
       if (cats.status === 'fulfilled' && cats.value.data && cats.value.data.length > 0) {
-        setCategories(cats.value.data);
-        setLocal('categories', cats.value.data);
+        const sanitized = sanitizeCategories(cats.value.data);
+        setCategories(sanitized);
+        setLocal('categories', sanitized);
+        if (cats.value.data.some(c => c.id === 'cat_salary') && cats.value.data.some(c => c.id === 'cat_income_0')) {
+          supabase.from('user_categories').delete().eq('id', 'cat_salary').eq('user_id', userId).then(() => {}, () => {});
+        }
       }
     } catch (err) {
       console.warn('Supabase fetch notice, falling back to local storage:', err);
@@ -242,25 +255,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Offline fallback: load from user-scoped local storage
       const cachedAccounts = getLocal<Account[]>('accounts', []);
       setAccounts(cachedAccounts);
-      setTransactions(getLocal('transactions', []));
-      setJournalEntries(getLocal('journalEntries', []));
+      const rawTxns = getLocal<Transaction[]>('transactions', []);
+      const normalizedTxns = rawTxns.map(t => t.category_id === 'cat_salary' ? { ...t, category_id: 'cat_income_0' } : t);
+      setTransactions(normalizedTxns);
+      setLocal('transactions', normalizedTxns);
+
+      const rawEntries = getLocal<JournalEntry[]>('journalEntries', []);
+      const normalizedEntries = rawEntries.map(e => e.category_id === 'cat_salary' ? { ...e, category_id: 'cat_income_0' } : e);
+      setJournalEntries(normalizedEntries);
+      setLocal('journalEntries', normalizedEntries);
+
       setGoals(getLocal('goals', []));
       setDebts(getLocal('debts', []));
       setChitFunds(getLocal('chitFunds', []));
       setRecurringTxns(getLocal('recurringTxns', []));
       setBudgets(getLocal('budgets', []));
-      setCategories(getLocal('categories', defaultCategories));
+      const cachedCats = sanitizeCategories(getLocal('categories', defaultCategories));
+      setCategories(cachedCats);
+      setLocal('categories', cachedCats);
       setSettings(getLocal('settings', defaultSettings));
       setNotifications(getLocal('notifications', [welcomeNotification]));
     } else {
       // Supabase is active: Ensure default categories, settings, and welcome notification if new
       setCategories(prev => {
-        if (prev.length === 0) {
-          setLocal('categories', defaultCategories);
-          supabase.from('user_categories').upsert(defaultCategories).then(() => {}, () => {});
-          return defaultCategories;
+        const sanitized = sanitizeCategories(prev);
+        if (sanitized.length === 0) {
+          const seeded = sanitizeCategories(defaultCategories);
+          setLocal('categories', seeded);
+          supabase.from('user_categories').upsert(seeded).then(() => {}, () => {});
+          return seeded;
         }
-        return prev;
+        setLocal('categories', sanitized);
+        return sanitized;
       });
       setSettings(prev => {
         if (!prev) {

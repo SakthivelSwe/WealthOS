@@ -16,7 +16,7 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
   const [time, setTime] = useState(txn?.local_time || format(new Date(), 'HH:mm'));
   const [accountId, setAccountId] = useState(txn?.account_id || accounts[0]?.id || '');
   const [toAccountId, setToAccountId] = useState(txn?.to_account_id || '');
-  const [categoryId, setCategoryId] = useState(txn?.category_id || '');
+  const [categoryId, setCategoryId] = useState(txn?.category_id === 'cat_salary' ? 'cat_income_0' : (txn?.category_id || ''));
   const [merchant, setMerchant] = useState(txn?.merchant || '');
   const [description, setDescription] = useState(txn?.description || '');
   const [paymentMethod, setPaymentMethod] = useState(txn?.payment_method || 'UPI');
@@ -24,7 +24,17 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const filteredCategories = categories.filter(c => type === 'INCOME' ? c.kind === 'INCOME' : c.kind === 'EXPENSE');
+  const filteredCategories = useMemo(() => {
+    const list = categories.filter(c => (type === 'INCOME' ? c.kind === 'INCOME' : c.kind === 'EXPENSE') && !c.archived);
+    const seen = new Set<string>();
+    return list.filter(c => {
+      if (c.id === 'cat_salary' && list.some(o => o.id === 'cat_income_0')) return false;
+      const label = getCategoryDisplayName(c.id, categories).trim();
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+  }, [categories, type]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,6 +195,17 @@ export function LedgerPage() {
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
 
+  const uniqueFilterCategories = useMemo(() => {
+    const seen = new Set<string>();
+    return categories.filter(c => {
+      if (c.id === 'cat_salary' && categories.some(o => o.id === 'cat_income_0')) return false;
+      const label = (c.name || '').trim();
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+  }, [categories]);
+
   const filtered = useMemo(() => {
     let txns = transactions.filter(t => !t.deleted_at);
     if (filterType !== 'ALL') txns = txns.filter(t => t.type === filterType);
@@ -329,7 +350,7 @@ export function LedgerPage() {
           {/* Category Filter */}
           <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: 170 }}>
             <option value="">All Categories</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {uniqueFilterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
       </div>

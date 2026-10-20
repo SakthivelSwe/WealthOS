@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useData } from '../../hooks/useData';
 import { parseMoney, getCategoryDisplayName, formatAccountLabel, POPULAR_BANKS, type TxnType, type NeedWant } from '../../types';
 import { X, Check, ArrowRightLeft, TrendingDown, TrendingUp, Plus, Building2 } from 'lucide-react';
@@ -23,6 +23,18 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
   const [needWant, setNeedWant] = useState<NeedWant | null>('NEED');
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [error, setError] = useState('');
+
+  const categoriesForType = useMemo(() => {
+    const list = categories.filter(c => c.kind === type && !c.archived);
+    const seen = new Set<string>();
+    return list.filter(c => {
+      if (c.id === 'cat_salary' && list.some(o => o.id === 'cat_income_0')) return false;
+      const label = getCategoryDisplayName(c.id, categories).trim();
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+  }, [categories, type]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +273,7 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
               <label className="form-label">Category</label>
               <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
                 <option value="">Select a category...</option>
-                {categories.filter(c => c.kind === type).map(c => (
+                {categoriesForType.map(c => (
                   <option key={c.id} value={c.id}>{getCategoryDisplayName(c.id, categories)}</option>
                 ))}
               </select>

@@ -4,6 +4,9 @@ import {
   formatMoney,
   parseMoney,
   getCurrencyInfo,
+  DEFAULT_CATEGORIES,
+  sanitizeCategories,
+  getCategoryDisplayName,
 } from '../src/types/index.ts';
 
 describe('WealthOS Financial Invariants & Currency Precision', () => {
@@ -86,5 +89,35 @@ describe('WealthOS Financial Invariants & Currency Precision', () => {
     const safeInput = 'Swiggy Dinner Order';
     const notShielded = /^[=+\-@\t\r]/.test(safeInput) ? `'${safeInput}` : safeInput;
     assert.equal(notShielded, safeInput);
+  });
+
+  test('DEFAULT_CATEGORIES contains exactly one Salary category', () => {
+    const incomeCategories = DEFAULT_CATEGORIES.filter(c => c.kind === 'INCOME');
+    const salaryCategories = incomeCategories.filter(c => c.name.includes('Salary'));
+    assert.equal(salaryCategories.length, 1, 'Should only have 1 Salary category in DEFAULT_CATEGORIES');
+    assert.equal(salaryCategories[0].id, 'cat_income_0', 'Salary category ID should be cat_income_0');
+  });
+
+  test('sanitizeCategories deduplicates duplicate category IDs and names', () => {
+    const rawCategories = [
+      { id: 'cat_income_0', name: '💰 Salary', kind: 'INCOME', sort_order: 25 },
+      { id: 'cat_income_1', name: '💼 Business', kind: 'INCOME', sort_order: 26 },
+      { id: 'cat_salary', name: '💰 Salary', kind: 'INCOME', sort_order: 25 },
+      { id: 'cat_food', name: '🍔 Food', kind: 'EXPENSE', sort_order: 0 },
+      { id: 'cat_food_dup', name: '🍔 Food', kind: 'EXPENSE', sort_order: 1 },
+    ];
+
+    const sanitized = sanitizeCategories(rawCategories);
+    const salaryCats = sanitized.filter(c => c.name === '💰 Salary');
+    assert.equal(salaryCats.length, 1, 'Sanitized categories must only have 1 Salary');
+    assert.equal(salaryCats[0].id, 'cat_income_0');
+
+    const foodCats = sanitized.filter(c => c.name === '🍔 Food');
+    assert.equal(foodCats.length, 1, 'Sanitized categories must only have 1 Food');
+  });
+
+  test('getCategoryDisplayName resolves both cat_income_0 and legacy cat_salary to 💰 Salary', () => {
+    assert.equal(getCategoryDisplayName('cat_income_0'), '💰 Salary');
+    assert.equal(getCategoryDisplayName('cat_salary'), '💰 Salary');
   });
 });

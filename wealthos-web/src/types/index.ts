@@ -308,10 +308,6 @@ export const DEFAULT_CATEGORIES: Omit<Category, 'user_id'>[] = [
   { id: 'cat_income_1', parent_id: null, name: '💼 Business', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 26 },
   { id: 'cat_income_2', parent_id: null, name: '📈 Interest', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 27 },
   { id: 'cat_income_3', parent_id: null, name: '🎁 Other Income', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 28 },
-  { id: 'cat_housing', parent_id: null, name: '🏠 Housing & Rent', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 13 },
-  { id: 'cat_investments', parent_id: null, name: '📈 Investments & SIP', kind: 'EXPENSE', need_want: 'SAVING', icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 22 },
-  { id: 'cat_utilities', parent_id: null, name: '⚡ Utilities & Bills', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 15 },
-  { id: 'cat_salary', parent_id: null, name: '💰 Salary', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 25 },
 ];
 
 export function getCategoryDisplayName(catId: string | null | undefined, categories: Category[] = []): string {
@@ -332,7 +328,7 @@ export function getCategoryDisplayName(catId: string | null | undefined, categor
     cat_transport: '🚗 Fuel & Transport',
     cat_shopping: '🛍️ Shopping',
     cat_entertainment: '🍿 Entertainment',
-    cat_salary: '💰 Salary & Earnings',
+    cat_salary: '💰 Salary',
     cat_income_0: '💰 Salary',
     cat_health: '❤️ Health & Wellness',
     cat_education: '📚 Education',
@@ -342,3 +338,37 @@ export function getCategoryDisplayName(catId: string | null | undefined, categor
   if (KNOWN_MAP[catId]) return KNOWN_MAP[catId];
   return catId.replace(/^cat_/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
+
+export function sanitizeCategories<T extends { id: string; name: string; kind?: string; archived?: boolean; sort_order?: number }>(cats: T[]): T[] {
+  if (!cats || !Array.isArray(cats)) return [];
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  const result: T[] = [];
+
+  // Sort canonical IDs first so cat_income_0 takes precedence over legacy cat_salary
+  const sorted = [...cats].sort((a, b) => {
+    if (a.id === 'cat_income_0' && b.id === 'cat_salary') return -1;
+    if (a.id === 'cat_salary' && b.id === 'cat_income_0') return 1;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
+
+  for (const cat of sorted) {
+    if (!cat || !cat.id) continue;
+    // Omit duplicate salary category if cat_income_0 exists
+    if (cat.id === 'cat_salary' && sorted.some(c => c.id === 'cat_income_0')) {
+      continue;
+    }
+    if (seenIds.has(cat.id)) continue;
+    seenIds.add(cat.id);
+
+    // Filter duplicate display names within same kind
+    const key = `${cat.kind || 'EXPENSE'}_${cat.name.trim().toLowerCase()}`;
+    if (seenNames.has(key)) continue;
+    seenNames.add(key);
+
+    result.push(cat);
+  }
+
+  return result;
+}
+
