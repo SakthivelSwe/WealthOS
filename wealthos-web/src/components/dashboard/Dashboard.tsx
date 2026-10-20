@@ -229,7 +229,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               <div className="cyber-card" style={{ height: '100%' }}>
                 <div className="cyber-card-glow" style={{ background: 'var(--neon-emerald)' }} />
                 <div className="stat-label">
-                  <span>Inflow This Month</span>
+                  <span>Income This Month</span>
                   <div className="cyber-icon-badge" style={{ background: 'var(--neon-emerald-glow)', color: 'var(--neon-emerald)' }}>
                     <ArrowDownRight size={18} />
                   </div>
@@ -238,7 +238,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                   +{formatMoney(monthlyIncome, currency, masked)}
                 </div>
                 <div className="stat-trend positive">
-                  <TrendingUp size={14} /> Active stream
+                  <TrendingUp size={14} /> Active income
                 </div>
               </div>
             </Tilt3DCard>
@@ -248,7 +248,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               <div className="cyber-card" style={{ height: '100%' }}>
                 <div className="cyber-card-glow" style={{ background: 'var(--neon-rose)' }} />
                 <div className="stat-label">
-                  <span>Outflow This Month</span>
+                  <span>Spent This Month</span>
                   <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
                     <ArrowUpRight size={18} />
                   </div>
@@ -257,7 +257,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                   -{formatMoney(monthlyExpense, currency, masked)}
                 </div>
                 <div className="stat-trend negative">
-                  <TrendingDown size={14} /> Burn rate monitored
+                  <TrendingDown size={14} /> Total expenses
                 </div>
               </div>
             </Tilt3DCard>
@@ -267,7 +267,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               <div className="cyber-card" style={{ height: '100%' }}>
                 <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
                 <div className="stat-label">
-                  <span>Monthly Net Surplus</span>
+                  <span>Saved This Month</span>
                   <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
                     <Zap size={18} />
                   </div>
@@ -278,7 +278,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                 <div className="stat-trend neutral">
                   {monthNetSurplus > 0
                     ? `≈ ${formatMoney(dailyBudget, currency, masked)} / day pacing (${daysRemaining} days left)`
-                    : 'Outflow exceeds monthly inflow'}
+                    : 'Expenses exceed your income this month'}
                 </div>
               </div>
             </Tilt3DCard>
@@ -288,7 +288,7 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               <div className="cyber-card" style={{ height: '100%' }}>
                 <div className="cyber-card-glow" style={{ background: 'var(--neon-purple)' }} />
                 <div className="stat-label">
-                  <span>50/30/20 vs Income</span>
+                  <span>Budget Guide (50/30/20)</span>
                   <div className="cyber-icon-badge" style={{ background: 'var(--neon-purple-glow)', color: 'var(--neon-purple)' }}>
                     <PieIcon size={18} />
                   </div>
@@ -342,12 +342,12 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                     <Flame size={18} />
                   </div>
                   <div>
-                    <div className="cyber-title">6-Month Liquidity & Flow Dynamics</div>
-                    <div className="cyber-subtitle">Income credits vs operating expenditures</div>
+                    <div className="cyber-title">6-Month Income vs Spending</div>
+                    <div className="cyber-subtitle">Compare your earnings and spending over the last 6 months</div>
                   </div>
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/insights')}>
-                  Deep Analytics <ChevronRight size={14} />
+                  View Insights <ChevronRight size={14} />
                 </button>
               </div>
 
@@ -404,8 +404,8 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                       <PieIcon size={18} />
                     </div>
                     <div>
-                      <div className="cyber-title">Top Expenditures</div>
-                      <div className="cyber-subtitle">This month's primary outflows</div>
+                      <div className="cyber-title">Top Spending Categories</div>
+                      <div className="cyber-subtitle">Where your money went this month</div>
                     </div>
                   </div>
                 </div>
@@ -466,11 +466,11 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
             </div>
             <div>
               <div className="cyber-title">Recent Transactions</div>
-              <div className="cyber-subtitle">Instant synchronization with your Android device</div>
+              <div className="cyber-subtitle">Synced with your Android phone</div>
             </div>
           </div>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate('/ledger')}>
-            View Full Ledger <ChevronRight size={14} />
+            View All Transactions <ChevronRight size={14} />
           </button>
         </div>
 
@@ -486,13 +486,13 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               }}
             >
               <Clock size={28} style={{ color: 'var(--neon-cyan)', opacity: 0.7, marginBottom: 8 }} />
-              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f1f5f9' }}>No Recent Transactions</div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#f1f5f9' }}>No Transactions Yet</div>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', margin: '4px 0 16px 0', maxWidth: 440, marginLeft: 'auto', marginRight: 'auto' }}>
-                Your financial ledger starts fresh today. Entries you record or sync from your Android device will show up here in realtime.
+                No transactions recorded yet. Add an expense or income to get started.
               </p>
               {onOpenNewTxn && (
                 <button className="btn btn-secondary btn-sm" onClick={onOpenNewTxn}>
-                  <Plus size={14} /> Record First Entry
+                  <Plus size={14} /> Add First Transaction
                 </button>
               )}
             </div>

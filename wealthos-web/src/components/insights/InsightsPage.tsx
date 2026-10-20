@@ -155,10 +155,10 @@ Question: ${promptToUse}`;
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            Neural Financial Insights
+            Spending & Savings Insights
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-            Deep liquidity analytics, category velocity, and generative AI financial advisory
+            Charts and smart tips to understand your spending and save more money
           </p>
         </div>
 
@@ -189,7 +189,7 @@ Question: ${promptToUse}`;
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-emerald)' }} />
               <div className="stat-label">
-                <span>Period Inflow</span>
+                <span>Total Income</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-emerald-glow)', color: 'var(--neon-emerald)' }}>
                   <TrendingUp size={18} />
                 </div>
@@ -207,7 +207,7 @@ Question: ${promptToUse}`;
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-rose)' }} />
               <div className="stat-label">
-                <span>Period Outflow</span>
+                <span>Total Expenses</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
                   <TrendingDown size={18} />
                 </div>
@@ -215,7 +215,7 @@ Question: ${promptToUse}`;
               <div className="stat-value" style={{ color: 'var(--neon-rose)' }}>
                 -{formatMoney(totalExpense, currency, masked)}
               </div>
-              <div className="stat-trend negative">Total debits in period</div>
+              <div className="stat-trend negative">Spent in this time period</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -225,7 +225,7 @@ Question: ${promptToUse}`;
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
               <div className="stat-label">
-                <span>Savings Velocity</span>
+                <span>Savings Rate</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
                   <BarChart2 size={18} />
                 </div>
@@ -234,7 +234,7 @@ Question: ${promptToUse}`;
                 {savingsRate}%
               </div>
               <div className="stat-trend neutral">
-                Net surplus: {formatMoney(totalIncome - totalExpense, currency, masked)}
+                Money saved: {formatMoney(totalIncome - totalExpense, currency, masked)}
               </div>
             </div>
           </Tilt3DCard>
@@ -252,8 +252,8 @@ Question: ${promptToUse}`;
                     <BarChart2 size={18} />
                   </div>
                   <div>
-                    <div className="cyber-title">Cashflow Dynamics ({label})</div>
-                    <div className="cyber-subtitle">Income credits vs debits per period</div>
+                    <div className="cyber-title">Monthly Income vs Expenses ({label})</div>
+                    <div className="cyber-subtitle">Compare your monthly earnings and spending</div>
                   </div>
                 </div>
               </div>
@@ -292,8 +292,8 @@ Question: ${promptToUse}`;
                     <Sparkles size={18} />
                   </div>
                   <div>
-                    <div className="cyber-title">Category Distribution</div>
-                    <div className="cyber-subtitle">Proportional breakdown of debits</div>
+                    <div className="cyber-title">Where Your Money Goes</div>
+                    <div className="cyber-subtitle">Spending breakdown by category</div>
                   </div>
                 </div>
               </div>
@@ -347,7 +347,7 @@ Question: ${promptToUse}`;
                 <div className="cyber-title">
                   AI Money Coach
                 </div>
-                <div className="cyber-subtitle">Read-only financial analysis & wealth optimization insights</div>
+                <div className="cyber-subtitle">Helpful recommendations based on your spending habits</div>
               </div>
             </div>
           </div>

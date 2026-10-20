@@ -296,12 +296,12 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
           {/* Need / Want / Saving Classification for Expenses */}
           {type === 'EXPENSE' && (
             <div className="form-group">
-              <label className="form-label">50/30/20 Classification</label>
+              <label className="form-label">Spend Type (Budget)</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 {[
-                  { id: 'NEED', label: 'Need (50%)', color: 'var(--semantic-info, #0ea5e9)' },
-                  { id: 'WANT', label: 'Want (30%)', color: '#a855f7' },
-                  { id: 'SAVING', label: 'Saving (20%)', color: 'var(--semantic-income, #10b981)' },
+                  { id: 'NEED', label: 'Need (Essential)', color: 'var(--semantic-info, #0ea5e9)' },
+                  { id: 'WANT', label: 'Want (Lifestyle)', color: '#a855f7' },
+                  { id: 'SAVING', label: 'Saving (Investment)', color: 'var(--semantic-income, #10b981)' },
                 ].map(item => (
                   <button
                     key={item.id}

@@ -33,11 +33,11 @@ export function FloatingNav({ onOpenCommand, onOpenNewTxn }: FloatingNavProps) {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/vaults', label: 'Vaults', icon: Wallet },
-    { path: '/ledger', label: 'Ledger', icon: ScrollText },
+    { path: '/accounts', label: 'Accounts', icon: Wallet },
+    { path: '/ledger', label: 'Transactions', icon: ScrollText },
     { path: '/insights', label: 'Insights', icon: BarChart2 },
-    { path: '/horizons', label: 'Horizons', icon: Target },
-    { path: '/config', label: 'Config', icon: Settings },
+    { path: '/plans', label: 'Plans & Goals', icon: Target },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   // Click outside to close profile dropdown
@@ -57,11 +57,11 @@ export function FloatingNav({ onOpenCommand, onOpenNewTxn }: FloatingNavProps) {
 
   const isItemActive = (path: string) => {
     if (path === '/' && location.pathname === '/') return true;
-    if (path === '/vaults' && (location.pathname === '/vaults' || location.pathname === '/accounts')) return true;
+    if (path === '/accounts' && (location.pathname === '/vaults' || location.pathname === '/accounts')) return true;
     if (path === '/ledger' && location.pathname === '/ledger') return true;
     if (path === '/insights' && location.pathname === '/insights') return true;
-    if (path === '/horizons' && (location.pathname === '/horizons' || location.pathname === '/plans')) return true;
-    if (path === '/config' && (location.pathname === '/config' || location.pathname === '/settings')) return true;
+    if (path === '/plans' && (location.pathname === '/horizons' || location.pathname === '/plans')) return true;
+    if (path === '/settings' && (location.pathname === '/config' || location.pathname === '/settings')) return true;
     return false;
   };
 

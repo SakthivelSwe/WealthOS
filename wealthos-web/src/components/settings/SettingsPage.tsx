@@ -347,12 +347,12 @@ export function SettingsPage() {
   };
 
   const sections = [
-    { id: 'profile', label: 'Identity & Currency', icon: User },
-    { id: 'budget', label: '50/30/20 Budgeting', icon: Database },
-    { id: 'privacy', label: 'Appearance & Masking', icon: Shield },
-    { id: 'data', label: 'Cloud Sync & Backups', icon: Download },
-    { id: 'account', label: 'Session Management', icon: Phone },
-    { id: 'danger', label: 'Danger Zone', icon: Trash2 },
+    { id: 'profile', label: 'Profile & Currency', icon: User },
+    { id: 'budget', label: 'Monthly Budget Targets', icon: Database },
+    { id: 'privacy', label: 'Appearance & Privacy', icon: Shield },
+    { id: 'data', label: 'Cloud Sync & Backup', icon: Download },
+    { id: 'account', label: 'Account & Logout', icon: Phone },
+    { id: 'danger', label: 'Delete All Data', icon: Trash2 },
   ];
 
   const totalPct = needsPct + wantsPct + savingsPct;
@@ -363,10 +363,10 @@ export function SettingsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            System Core & Sync
+            Settings
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-            Manage neural preferences, Supabase cloud mirroring, and cryptographic backups
+            Manage your profile, currency, budget targets, and backups
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

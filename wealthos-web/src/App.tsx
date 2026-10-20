@@ -21,13 +21,13 @@ function CommandPalette({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const commands = [
-    { label: 'Executive Dashboard', path: '/', shortcut: 'G D' },
-    { label: 'Vaults & Accounts', path: '/accounts', shortcut: 'G A' },
-    { label: 'Live Financial Ledger', path: '/ledger', shortcut: 'G L' },
-    { label: 'Neural AI Insights', path: '/insights', shortcut: 'G I' },
-    { label: 'Wealth Horizons & Plans', path: '/plans', shortcut: 'G P' },
-    { label: 'System Configuration', path: '/settings', shortcut: 'G S' },
-    { label: 'Notification Center', path: '/notifications', shortcut: '' },
+    { label: 'Dashboard', path: '/', shortcut: 'G D' },
+    { label: 'Bank Accounts & Cards', path: '/accounts', shortcut: 'G A' },
+    { label: 'Transactions History', path: '/ledger', shortcut: 'G L' },
+    { label: 'Spending & Savings Insights', path: '/insights', shortcut: 'G I' },
+    { label: 'Plans, Goals & Loans', path: '/plans', shortcut: 'G P' },
+    { label: 'Settings', path: '/settings', shortcut: 'G S' },
+    { label: 'Notifications', path: '/notifications', shortcut: '' },
   ].filter(c => !query || c.label.toLowerCase().includes(query.toLowerCase()));
 
   return (

@@ -59,7 +59,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800 }}>
-            {account ? 'Edit Vault Entity' : 'Add New Vault Account'}
+            {account ? 'Edit Account' : 'Add New Account'}
           </h2>
           <button type="button" onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: '50%' }}>
             <X size={18} />
@@ -76,7 +76,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Asset Classification</label>
+              <label className="form-label">Account Type</label>
               <select value={type} onChange={e => setType(e.target.value as AccountType)}>
                 {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{ACCOUNT_TYPE_LABELS[t]}</option>)}
               </select>
@@ -92,7 +92,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
           {/* Quick Bank Presets */}
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Building2 size={13} style={{ color: 'var(--neon-cyan)' }} /> Popular Bank / Institution Presets
+              <Building2 size={13} style={{ color: 'var(--neon-cyan)' }} /> Popular Banks (1-Click Fill)
             </label>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
               {POPULAR_BANKS.map(bank => {
@@ -203,17 +203,17 @@ export function AccountsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            Vaults & Portfolios
+            Bank Accounts & Wallets
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-            Manage liquid bank accounts, physical cash, credit lines, and investments
+            Track all your bank balances, cash, cards, and loans in one place
           </p>
         </div>
         <button
           className="btn btn-primary"
           onClick={() => { setEditAccount(undefined); setShowModal(true); }}
         >
-          <Plus size={16} /> Add Vault Account
+          <Plus size={16} /> Add Account
         </button>
       </div>
 
@@ -224,7 +224,7 @@ export function AccountsPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
               <div className="stat-label">
-                <span>Aggregate Net Worth</span>
+                <span>Total Net Worth</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
                   <Wallet size={18} />
                 </div>
@@ -232,7 +232,7 @@ export function AccountsPage() {
               <div className="stat-value" style={{ color: 'var(--neon-cyan)' }}>
                 {formatMoney(netWorth, currency, masked)}
               </div>
-              <div className="stat-trend neutral">All active assets minus liabilities</div>
+              <div className="stat-trend neutral">Total balance minus loans & cards</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -242,7 +242,7 @@ export function AccountsPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-emerald)' }} />
               <div className="stat-label">
-                <span>Total Assets</span>
+                <span>Total Money & Savings</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-emerald-glow)', color: 'var(--neon-emerald)' }}>
                   <TrendingUp size={18} />
                 </div>
@@ -250,7 +250,7 @@ export function AccountsPage() {
               <div className="stat-value" style={{ color: 'var(--neon-emerald)' }}>
                 {formatMoney(totalAssets, currency, masked)}
               </div>
-              <div className="stat-trend positive">Positive balances & reserves</div>
+              <div className="stat-trend positive">Bank accounts, cash, and investments</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -260,7 +260,7 @@ export function AccountsPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-rose)' }} />
               <div className="stat-label">
-                <span>Total Liabilities</span>
+                <span>Total Loans & Credit Cards</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
                   <CreditCard size={18} />
                 </div>
@@ -268,7 +268,7 @@ export function AccountsPage() {
               <div className="stat-value" style={{ color: 'var(--neon-rose)' }}>
                 {formatMoney(Math.abs(totalLiabilities), currency, masked)}
               </div>
-              <div className="stat-trend negative">Credit cards & debt balances</div>
+              <div className="stat-trend negative">Pending loan amounts & card bills</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -288,10 +288,10 @@ export function AccountsPage() {
         >
           <Building2 size={44} style={{ color: 'var(--neon-cyan)', marginBottom: 16, opacity: 0.8 }} />
           <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginBottom: 8 }}>
-            No Vault Accounts Added Yet
+            No Accounts Added Yet
           </h2>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '0.88rem', maxWidth: 480, margin: '0 auto 24px auto', lineHeight: 1.6 }}>
-            Your ledger starts fresh today. Connect your first primary bank account, credit card, cash wallet, or savings account to start monitoring balances.
+            Add your bank account, credit card, or cash wallet to start tracking your money.
           </p>
 
           <button
@@ -299,7 +299,7 @@ export function AccountsPage() {
             onClick={() => { setEditAccount(undefined); setShowModal(true); }}
             style={{ marginBottom: 28 }}
           >
-            <Plus size={18} /> Add Your First Vault Account
+            <Plus size={18} /> Add Your First Account
           </button>
 
           {/* Quick-add popular Indian banks */}

@@ -245,10 +245,10 @@ export function LedgerPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
-            Financial Ledger
+            Transactions
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-            Synchronized journal entries, categorized cashflows, and live double-entry records
+            All your income, expense, and transfer records in one place
           </p>
         </div>
         <button
@@ -266,7 +266,7 @@ export function LedgerPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-emerald)' }} />
               <div className="stat-label">
-                <span>Total Inflow</span>
+                <span>Total Income</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-emerald-glow)', color: 'var(--neon-emerald)' }}>
                   <ArrowDownRight size={18} />
                 </div>
@@ -274,7 +274,7 @@ export function LedgerPage() {
               <div className="stat-value" style={{ color: 'var(--neon-emerald)' }}>
                 +{formatMoney(totalIncome, currency, masked)}
               </div>
-              <div className="stat-trend positive">{filtered.filter(t => t.type === 'INCOME').length} credits</div>
+              <div className="stat-trend positive">{filtered.filter(t => t.type === 'INCOME').length} income records</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -284,7 +284,7 @@ export function LedgerPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-rose)' }} />
               <div className="stat-label">
-                <span>Total Outflow</span>
+                <span>Total Expenses</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-rose-glow)', color: 'var(--neon-rose)' }}>
                   <ArrowUpRight size={18} />
                 </div>
@@ -292,7 +292,7 @@ export function LedgerPage() {
               <div className="stat-value" style={{ color: 'var(--neon-rose)' }}>
                 -{formatMoney(totalExpense, currency, masked)}
               </div>
-              <div className="stat-trend negative">{filtered.filter(t => t.type === 'EXPENSE').length} debits</div>
+              <div className="stat-trend negative">{filtered.filter(t => t.type === 'EXPENSE').length} expense records</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -302,7 +302,7 @@ export function LedgerPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
               <div className="stat-label">
-                <span>Net Cashflow</span>
+                <span>Net Balance</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
                   <ArrowLeftRight size={18} />
                 </div>
@@ -310,7 +310,7 @@ export function LedgerPage() {
               <div className="stat-value" style={{ color: totalIncome - totalExpense >= 0 ? 'var(--neon-cyan)' : 'var(--neon-rose)' }}>
                 {formatMoney(totalIncome - totalExpense, currency, masked)}
               </div>
-              <div className="stat-trend neutral">Net margin across selected query</div>
+              <div className="stat-trend neutral">Remaining cashflow in selected view</div>
             </div>
           </Tilt3DCard>
         </div>
@@ -346,7 +346,7 @@ export function LedgerPage() {
 
           {/* Account Filter */}
           <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ width: 170 }}>
-            <option value="">All Vaults</option>
+            <option value="">All Accounts</option>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
 
@@ -413,10 +413,10 @@ export function LedgerPage() {
 
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                          {txn.merchant || txn.description || 'Ledger Entry'}
+                          {txn.merchant || txn.description || 'Transaction'}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                          <span>{acc?.name || 'Vault'}</span>
+                          <span>{acc?.name || 'Account'}</span>
                           {txn.category_id && <span>• {getCategoryDisplayName(txn.category_id, categories)}</span>}
                           {txn.payment_method && <span>• {txn.payment_method}</span>}
                           {txn.need_want && (
@@ -454,7 +454,7 @@ export function LedgerPage() {
                           type="button"
                           className="btn-ghost btn-sm"
                           style={{ padding: 6, borderRadius: 'var(--radius-sm)', color: 'var(--neon-rose)' }}
-                          onClick={() => { if (confirm('Delete this ledger record?')) deleteTransaction(txn.id); }}
+                          onClick={() => { if (confirm('Delete this transaction?')) deleteTransaction(txn.id); }}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -472,13 +472,13 @@ export function LedgerPage() {
             <Clock size={36} style={{ margin: '0 auto 12px auto', color: 'var(--neon-cyan)', opacity: 0.7 }} />
             <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>No Transactions Found</div>
             <p style={{ fontSize: '0.85rem', marginTop: 4, maxWidth: 400, marginLeft: 'auto', marginRight: 'auto', marginBottom: 20 }}>
-              Your ledger starts fresh today. Record an expense, income, or transfer to track your cashflow.
+              No transactions recorded yet. Add an expense or income to track your cashflow.
             </p>
             <button
               className="btn btn-primary btn-md"
               onClick={() => { setEditTxn(undefined); setShowModal(true); }}
             >
-              <Plus size={16} /> Record First Entry
+              <Plus size={16} /> Add First Transaction
             </button>
           </div>
         )}

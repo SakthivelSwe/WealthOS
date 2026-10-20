@@ -256,7 +256,7 @@ export function HoloCard3D({
 
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                LIQUID ASSETS
+                CASH & BANK BALANCE
               </div>
               <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981', fontFamily: 'var(--font-mono)' }}>
                 {formatMoney(liquidBalance, currency, masked)}
@@ -361,14 +361,14 @@ export function HoloCard3D({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 10 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontSize: '0.72rem', fontWeight: 600 }}>
-                <ShieldCheck size={14} /> PBKDF2 + AES-GCM Encrypted
+                <ShieldCheck size={14} /> 100% Private & Encrypted
               </div>
               <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: 2 }}>
-                Zero-Knowledge Client-Side Vault Encryption
+                Only you can access your financial data
               </div>
             </div>
             <div style={{ color: '#64748b', fontSize: '0.68rem', fontWeight: 600 }}>
-              Private Vault
+              Personal & Safe
             </div>
           </div>
         </div>

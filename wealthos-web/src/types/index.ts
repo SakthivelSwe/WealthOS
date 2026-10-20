@@ -214,15 +214,15 @@ export function parseMoney(text: string, currencyCode: string = 'INR'): number {
 
 // Account type helpers
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
-  BANK: '🏦 Bank',
-  CASH: '💵 Cash',
-  UPI_WALLET: '📱 UPI Wallet',
-  SAVINGS: '🏧 Savings',
+  BANK: '🏦 Bank Account',
+  CASH: '💵 Cash in Hand',
+  UPI_WALLET: '📱 UPI Wallet (GPay / Paytm)',
+  SAVINGS: '🏧 Savings Account',
   CREDIT_CARD: '💳 Credit Card',
-  INVESTMENT: '📈 Investment',
-  LOAN: '🏠 Loan',
-  OTHER_ASSET: '💎 Other Asset',
-  OTHER_LIABILITY: '📋 Other Liability',
+  INVESTMENT: '📈 Investments & Stocks',
+  LOAN: '🏠 Loans & EMI',
+  OTHER_ASSET: '💎 Other Assets (Gold / Land)',
+  OTHER_LIABILITY: '📋 Money I Owe Others',
 };
 
 export const ACCOUNT_TYPE_COLORS: Record<AccountType, string> = {

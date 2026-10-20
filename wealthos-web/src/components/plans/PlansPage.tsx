@@ -738,10 +738,10 @@ export function PlansPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.85rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>
-            Financial Goals, Chit Funds & Loans
+            Plans, Goals & Loans
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
-            Track emergency funds, monthly chit fund schemes, loan EMIs, and recurring bills in simple Indian rupees
+            Save for goals, track chit funds, manage loans, and organize monthly bills
           </p>
         </div>
 
