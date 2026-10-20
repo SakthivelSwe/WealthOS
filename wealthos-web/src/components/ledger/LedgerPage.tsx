@@ -4,6 +4,7 @@ import { formatMoney, parseMoney, getCategoryDisplayName, formatAccountLabel, ty
 import { Tilt3DCard } from '../shared/Tilt3DCard';
 import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Clock, X, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import { CategoryPicker } from '../shared/CategoryPicker';
 
 const PAGE_SIZE = 40;
 
@@ -151,10 +152,12 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
             ) : (
               <div className="form-group">
                 <label className="form-label">Category</label>
-                <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-                  <option value="">Select category...</option>
-                  {filteredCategories.map(c => <option key={c.id} value={c.id}>{getCategoryDisplayName(c.id, categories)}</option>)}
-                </select>
+                <CategoryPicker
+                  type={type}
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  categories={categories}
+                />
               </div>
             )}
           </div>

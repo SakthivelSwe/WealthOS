@@ -3,6 +3,7 @@ import { useData } from '../../hooks/useData';
 import { parseMoney, getCategoryDisplayName, formatAccountLabel, POPULAR_BANKS, type TxnType, type NeedWant } from '../../types';
 import { X, Check, ArrowRightLeft, TrendingDown, TrendingUp, Plus, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { CategoryPicker } from './CategoryPicker';
 
 interface NewTransactionModalProps {
   onClose: () => void;
@@ -271,12 +272,12 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
           {type !== 'TRANSFER' && (
             <div className="form-group">
               <label className="form-label">Category</label>
-              <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
-                <option value="">Select a category...</option>
-                {categoriesForType.map(c => (
-                  <option key={c.id} value={c.id}>{getCategoryDisplayName(c.id, categories)}</option>
-                ))}
-              </select>
+              <CategoryPicker
+                type={type}
+                value={categoryId}
+                onChange={setCategoryId}
+                categories={categories}
+              />
             </div>
           )}
 

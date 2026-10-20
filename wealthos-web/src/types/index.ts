@@ -277,66 +277,96 @@ export function formatAccountLabel(acc: Account): string {
   return `${acc.name}${digits} • ${typeLabel}`;
 }
 
-// Default categories (mirrors Android)
+// Default categories (mirrors Android catalog with vibrant, clear emojis)
 export const DEFAULT_CATEGORIES: Omit<Category, 'user_id'>[] = [
-  { id: 'cat_food', parent_id: null, name: '🍔 Food', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 0 },
-  { id: 'cat_food_groceries', parent_id: 'cat_food', name: 'Groceries', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 1 },
-  { id: 'cat_food_restaurant', parent_id: 'cat_food', name: 'Restaurant', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 2 },
-  { id: 'cat_food_snacks', parent_id: 'cat_food', name: 'Snacks', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 3 },
-  { id: 'cat_food_coffee', parent_id: 'cat_food', name: 'Coffee', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 4 },
-  { id: 'cat_food_delivery', parent_id: 'cat_food', name: 'Delivery', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 5 },
-  { id: 'cat_transport', parent_id: null, name: '🚗 Transport', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF7FA6D9, archived: false, sort_order: 6 },
-  { id: 'cat_transport_fuel', parent_id: 'cat_transport', name: 'Fuel', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF7FA6D9, archived: false, sort_order: 7 },
-  { id: 'cat_transport_metro', parent_id: 'cat_transport', name: 'Metro', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF7FA6D9, archived: false, sort_order: 8 },
-  { id: 'cat_shopping', parent_id: null, name: '🛍️ Shopping', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFB58BC9, archived: false, sort_order: 9 },
-  { id: 'cat_shopping_clothing', parent_id: 'cat_shopping', name: 'Clothing', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFB58BC9, archived: false, sort_order: 10 },
-  { id: 'cat_shopping_electronics', parent_id: 'cat_shopping', name: 'Electronics', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFB58BC9, archived: false, sort_order: 11 },
-  { id: 'cat_bills', parent_id: null, name: '🧾 Bills', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 12 },
-  { id: 'cat_bills_rent', parent_id: 'cat_bills', name: 'Rent', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 13 },
-  { id: 'cat_bills_electricity', parent_id: 'cat_bills', name: 'Electricity', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 14 },
-  { id: 'cat_bills_internet', parent_id: 'cat_bills', name: 'Internet', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 15 },
-  { id: 'cat_bills_subscriptions', parent_id: 'cat_bills', name: 'Subscriptions', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 16 },
-  { id: 'cat_health', parent_id: null, name: '❤️ Health', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFE0736B, archived: false, sort_order: 17 },
-  { id: 'cat_education', parent_id: null, name: '📚 Education', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF6FB7C4, archived: false, sort_order: 18 },
-  { id: 'cat_entertainment', parent_id: null, name: '🍿 Entertainment', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFC98B9E, archived: false, sort_order: 19 },
-  { id: 'cat_travel', parent_id: null, name: '✈️ Travel', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFF8BC9A6, archived: false, sort_order: 20 },
-  { id: 'cat_family', parent_id: null, name: '👨‍👩‍👧 Family', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9B58B, archived: false, sort_order: 21 },
-  { id: 'cat_investment', parent_id: null, name: '📈 Investment', kind: 'EXPENSE', need_want: 'SAVING', icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 22 },
-  { id: 'cat_loan_emi', parent_id: null, name: '🏦 Loan / EMI', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFA3A3AD, archived: false, sort_order: 23 },
-  { id: 'cat_misc', parent_id: null, name: '📦 Misc', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFF8E8E96, archived: false, sort_order: 24 },
+  { id: 'cat_food', parent_id: null, name: '🍔 Food & Dining', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 0 },
+  { id: 'cat_food_groceries', parent_id: 'cat_food', name: '🥦 Groceries & Veggies', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 1 },
+  { id: 'cat_food_restaurant', parent_id: 'cat_food', name: '🍽️ Hotel & Restaurant', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 2 },
+  { id: 'cat_food_snacks', parent_id: 'cat_food', name: '☕ Snacks & Tea', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 3 },
+  { id: 'cat_food_coffee', parent_id: 'cat_food', name: '☕ Coffee & Cafe', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 4 },
+  { id: 'cat_food_delivery', parent_id: 'cat_food', name: '🛵 Food Delivery (Zomato/Swiggy)', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9A66B, archived: false, sort_order: 5 },
+  { id: 'cat_transport', parent_id: null, name: '🚗 Travel & Commute', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF7FA6D9, archived: false, sort_order: 6 },
+  { id: 'cat_transport_fuel', parent_id: 'cat_transport', name: '⛽ Petrol & Fuel', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF7FA6D9, archived: false, sort_order: 7 },
+  { id: 'cat_transport_metro', parent_id: 'cat_transport', name: '🚇 Metro & Train', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF7FA6D9, archived: false, sort_order: 8 },
+  { id: 'cat_shopping', parent_id: null, name: '🛍️ Shopping & Spends', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFB58BC9, archived: false, sort_order: 9 },
+  { id: 'cat_shopping_clothing', parent_id: 'cat_shopping', name: '👕 Clothes & Fashion', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFB58BC9, archived: false, sort_order: 10 },
+  { id: 'cat_shopping_electronics', parent_id: 'cat_shopping', name: '📱 Mobiles & Electronics', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFB58BC9, archived: false, sort_order: 11 },
+  { id: 'cat_bills', parent_id: null, name: '🧾 Bills & Utilities', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 12 },
+  { id: 'cat_bills_rent', parent_id: 'cat_bills', name: '🏠 Rent & Housing', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 13 },
+  { id: 'cat_bills_electricity', parent_id: 'cat_bills', name: '⚡ Electricity Bill (EB)', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 14 },
+  { id: 'cat_bills_internet', parent_id: 'cat_bills', name: '🌐 WiFi & Broadband', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 15 },
+  { id: 'cat_bills_subscriptions', parent_id: 'cat_bills', name: '📱 Mobile Recharge & OTT', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFD1A85A, archived: false, sort_order: 16 },
+  { id: 'cat_health', parent_id: null, name: '❤️ Health & Medicine', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFE0736B, archived: false, sort_order: 17 },
+  { id: 'cat_education', parent_id: null, name: '📚 School & College Fees', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFF6FB7C4, archived: false, sort_order: 18 },
+  { id: 'cat_entertainment', parent_id: null, name: '🍿 Movies & Entertainment', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFFC98B9E, archived: false, sort_order: 19 },
+  { id: 'cat_travel', parent_id: null, name: '✈️ Travel & Vacation', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFF8BC9A6, archived: false, sort_order: 20 },
+  { id: 'cat_family', parent_id: null, name: '👨‍👩‍👧 Family & Home', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFC9B58B, archived: false, sort_order: 21 },
+  { id: 'cat_investment', parent_id: null, name: '📈 Mutual Funds & Stocks (SIP)', kind: 'EXPENSE', need_want: 'SAVING', icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 22 },
+  { id: 'cat_loan_emi', parent_id: null, name: '🏦 Bank Loan EMI & Repayment', kind: 'EXPENSE', need_want: 'NEED', icon: 'default', color: 0xFFA3A3AD, archived: false, sort_order: 23 },
+  { id: 'cat_misc', parent_id: null, name: '📦 Other Expenses', kind: 'EXPENSE', need_want: 'WANT', icon: 'default', color: 0xFF8E8E96, archived: false, sort_order: 24 },
   { id: 'cat_income_0', parent_id: null, name: '💰 Salary', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 25 },
-  { id: 'cat_income_1', parent_id: null, name: '💼 Business', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 26 },
-  { id: 'cat_income_2', parent_id: null, name: '📈 Interest', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 27 },
-  { id: 'cat_income_3', parent_id: null, name: '🎁 Other Income', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 28 },
+  { id: 'cat_income_1', parent_id: null, name: '💼 Business & Freelance', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 26 },
+  { id: 'cat_income_2', parent_id: null, name: '📈 Interest & Dividends', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 27 },
+  { id: 'cat_income_3', parent_id: null, name: '🎁 Bonus, Gift & Cashback', kind: 'INCOME', need_want: null, icon: 'default', color: 0xFF7FD1AE, archived: false, sort_order: 28 },
 ];
 
+export const CATEGORY_EMOJI_MAP: Record<string, string> = {
+  cat_housing: '🏠 Rent & Housing',
+  cat_bills_rent: '🏠 Rent & Housing',
+  cat_bills_electricity: '⚡ Electricity Bill (EB)',
+  cat_bills_internet: '🌐 WiFi & Broadband',
+  cat_bills_subscriptions: '📱 Mobile Recharge & OTT',
+  cat_bills: '🧾 Bills & Utilities',
+  cat_food: '🍔 Food & Dining',
+  cat_food_groceries: '🥦 Groceries & Veggies',
+  cat_food_restaurant: '🍽️ Hotel & Restaurant',
+  cat_food_snacks: '☕ Snacks & Tea',
+  cat_food_coffee: '☕ Coffee & Cafe',
+  cat_food_delivery: '🛵 Food Delivery',
+  cat_transport: '🚗 Travel & Commute',
+  cat_transport_fuel: '⛽ Petrol & Fuel',
+  cat_transport_metro: '🚇 Metro & Train',
+  cat_shopping: '🛍️ Shopping & Spends',
+  cat_shopping_clothing: '👕 Clothes & Fashion',
+  cat_shopping_electronics: '📱 Mobiles & Electronics',
+  cat_health: '❤️ Health & Medicine',
+  cat_education: '📚 School & College Fees',
+  cat_entertainment: '🍿 Movies & Entertainment',
+  cat_travel: '✈️ Travel & Vacation',
+  cat_family: '👨‍👩‍👧 Family & Home',
+  cat_investments: '📈 Mutual Funds & Stocks (SIP)',
+  cat_investment: '📈 Mutual Funds & Stocks (SIP)',
+  cat_loan_emi: '🏦 Bank Loan EMI & Repayment',
+  cat_misc: '📦 Other Expenses',
+  cat_salary: '💰 Salary',
+  cat_income_0: '💰 Salary',
+  cat_income_1: '💼 Business & Freelance',
+  cat_income_2: '📈 Interest & Dividends',
+  cat_income_3: '🎁 Bonus, Gift & Cashback',
+};
+
 export function getCategoryDisplayName(catId: string | null | undefined, categories: Category[] = []): string {
-  if (!catId) return 'General';
+  if (!catId) return '📦 General';
+
   const found = categories.find(c => c.id === catId);
-  if (found && !found.name.startsWith('cat_')) return found.name;
+  if (found) {
+    if (/^\p{Extended_Pictographic}/u.test(found.name.trim())) {
+      return found.name;
+    }
+    if (CATEGORY_EMOJI_MAP[found.id]) {
+      return CATEGORY_EMOJI_MAP[found.id];
+    }
+    return `🏷️ ${found.name}`;
+  }
 
-  const KNOWN_MAP: Record<string, string> = {
-    cat_housing: '🏠 Housing & Rent',
-    cat_bills_rent: '🏠 Housing & Rent',
-    cat_investments: '📈 Investments & SIP',
-    cat_investment: '📈 Investments & SIP',
-    cat_utilities: '⚡ Utilities & Bills',
-    cat_bills: '🧾 Bills',
-    cat_food: '🍔 Food & Dining',
-    cat_food_groceries: '🥦 Groceries',
-    cat_food_restaurant: '🍽️ Restaurant',
-    cat_transport: '🚗 Fuel & Transport',
-    cat_shopping: '🛍️ Shopping',
-    cat_entertainment: '🍿 Entertainment',
-    cat_salary: '💰 Salary',
-    cat_income_0: '💰 Salary',
-    cat_health: '❤️ Health & Wellness',
-    cat_education: '📚 Education',
-    cat_travel: '✈️ Travel',
-  };
+  if (CATEGORY_EMOJI_MAP[catId]) return CATEGORY_EMOJI_MAP[catId];
+  return `🏷️ ${catId.replace(/^cat_/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+}
 
-  if (KNOWN_MAP[catId]) return KNOWN_MAP[catId];
-  return catId.replace(/^cat_/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+export function getCategoryEmoji(catId: string | null | undefined, categories: Category[] = []): string {
+  const label = getCategoryDisplayName(catId, categories);
+  const match = label.match(/^\p{Extended_Pictographic}/u);
+  return match ? match[0] : '🏷️';
 }
 
 export function sanitizeCategories<T extends { id: string; name: string; kind?: string; archived?: boolean; sort_order?: number }>(cats: T[]): T[] {
