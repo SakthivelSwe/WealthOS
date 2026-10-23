@@ -38,6 +38,7 @@ export interface Category {
   color: number;
   archived: boolean;
   sort_order: number;
+  budget_limit_minor?: number | null;
 }
 
 export interface Transaction {

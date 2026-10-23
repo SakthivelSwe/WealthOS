@@ -26,7 +26,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, addDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
 interface DashboardProps {
@@ -35,7 +35,7 @@ interface DashboardProps {
 
 export function Dashboard({ onOpenNewTxn }: DashboardProps) {
   const navigate = useNavigate();
-  const { accounts, transactions, journalEntries, settings, categories, updateSettings } = useData();
+  const { accounts, transactions, journalEntries, settings, categories, recurringTxns, updateSettings } = useData();
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
   const userName = settings?.user_name || 'WealthOS User';
@@ -113,6 +113,26 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysRemaining = daysInMonth - now.getDate() + 1;
   const dailyBudget = daysRemaining > 0 ? Math.floor(surplusToPace / daysRemaining) : 0;
+
+  // Daily spending & pacing (Phase 7.3)
+  const todayStr = format(now, 'yyyy-MM-dd');
+  const todayExpense = transactions
+    .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.local_date === todayStr && (!t.currency || t.currency === currency))
+    .reduce((s, t) => s + t.amount_minor, 0);
+
+  // Upcoming bills in next 14 days & shortfall check (Phase 7.4)
+  const next14DaysStr = format(addDays(now, 14), 'yyyy-MM-dd');
+  const upcomingBills = useMemo(() => {
+    return (recurringTxns || [])
+      .filter(r => r.type === 'EXPENSE' && r.active && r.next_run_date >= todayStr && r.next_run_date <= next14DaysStr)
+      .map(r => ({
+        ...r,
+        categoryName: getCategoryDisplayName(r.category_id, categories),
+      }));
+  }, [recurringTxns, todayStr, next14DaysStr, categories]);
+
+  const upcomingBillsTotal = upcomingBills.reduce((s, r) => s + r.amount_minor, 0);
+  const hasBillShortfall = upcomingBillsTotal > 0 && liquidBalance < upcomingBillsTotal;
 
   // 6-month historical area trend
   const trendData = useMemo(() => {
@@ -205,6 +225,42 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
         </div>
       )}
 
+      {/* Bill Shortfall / Upcoming Bills Banner (Phase 7.4) */}
+      {upcomingBillsTotal > 0 && (
+        <div
+          style={{
+            background: hasBillShortfall ? 'rgba(244, 63, 94, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+            border: `1px solid ${hasBillShortfall ? 'var(--neon-rose)' : 'rgba(16, 185, 129, 0.3)'}`,
+            borderRadius: 'var(--radius-md)',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem' }}>{hasBillShortfall ? '⚠️' : '🔔'}</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.92rem', color: hasBillShortfall ? 'var(--neon-rose)' : '#f8fafc' }}>
+                {hasBillShortfall
+                  ? `Upcoming Bills Warning: ${formatMoney(upcomingBillsTotal, currency, masked)} due soon exceeds your liquid vault balance`
+                  : `Upcoming Bills: ${formatMoney(upcomingBillsTotal, currency, masked)} due in next 14 days`}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                {hasBillShortfall
+                  ? `Shortfall of ${formatMoney(upcomingBillsTotal - liquidBalance, currency, masked)}. Your liquid vault balance is ${formatMoney(liquidBalance, currency, masked)} across ${upcomingBills.length} upcoming bill(s).`
+                  : `Liquid vault balance (${formatMoney(liquidBalance, currency, masked)}) fully covers your ${upcomingBills.length} upcoming bill(s).`}
+              </div>
+            </div>
+          </div>
+          <button className="btn btn-sm btn-secondary" onClick={() => navigate('/plans')}>
+            View Bills
+          </button>
+        </div>
+      )}
+
       {/* ========================================================
           HERO ROW: 3D HOLOGRAPHIC CARD + SPATIAL TELEMETRY
           ======================================================== */}
@@ -279,6 +335,13 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
                   {monthNetSurplus > 0
                     ? `≈ ${formatMoney(dailyBudget, currency, masked)} / day pacing (${daysRemaining} days left)`
                     : 'Expenses exceed your income this month'}
+                </div>
+                {/* Today's spending summary (Phase 7.3) */}
+                <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--glass-border)', fontSize: '0.72rem', color: todayExpense > dailyBudget && dailyBudget > 0 ? 'var(--neon-rose)' : 'var(--text-tertiary)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Today's spend:</span>
+                  <span style={{ fontWeight: 700, color: todayExpense > dailyBudget && dailyBudget > 0 ? 'var(--neon-rose)' : '#f8fafc' }}>
+                    {formatMoney(todayExpense, currency, masked)} {dailyBudget > 0 && (todayExpense <= dailyBudget ? `(≤ ${formatMoney(dailyBudget, currency, masked)})` : `(> allowance)`)}
+                  </span>
                 </div>
               </div>
             </Tilt3DCard>

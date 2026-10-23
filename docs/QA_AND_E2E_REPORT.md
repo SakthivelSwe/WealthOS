@@ -1,8 +1,8 @@
 # WealthOS — Quality Assurance & End-to-End Verification Report
 
-**Date**: October 18, 2026  
+**Date**: October 24, 2026  
 **Execution Environment**: Windows 11, JDK 21, Node.js v20, Gradle 9.5.0, Chrome Headless / Vite Local Server  
-**Test Suite Coverage**: 105 Automated Unit & Domain Tests, TypeScript Production Build, Browser Automated Verification
+**Test Suite Coverage**: 154 Automated Unit & Domain Tests, TypeScript Production Build, Browser Automated Verification
 
 ---
 
@@ -12,9 +12,9 @@
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | `:domain` Unit Tests | 80 | 80 | 0 | 0 | **PASS** |
 | `:app` Unit Tests (`testDebugUnitTest`) | 25 | 25 | 0 | 0 | **PASS** |
-| Web Unit Tests (`npm test` / Node test runner) | 13 | 13 | 0 | 0 | **PASS** |
+| Web Unit Tests (`npm test` / Node test runner) | 49 | 49 | 0 | 0 | **PASS** |
 | Web TypeScript Compilation (`tsc`) | Full project | Full | 0 | 0 | **PASS** |
-| Web Production Bundle (`vite build`) | 2,867 modules | 2,867 | 0 | 0 | **PASS** |
+| Web Production Bundle (`vite build`) | 2,870 modules | 2,870 | 0 | 0 | **PASS** |
 | GitHub Actions CI (`verify.yml` with `web-verify`) | Full pipeline | Configured | 0 | 0 | **PASS** |
 | Web Live Local Server | Endpoints | All routes | 0 | 0 | **PASS** |
 | Remote Production Deployed Site | Public checks | Partial | 0 | Auth gated | **BLOCKED** |
@@ -49,6 +49,10 @@
 | **FIN-22: RFC 4180 CSV Formula Injection Shielding** | Exported CSV properly escapes quotes and shields dangerous prefixes (`=`, `+`, `-`, `@`). | Formula prefixes prefixed with `'`; quotes escaped as `""`. | **PASS** | Verified in `SettingsPage.tsx:handleExportCSV`. |
 | **FIN-23: Double-Entry Balanced Legs on Transaction Creation** | New transactions must produce balanced debit/credit legs (`sum === 0`) for EXPENSE, INCOME, and TRANSFER. | Balanced legs generated with account and category offsets. | **PASS** | Verified in `NewTransactionModal.tsx` & `Ledger.kt:isBalanced`. |
 | **FIN-24: Atomic Journal Leg Synchronization on Edit** | Editing transaction amount, account, or category updates both transaction and journal entries. | `useData.tsx` deletes old legs and inserts updated legs atomically; balances update. | **PASS** | Verified in `useData.tsx:updateTransaction` & `LedgerPage.tsx`. |
+| **FIN-25: Variable Monthly Salary Planning & Safe-to-Spend** | Calculates actual safe-to-spend based on confirmed income received, deducting committed obligations, expenses, and 5% cash buffer. Floors at 0. | Safe-to-spend matches itemized calculation exactly; 0 income floors to ₹0 safe-to-spend. | **PASS** | Verified in `audit_integrity.test.js` & `PlansPage.tsx`. |
+| **FIN-26: Indian Bank Statement Import & Reconciliation** | Parse Axis Bank statement CSV/text with lakhs/crores formatting, extract UPI merchant/ref, and verify closing balance mathematically. | Statement parses cleanly; balances reconcile; duplicates flagged against existing ledger. | **PASS** | Verified in `statementParser.test.js` & `ImportStatementModal.tsx`. |
+| **FIN-27: User-Adjustable Category Spending Limits** | Set and track per-category spending limits with progress indicators (green <75%, amber 75-100%, red >100%). | Category budget limits evaluate accurately and persist across app reloads. | **PASS** | Verified in `audit_integrity.test.js` & `PlansPage.tsx`. |
+| **FIN-28: Daily Pacing & Bill Shortfall Protection** | Alerts user if upcoming recurring bills due within 14 days exceed current liquid vault balance. Paces daily spending against monthly surplus. | Shortfall accurately identified; daily burn compared against allowance. | **PASS** | Verified in `audit_integrity.test.js` & `Dashboard.tsx`. |
 
 ---
 

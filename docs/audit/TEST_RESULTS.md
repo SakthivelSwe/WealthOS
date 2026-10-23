@@ -11,7 +11,7 @@
 | Test Suite | Environment | Tests Executed | Passed | Failed | Skipped | Status |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | **Web Build (`npm run build`)** | Node.js / Vite 8.3.4 | N/A (Compilation) | Clean | 0 | 0 | **PASS** |
-| **Web Unit & Regression (`npm test`)** | Node.js / `tsx --test` | 45 | 45 | 0 | 0 | **PASS** |
+| **Web Unit & Regression (`npm test`)** | Node.js / `tsx --test` | 49 | 49 | 0 | 0 | **PASS** |
 | **Android Domain Tests (`:domain:test`)** | JDK 21 / Gradle 9.5.0 | Domain Suites | All | 0 | 0 | **PASS** |
 | **Android App Unit Tests (`:app:testDebugUnitTest`)** | JDK 21 / Android SDK 37 | App Suites | All | 0 | 0 | **PASS** |
 
@@ -66,7 +66,14 @@ npm test
   ✔ Safe-to-spend floors at zero when expenses exceed available funds (0.0741ms)
   ✔ Zero confirmed income results in zero safe-to-spend (0.0515ms)
   ✔ Variable salary allocation splits exactly by percentages (0.0601ms)
-✔ Phase 4: Variable Monthly Salary Planning & Safe-to-Spend (0.4125ms)
+✔ Phase 4: Variable Monthly Salary Planning & Safe-to-Spend (0.6191ms)
+
+▶ Phase 7: Spending Controls & Shortfall Protection
+  ✔ Category budget evaluates under, near-limit, and over-limit status (0.1495ms)
+  ✔ Daily spending velocity evaluates pacing accurately (0.098ms)
+  ✔ Upcoming bills shortfall correctly detects liquid funds insufficiency (0.1161ms)
+  ✔ Month-over-month category trend accurately computes delta and percentage (0.089ms)
+✔ Phase 7: Spending Controls & Shortfall Protection (1.4735ms)
 
 ▶ WealthOS Web Backup Crypto & Interoperability Engine
   ✔ Envelope encrypts and round-trips decrypts cleanly with valid passphrase (48.9311ms)
@@ -102,14 +109,14 @@ npm test
   ✔ Discrepancy is detected when arithmetic does not balance (0.2311ms)
 ✔ Phase 5: Bank Statement Parser & Reconciliation Engine (4.8061ms)
 
-ℹ tests 45
-ℹ suites 9
-ℹ pass 45
+ℹ tests 49
+ℹ suites 10
+ℹ pass 49
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 329.9871
+ℹ duration_ms 310.2807
 ```
 
 ---

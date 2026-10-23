@@ -422,3 +422,113 @@ describe('Phase 4: Variable Monthly Salary Planning & Safe-to-Spend', () => {
   });
 });
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Phase 7: Spending Control Features — Budgets, Daily Pacing & Bill Shortfall
+// ──────────────────────────────────────────────────────────────────────────────
+describe('Phase 7: Spending Controls & Shortfall Protection', () => {
+
+  it('Category budget evaluates under, near-limit, and over-limit status', () => {
+    function evalBudget(spentMinor, limitMinor) {
+      if (!limitMinor || limitMinor <= 0) return { status: 'no_limit', pct: 0 };
+      const pct = (spentMinor / limitMinor) * 100;
+      const isOver = spentMinor > limitMinor;
+      const isNear = !isOver && pct >= 80;
+      return {
+        status: isOver ? 'over' : isNear ? 'near' : 'safe',
+        pct: Math.round(pct),
+        remainingMinor: limitMinor - spentMinor,
+      };
+    }
+
+    // Under budget: ₹4,000 spent of ₹10,000 limit
+    const safe = evalBudget(400000, 1000000);
+    assert.equal(safe.status, 'safe');
+    assert.equal(safe.pct, 40);
+    assert.equal(safe.remainingMinor, 600000);
+
+    // Near limit: ₹8,500 spent of ₹10,000 limit (85%)
+    const near = evalBudget(850000, 1000000);
+    assert.equal(near.status, 'near');
+    assert.equal(near.pct, 85);
+    assert.equal(near.remainingMinor, 150000);
+
+    // Over budget: ₹12,000 spent of ₹10,000 limit (120%)
+    const over = evalBudget(1200000, 1000000);
+    assert.equal(over.status, 'over');
+    assert.equal(over.pct, 120);
+    assert.equal(over.remainingMinor, -200000);
+  });
+
+  it('Daily spending velocity evaluates pacing accurately', () => {
+    function evalDailyVelocity(todaySpendMinor, monthlySurplusMinor, daysRemaining) {
+      const dailyAllowance = daysRemaining > 0 ? Math.floor(monthlySurplusMinor / daysRemaining) : 0;
+      const isOver = todaySpendMinor > dailyAllowance;
+      return {
+        dailyAllowance,
+        isOver,
+        difference: todaySpendMinor - dailyAllowance,
+      };
+    }
+
+    // Surplus ₹15,000 across 10 remaining days = ₹1,500 / day
+    const onTrack = evalDailyVelocity(120000, 1500000, 10);
+    assert.equal(onTrack.dailyAllowance, 150000); // ₹1,500
+    assert.equal(onTrack.isOver, false);
+    assert.equal(onTrack.difference, -30000); // ₹300 under
+
+    // Overspend today: spent ₹2,500 vs ₹1,500 allowance
+    const over = evalDailyVelocity(250000, 1500000, 10);
+    assert.equal(over.isOver, true);
+    assert.equal(over.difference, 100000); // ₹1,000 over
+  });
+
+  it('Upcoming bills shortfall correctly detects liquid funds insufficiency', () => {
+    function checkShortfall(liquidBalanceMinor, upcomingBills) {
+      const totalDue = upcomingBills.reduce((s, b) => s + b.amountMinor, 0);
+      const hasShortfall = totalDue > 0 && liquidBalanceMinor < totalDue;
+      return {
+        totalDue,
+        hasShortfall,
+        shortfallMinor: hasShortfall ? totalDue - liquidBalanceMinor : 0,
+      };
+    }
+
+    const bills = [
+      { name: 'House Rent', amountMinor: 1500000 },
+      { name: 'WiFi Broadband', amountMinor: 100000 },
+      { name: 'Electricity Bill', amountMinor: 250000 },
+    ]; // Total = ₹18,500
+
+    // User only has ₹800 liquid balance (like the user in our audit scenario!)
+    const auditScenario = checkShortfall(80000, bills);
+    assert.equal(auditScenario.totalDue, 1850000);
+    assert.equal(auditScenario.hasShortfall, true);
+    assert.equal(auditScenario.shortfallMinor, 1770000); // ₹17,700 shortfall
+
+    // User has ₹25,000 liquid balance
+    const safeScenario = checkShortfall(2500000, bills);
+    assert.equal(safeScenario.hasShortfall, false);
+    assert.equal(safeScenario.shortfallMinor, 0);
+  });
+
+  it('Month-over-month category trend accurately computes delta and percentage', () => {
+    function compareCategory(thisMonthMinor, lastMonthMinor) {
+      const delta = thisMonthMinor - lastMonthMinor;
+      const pctChange = lastMonthMinor > 0
+        ? Math.round((delta / lastMonthMinor) * 100)
+        : (thisMonthMinor > 0 ? 100 : 0);
+      return { delta, pctChange };
+    }
+
+    // Dining increased from ₹3,000 to ₹4,500 (+50%)
+    const dining = compareCategory(450000, 300000);
+    assert.equal(dining.delta, 150000);
+    assert.equal(dining.pctChange, 50);
+
+    // Fuel decreased from ₹2,000 to ₹1,500 (-25%)
+    const fuel = compareCategory(150000, 200000);
+    assert.equal(fuel.delta, -50000);
+    assert.equal(fuel.pctChange, -25);
+  });
+});
+

@@ -56,6 +56,7 @@ interface DataContextType {
   addChitFund: (chit: Omit<ChitFund, 'user_id'>) => Promise<void>;
   addRecurring: (rec: Omit<RecurringTransaction, 'user_id'>) => Promise<void>;
   addBudget: (budget: Omit<Budget, 'user_id'>) => Promise<void>;
+  updateCategoryBudget: (categoryId: string, limitMinor: number | null) => Promise<void>;
   updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
@@ -161,7 +162,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setChitFunds(getLocal('chitFunds', []));
         setRecurringTxns(getLocal('recurringTxns', []));
         setBudgets(getLocal('budgets', []));
-        const cachedCats = sanitizeCategories(getLocal('categories', []));
+        const rawCachedCats = sanitizeCategories(getLocal<Category[]>('categories', []));
+        const savedBudgets = getLocal<Record<string, number>>('category_budgets', {});
+        const cachedCats = rawCachedCats.map((c: Category) => ({
+          ...c,
+          budget_limit_minor: savedBudgets[c.id] ?? c.budget_limit_minor ?? null,
+        }));
         setCategories(cachedCats);
         setLocal('categories', cachedCats);
         setSettings(getLocal('settings', null));
@@ -234,8 +240,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       if (cats.status === 'fulfilled' && cats.value.data && cats.value.data.length > 0) {
         const sanitized = sanitizeCategories(cats.value.data);
-        setCategories(sanitized);
-        setLocal('categories', sanitized);
+        const savedBudgets = getLocal<Record<string, number>>('category_budgets', {});
+        const mergedCats = sanitized.map(c => ({
+          ...c,
+          budget_limit_minor: savedBudgets[c.id] ?? (c as any).budget_limit_minor ?? null,
+        }));
+        setCategories(mergedCats);
+        setLocal('categories', mergedCats);
         if (cats.value.data.some(c => c.id === 'cat_salary') && cats.value.data.some(c => c.id === 'cat_income_0')) {
           supabase.from('user_categories').delete().eq('id', 'cat_salary').eq('user_id', userId).then(() => {}, () => {});
         }
@@ -624,6 +635,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [userId]);
 
+  const updateCategoryBudget = useCallback(async (categoryId: string, limitMinor: number | null) => {
+    const savedBudgets = getLocal<Record<string, number>>('category_budgets', {});
+    if (limitMinor === null || limitMinor <= 0) {
+      delete savedBudgets[categoryId];
+    } else {
+      savedBudgets[categoryId] = limitMinor;
+    }
+    setLocal('category_budgets', savedBudgets);
+
+    setCategories(prev => {
+      const updated = prev.map(c => c.id === categoryId ? { ...c, budget_limit_minor: limitMinor } : c);
+      setLocal('categories', updated);
+      return updated;
+    });
+
+    try {
+      if (userId && !isDemo) {
+        await supabase.from('user_categories').update({ budget_limit_minor: limitMinor }).eq('id', categoryId).eq('user_id', userId);
+      }
+    } catch (e) {
+      console.warn('Category budget stored in local storage:', e);
+    }
+  }, [userId, isDemo, getLocal, setLocal]);
+
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
     setSettings(prev => {
       const updated: UserSettings = prev ? { ...prev, ...updates, updated_at: Date.now() } : {
@@ -917,7 +952,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addAccount, updateAccount, deleteAccount,
       addTransaction, updateTransaction, deleteTransaction,
       addGoal, updateGoal, addDebt, updateDebt,
-      addChitFund, addRecurring, addBudget,
+      addChitFund, addRecurring, addBudget, updateCategoryBudget,
       updateSettings, markNotificationRead, markAllNotificationsRead,
       importAllData,
     }}>

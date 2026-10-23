@@ -15,3 +15,7 @@
 | D11 | minSdk 31 (Android 12); compile/target = latest stable SDK (device runs Android 16) | User requirement: Android 12 through current and future versions |
 | D13 | Write code first, install SDK afterwards, then compile and fix in one pass | User's chosen workflow; raises risk of compile errors, so code stays simple and conventional |
 | D12 | Exact dependency versions chosen at bootstrap from official release notes | Do not rely on stale knowledge |
+| D14 | Variable Monthly Salary Planning & Safe-to-Spend Engine | Replaces static basis income with real credited income per month (`user_monthly_plans`). Floors safe-to-spend at zero and itemizes obligations. |
+| D15 | Indian Bank Statement Parser & Mathematical Reconciliation | Closing balance formula verifies statements mathematically. Discrepancies are highlighted transparently rather than auto-balanced. |
+| D16 | Composite Key Journal Deduplication & Atomic Sync RPCs | Deduplicates journal entries on `txn_id + account_id + category_id` preventing balance corruption during restores or cloud syncs. |
+| D17 | Spending Controls with Simple English & 1-Click Emojis | 1-click emoji category buttons, user-adjustable category limits, daily velocity pacing, and bill shortfall protection with plain English. |

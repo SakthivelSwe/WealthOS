@@ -106,6 +106,49 @@ export function InsightsPage() {
     ].filter(item => item.value > 0);
   }, [periodTxns, totalIncome]);
 
+  // Phase 7.6: This month vs Last month category spending comparison
+  const categoryComparison = useMemo(() => {
+    const thisMonthStart = format(startOfMonth(now), 'yyyy-MM-dd');
+    const thisMonthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
+    const lastMonthDate = subMonths(now, 1);
+    const lastMonthStart = format(startOfMonth(lastMonthDate), 'yyyy-MM-dd');
+    const lastMonthEnd = format(endOfMonth(lastMonthDate), 'yyyy-MM-dd');
+
+    const thisMonthMap = new Map<string, number>();
+    const lastMonthMap = new Map<string, number>();
+
+    transactions.filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.category_id).forEach(t => {
+      if (t.local_date >= thisMonthStart && t.local_date <= thisMonthEnd) {
+        thisMonthMap.set(t.category_id!, (thisMonthMap.get(t.category_id!) || 0) + t.amount_minor);
+      } else if (t.local_date >= lastMonthStart && t.local_date <= lastMonthEnd) {
+        lastMonthMap.set(t.category_id!, (lastMonthMap.get(t.category_id!) || 0) + t.amount_minor);
+      }
+    });
+
+    const allCatIds = new Set([...thisMonthMap.keys(), ...lastMonthMap.keys()]);
+    return Array.from(allCatIds).map(catId => {
+      const cat = categories.find(c => c.id === catId);
+      const thisMonthMinor = thisMonthMap.get(catId) || 0;
+      const lastMonthMinor = lastMonthMap.get(catId) || 0;
+      const deltaMinor = thisMonthMinor - lastMonthMinor;
+      const pctChange = lastMonthMinor > 0
+        ? Math.round((deltaMinor / lastMonthMinor) * 100)
+        : (thisMonthMinor > 0 ? 100 : 0);
+
+      return {
+        categoryId: catId,
+        name: getCategoryDisplayName(catId, categories),
+        icon: cat?.icon && cat.icon.length <= 4 ? cat.icon : '🏷️',
+        thisMonthMinor,
+        lastMonthMinor,
+        deltaMinor,
+        pctChange,
+      };
+    })
+    .sort((a, b) => b.deltaMinor - a.deltaMinor)
+    .slice(0, 8);
+  }, [transactions, categories, now]);
+
   const runAiAnalysis = async (customPrompt?: string) => {
     const promptToUse = customPrompt || aiQuestion;
     setAiLoading(true);
@@ -342,6 +385,77 @@ Question: ${promptToUse}`;
           </Tilt3DCard>
         </div>
       </div>
+
+      {/* Category Spending Trends: This Month vs Last Month (Phase 7.6) */}
+      <Tilt3DCard maxTilt={3}>
+        <div className="cyber-card">
+          <div className="cyber-header">
+            <div className="cyber-title-group">
+              <div className="cyber-icon-badge" style={{ background: 'rgba(6, 182, 212, 0.15)', color: 'var(--neon-cyan)' }}>
+                <TrendingUp size={18} />
+              </div>
+              <div>
+                <div className="cyber-title">Monthly Category Comparison</div>
+                <div className="cyber-subtitle">This Month vs Previous Month Spending Changes</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+            {categoryComparison.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                No category expense data to compare between months
+              </div>
+            ) : (
+              categoryComparison.map(item => (
+                <div
+                  key={item.categoryId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: '1.4rem' }}>{item.icon}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#f8fafc' }}>
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)' }}>
+                        Last Month: {formatMoney(item.lastMonthMinor, currency, masked)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#f8fafc' }}>
+                      {formatMoney(item.thisMonthMinor, currency, masked)}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        color: item.deltaMinor > 0 ? 'var(--neon-rose)' : item.deltaMinor < 0 ? 'var(--neon-emerald)' : 'var(--text-tertiary)',
+                      }}
+                    >
+                      {item.deltaMinor > 0
+                        ? `+${formatMoney(item.deltaMinor, currency, masked)} (+${item.pctChange}%)`
+                        : item.deltaMinor < 0
+                        ? `-${formatMoney(Math.abs(item.deltaMinor), currency, masked)} (${item.pctChange}%)`
+                        : 'No change'}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </Tilt3DCard>
 
       {/* 3D NEURAL AI FINANCIAL COACH (GEMINI) */}
       <Tilt3DCard maxTilt={3}>

@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { useData } from '../../hooks/useData';
 import { supabase } from '../../lib/supabase';
-import { formatMoney, parseMoney, type Goal, type Debt, type ChitFund, type RecurringTransaction, type MonthlyPlan } from '../../types';
+import { formatMoney, parseMoney, type Goal, type Debt, type ChitFund, type RecurringTransaction, type MonthlyPlan, type Category } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { Target, CreditCard, Coins, Repeat, Plus, X, Check, ShieldAlert, Sparkles, HelpCircle, Info, Wallet, TrendingUp, BadgeIndianRupee } from 'lucide-react';
+import { Target, CreditCard, Coins, Repeat, Plus, X, Check, ShieldAlert, Sparkles, HelpCircle, Info, Wallet, TrendingUp, BadgeIndianRupee, Sliders } from 'lucide-react';
 import { format, addMonths, startOfMonth } from 'date-fns';
 
 // ===== GOAL MODAL =====
@@ -902,9 +902,153 @@ function SalaryPlanModal({ month, onClose, onSaved }: { month: string; onClose: 
   );
 }
 
+// ===== CATEGORY BUDGET MODAL =====
+interface CategoryBudgetModalProps {
+  category: Category;
+  currentSpentMinor: number;
+  currency: string;
+  masked: boolean;
+  onClose: () => void;
+  onSave: (categoryId: string, limitMinor: number | null) => Promise<void>;
+}
+
+function CategoryBudgetModal({
+  category,
+  currentSpentMinor,
+  currency,
+  masked,
+  onClose,
+  onSave,
+}: CategoryBudgetModalProps) {
+  const currentLimit = category.budget_limit_minor ? (category.budget_limit_minor / 100).toString() : '';
+  const [limitStr, setLimitStr] = useState(currentLimit);
+  const [loading, setLoading] = useState(false);
+
+  const presets = ['2000', '5000', '10000', '15000', '25000', '50000'];
+
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+    const parsed = limitStr.trim() ? parseMoney(limitStr, currency) : null;
+    await onSave(category.id, parsed);
+    setLoading(false);
+    onClose();
+  };
+
+  const handleClear = async () => {
+    setLoading(true);
+    await onSave(category.id, null);
+    setLoading(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1200 }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: '1.8rem' }}>{category.icon && category.icon.length <= 4 ? category.icon : '🏷️'}</span>
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
+                {category.name}
+              </h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
+                Set monthly spending limit
+              </p>
+            </div>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ padding: 6 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Current Spending Info */}
+        <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem' }}>
+            <span style={{ color: 'var(--text-tertiary)' }}>Spent This Month:</span>
+            <span style={{ fontWeight: 800, color: '#f8fafc' }}>{formatMoney(currentSpentMinor, currency, masked)}</span>
+          </div>
+          {category.budget_limit_minor && category.budget_limit_minor > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginTop: 6 }}>
+              <span style={{ color: 'var(--text-tertiary)' }}>Current Monthly Limit:</span>
+              <span style={{ fontWeight: 700, color: 'var(--neon-cyan)' }}>{formatMoney(category.budget_limit_minor, currency, masked)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Presets */}
+        <div style={{ marginBottom: 16 }}>
+          <label className="form-label" style={{ marginBottom: 8 }}>Quick Budget Presets ({currency})</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {presets.map(p => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setLimitStr(p)}
+                className="btn btn-sm"
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: limitStr === p ? '1.5px solid var(--neon-cyan)' : '1px solid rgba(255,255,255,0.08)',
+                  background: limitStr === p ? 'rgba(6, 182, 212, 0.18)' : 'rgba(255,255,255,0.04)',
+                  color: limitStr === p ? '#fff' : 'var(--text-secondary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                }}
+              >
+                ₹{Number(p).toLocaleString('en-IN')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form onSubmit={handleSave}>
+          <div className="form-group">
+            <label className="form-label">Monthly Limit Amount ({currency}) *</label>
+            <input
+              type="number"
+              step="any"
+              value={limitStr}
+              onChange={e => setLimitStr(e.target.value)}
+              placeholder="e.g. 10000"
+              autoFocus
+            />
+            <span style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+              Enter amount in Rupees (paise handled automatically)
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 24 }}>
+            {category.budget_limit_minor ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={handleClear}
+                disabled={loading}
+                style={{ color: 'var(--neon-rose)' }}
+              >
+                Remove Limit
+              </button>
+            ) : <span />}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onClose} disabled={loading}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary btn-sm" disabled={loading} style={{ background: 'var(--neon-cyan)', color: '#000' }}>
+                {loading ? 'Saving...' : 'Save Limit'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ===== MAIN PLANS PAGE =====
 export function PlansPage() {
-  const { goals, debts, chitFunds, recurringTxns, transactions, settings } = useData();
+  const { goals, debts, chitFunds, recurringTxns, transactions, settings, categories, updateCategoryBudget } = useData();
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
 
@@ -912,6 +1056,7 @@ export function PlansPage() {
   const [monthlyPlans, setMonthlyPlans] = useState<MonthlyPlan[]>([]);
   const [showSalaryModal, setShowSalaryModal] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [editingBudgetCategory, setEditingBudgetCategory] = useState<Category | null>(null);
 
   // Compute safe-to-spend for selected month from local data
   const planForMonth = monthlyPlans.find(p => p.month === selectedMonth);
@@ -930,7 +1075,44 @@ export function PlansPage() {
     return Math.max(0, income - monthExpenses - committed - buffer);
   }, [planForMonth, monthExpenses]);
 
-  const [activeTab, setActiveTab] = useState<'salary' | 'goals' | 'debts' | 'chits' | 'recurring'>('salary');
+  // Category Budgets calculations
+  const expenseCategories = useMemo(() => {
+    return categories.filter(c => c.kind === 'EXPENSE' && !c.archived);
+  }, [categories]);
+
+  const categorySpentMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const [y, m] = selectedMonth.split('-');
+    const prefix = `${y}-${m}`;
+    transactions
+      .filter(t => t.type === 'EXPENSE' && !t.deleted_at && t.local_date.startsWith(prefix) && t.category_id)
+      .forEach(t => {
+        map.set(t.category_id!, (map.get(t.category_id!) || 0) + t.amount_minor);
+      });
+    return map;
+  }, [transactions, selectedMonth]);
+
+  const totalBudgetedMinor = useMemo(() => {
+    return expenseCategories
+      .filter(c => (c.budget_limit_minor || 0) > 0)
+      .reduce((s, c) => s + c.budget_limit_minor!, 0);
+  }, [expenseCategories]);
+
+  const totalSpentInBudgetedMinor = useMemo(() => {
+    return expenseCategories
+      .filter(c => (c.budget_limit_minor || 0) > 0)
+      .reduce((s, c) => s + (categorySpentMap.get(c.id) || 0), 0);
+  }, [expenseCategories, categorySpentMap]);
+
+  const overbudgetCategories = useMemo(() => {
+    return expenseCategories.filter(c => (c.budget_limit_minor || 0) > 0 && (categorySpentMap.get(c.id) || 0) > c.budget_limit_minor!);
+  }, [expenseCategories, categorySpentMap]);
+
+  const activeBudgetCount = useMemo(() => {
+    return expenseCategories.filter(c => (c.budget_limit_minor || 0) > 0).length;
+  }, [expenseCategories]);
+
+  const [activeTab, setActiveTab] = useState<'salary' | 'budgets' | 'goals' | 'debts' | 'chits' | 'recurring'>('salary');
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalPresetId, setGoalPresetId] = useState<string | undefined>();
   const [showDebtModal, setShowDebtModal] = useState(false);
@@ -1175,6 +1357,43 @@ export function PlansPage() {
             </div>
           </Tilt3DCard>
         </div>
+
+        {/* Card 5: Category Limits */}
+        <div className="col-span-3" onClick={() => setActiveTab('budgets')} style={{ cursor: 'pointer' }}>
+          <Tilt3DCard>
+            <div
+              className="cyber-card"
+              style={{
+                border: activeTab === 'budgets' ? '2px solid var(--neon-cyan)' : '1px solid var(--glass-border)',
+                boxShadow: activeTab === 'budgets' ? '0 0 20px rgba(0, 240, 255, 0.35)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
+              <div className="stat-label">
+                <span>📊 Category Limits</span>
+                <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
+                  <Sliders size={18} />
+                </div>
+              </div>
+              <div className="stat-value" style={{ color: 'var(--neon-cyan)' }}>
+                {activeBudgetCount > 0 ? formatMoney(totalBudgetedMinor, currency, masked) : '—'}
+              </div>
+              <div className="stat-trend neutral">
+                {overbudgetCategories.length > 0
+                  ? `⚠️ ${overbudgetCategories.length} over limit`
+                  : activeBudgetCount > 0
+                  ? `${activeBudgetCount} active limits`
+                  : 'Tap to set limits'}
+              </div>
+              {activeTab === 'budgets' && (
+                <div style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--neon-cyan)', fontWeight: 700 }}>
+                  ● Active View
+                </div>
+              )}
+            </div>
+          </Tilt3DCard>
+        </div>
       </div>
 
       {/* Cyber Tab Navigation */}
@@ -1193,6 +1412,7 @@ export function PlansPage() {
       >
         {[
           { id: 'salary', label: '💰 Monthly Salary', count: monthlyPlans.length },
+          { id: 'budgets', label: '📊 Category Limits', count: activeBudgetCount },
           { id: 'goals', label: '🎯 Savings Goals', count: goals.length },
           { id: 'debts', label: '💳 Loans & EMIs', count: debts.length },
           { id: 'chits', label: '🪙 Chit Funds', count: chitFunds.length },
@@ -1335,6 +1555,181 @@ export function PlansPage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== CATEGORY BUDGETS TAB ===== */}
+      {activeTab === 'budgets' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Header controls */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div>
+                <label className="form-label" style={{ marginBottom: 4 }}>Select Month</label>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={e => setSelectedMonth(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--glass-border)',
+                    color: '#f8fafc',
+                    fontSize: '0.9rem',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>
+              Click any category card below to set or adjust its monthly spending limit
+            </div>
+          </div>
+
+          {/* Category Budget Telemetry Summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
+            <div className="cyber-card" style={{ borderLeft: '3px solid var(--neon-cyan)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--neon-cyan)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                📊 Total Monthly Limit
+              </div>
+              <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--neon-cyan)' }}>
+                {formatMoney(totalBudgetedMinor, currency, masked)}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                Across {activeBudgetCount} active categories
+              </div>
+            </div>
+
+            <div className="cyber-card" style={{ borderLeft: '3px solid var(--neon-purple)' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--neon-purple)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                💸 Spent in Budgeted Categories
+              </div>
+              <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--neon-purple)' }}>
+                {formatMoney(totalSpentInBudgetedMinor, currency, masked)}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                {totalBudgetedMinor > 0 ? `${Math.round((totalSpentInBudgetedMinor / totalBudgetedMinor) * 100)}% of total limit spent` : 'No limits configured'}
+              </div>
+            </div>
+
+            <div className="cyber-card" style={{ borderLeft: `3px solid ${overbudgetCategories.length > 0 ? 'var(--neon-rose)' : 'var(--neon-emerald)'}` }}>
+              <div style={{ fontSize: '0.72rem', color: overbudgetCategories.length > 0 ? 'var(--neon-rose)' : 'var(--neon-emerald)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                {overbudgetCategories.length > 0 ? '⚠️ Over Limit Alert' : '✅ Budget Health'}
+              </div>
+              <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.6rem', fontWeight: 800, color: overbudgetCategories.length > 0 ? 'var(--neon-rose)' : 'var(--neon-emerald)' }}>
+                {overbudgetCategories.length > 0 ? `${overbudgetCategories.length} Exceeded` : 'All On Track'}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                {overbudgetCategories.length > 0 ? 'Review discretionary spending below' : 'All category spending is within limits'}
+              </div>
+            </div>
+          </div>
+
+          {/* Cards for each expense category */}
+          <div className="responsive-grid-cards">
+            {expenseCategories.map(cat => {
+              const spentMinor = categorySpentMap.get(cat.id) || 0;
+              const limitMinor = cat.budget_limit_minor || 0;
+              const hasBudget = limitMinor > 0;
+              const pct = hasBudget ? (spentMinor / limitMinor) * 100 : 0;
+              const isOver = hasBudget && spentMinor > limitMinor;
+              const isNear = hasBudget && !isOver && pct >= 80;
+
+              return (
+                <Tilt3DCard key={cat.id}>
+                  <div
+                    className="cyber-card"
+                    onClick={() => setEditingBudgetCategory(cat)}
+                    style={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      border: isOver ? '1.5px solid var(--neon-rose)' : isNear ? '1.5px solid var(--neon-amber)' : '1px solid var(--glass-border)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: '1.5rem' }}>{cat.icon && cat.icon.length <= 4 ? cat.icon : '🏷️'}</span>
+                          <div>
+                            <div style={{ fontFamily: 'var(--font-outfit)', fontWeight: 800, fontSize: '1.05rem', color: '#f8fafc' }}>
+                              {cat.name}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                              {cat.need_want ? `${cat.need_want}` : 'Expense'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {hasBudget ? (
+                          <span
+                            className={`badge ${isOver ? 'badge-rose' : isNear ? 'badge-amber' : 'badge-green'}`}
+                            style={{ fontSize: '0.75rem', fontWeight: 700 }}
+                          >
+                            {isOver ? `Over by ${formatMoney(spentMinor - limitMinor, currency, masked)}` : `${Math.round(pct)}%`}
+                          </span>
+                        ) : (
+                          <span className="badge badge-secondary" style={{ fontSize: '0.72rem', opacity: 0.8 }}>
+                            No limit
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Spent vs Budget */}
+                      <div style={{ margin: '14px 0 8px 0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: 4 }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Spent:</span>
+                          <span style={{ fontWeight: 800, color: isOver ? 'var(--neon-rose)' : '#f8fafc' }}>
+                            {formatMoney(spentMinor, currency, masked)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: 6 }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Monthly Limit:</span>
+                          <span style={{ fontWeight: 700, color: hasBudget ? 'var(--neon-cyan)' : 'var(--text-tertiary)' }}>
+                            {hasBudget ? formatMoney(limitMinor, currency, masked) : 'Not set'}
+                          </span>
+                        </div>
+
+                        {hasBudget && (
+                          <div className="cyber-progress-track" style={{ height: 8 }}>
+                            <div
+                              className="cyber-progress-fill"
+                              style={{
+                                width: `${Math.min(100, pct)}%`,
+                                background: isOver
+                                  ? 'var(--neon-rose)'
+                                  : isNear
+                                  ? 'var(--neon-amber)'
+                                  : 'linear-gradient(90deg, var(--neon-cyan), var(--neon-emerald))',
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.76rem', color: isOver ? 'var(--neon-rose)' : isNear ? 'var(--neon-amber)' : 'var(--text-tertiary)' }}>
+                        {hasBudget
+                          ? (isOver ? '⚠️ Exceeded limit' : `${formatMoney(limitMinor - spentMinor, currency, masked)} left`)
+                          : 'Click to set limit'}
+                      </span>
+                      <button
+                        className="btn btn-sm btn-ghost"
+                        style={{ fontSize: '0.75rem', padding: '4px 10px', color: 'var(--neon-cyan)' }}
+                      >
+                        {hasBudget ? 'Edit Limit' : '+ Set Limit'}
+                      </button>
+                    </div>
+                  </div>
+                </Tilt3DCard>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1601,6 +1996,19 @@ export function PlansPage() {
             const filtered = prev.filter(p => p.month !== plan.month);
             return [...filtered, plan];
           })}
+        />
+      )}
+      {editingBudgetCategory && (
+        <CategoryBudgetModal
+          category={editingBudgetCategory}
+          currentSpentMinor={categorySpentMap.get(editingBudgetCategory.id) || 0}
+          currency={currency}
+          masked={masked}
+          onClose={() => setEditingBudgetCategory(null)}
+          onSave={async (catId, limitMinor) => {
+            await updateCategoryBudget(catId, limitMinor);
+            setEditingBudgetCategory(null);
+          }}
         />
       )}
     </div>
