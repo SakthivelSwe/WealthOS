@@ -145,6 +145,33 @@ export interface Budget {
   updated_at: number;
 }
 
+/** Monthly income plan — one per calendar month (YYYY-MM). Tracks actual salary received,
+ *  planned allocation percentages, committed obligations, and safe-to-spend. */
+export interface MonthlyPlan {
+  id: string;
+  user_id: string;
+  month: string;             // 'YYYY-MM'
+  currency: string;
+  status: 'DRAFT' | 'ACTIVE' | 'CLOSED';
+  // Income
+  confirmed_income_minor: number;
+  estimated_income_minor: number;
+  income_source: string | null;        // 'Salary' | 'Bonus' | 'Freelance' | 'Other'
+  income_received_date: string | null; // 'YYYY-MM-DD'
+  // Allocation percentages
+  needs_pct: number;
+  wants_pct: number;
+  savings_pct: number;
+  // Committed outflows (minor units)
+  committed_bills_minor: number;
+  committed_debt_payments_minor: number;
+  committed_savings_minor: number;
+  buffer_pct: number;                  // cash buffer % of income (default 5)
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface UserSettings {
   user_id: string;
   currency: string;

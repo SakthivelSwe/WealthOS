@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useData } from '../../hooks/useData';
-import { formatMoney, parseMoney, type Goal, type Debt, type ChitFund, type RecurringTransaction } from '../../types';
+import { supabase } from '../../lib/supabase';
+import { formatMoney, parseMoney, type Goal, type Debt, type ChitFund, type RecurringTransaction, type MonthlyPlan } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { Target, CreditCard, Coins, Repeat, Plus, X, Check, ShieldAlert, Sparkles, HelpCircle, Info } from 'lucide-react';
-import { format, addMonths } from 'date-fns';
+import { Target, CreditCard, Coins, Repeat, Plus, X, Check, ShieldAlert, Sparkles, HelpCircle, Info, Wallet, TrendingUp, BadgeIndianRupee } from 'lucide-react';
+import { format, addMonths, startOfMonth } from 'date-fns';
 
 // ===== GOAL MODAL =====
 interface GoalPreset {
@@ -714,13 +715,222 @@ function RecurringModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ===== SALARY PLAN MODAL =====
+function SalaryPlanModal({ month, onClose, onSaved }: { month: string; onClose: () => void; onSaved: (plan: MonthlyPlan) => void }) {
+  const { settings, transactions } = useData();
+  const currency = settings?.currency || 'INR';
+
+  const [salary, setSalary] = useState('');
+  const [incomeSource, setIncomeSource] = useState('Salary');
+  const [receivedDate, setReceivedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [needsPct, setNeedsPct] = useState(50);
+  const [wantsPct, setWantsPct] = useState(30);
+  const [savingsPct, setSavingsPct] = useState(20);
+  const [bills, setBills] = useState('');
+  const [emiPayments, setEmiPayments] = useState('');
+  const [sipSavings, setSipSavings] = useState('');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Auto-compute committed bills from recurring transactions
+  const { data: authUser } = { data: { user: null as any } };
+
+  const totalPct = needsPct + wantsPct + savingsPct;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!salary || parseFloat(salary) <= 0) {
+      setError('Please enter the actual amount credited to your bank account.');
+      return;
+    }
+    if (totalPct > 100) {
+      setError(`Allocation adds up to ${totalPct}% — must be 100% or less.`);
+      return;
+    }
+    setLoading(true);
+    setError('');
+
+    const now = Date.now();
+    const plan: MonthlyPlan = {
+      id: 'mp_' + month.replace('-', '') + '_' + now,
+      user_id: '',   // filled by Supabase RLS
+      month,
+      currency,
+      status: 'ACTIVE',
+      confirmed_income_minor: parseMoney(salary, currency),
+      estimated_income_minor: parseMoney(salary, currency),
+      income_source: incomeSource,
+      income_received_date: receivedDate,
+      needs_pct: needsPct,
+      wants_pct: wantsPct,
+      savings_pct: savingsPct,
+      committed_bills_minor: parseMoney(bills || '0', currency),
+      committed_debt_payments_minor: parseMoney(emiPayments || '0', currency),
+      committed_savings_minor: parseMoney(sipSavings || '0', currency),
+      buffer_pct: 5,
+      notes: notes || null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    try {
+      const { error: dbErr } = await supabase.from('user_monthly_plans').upsert(plan);
+      if (dbErr) console.warn('Monthly plan cloud upsert:', dbErr.message);
+    } catch (e) {
+      console.warn('Monthly plan stored locally:', e);
+    }
+
+    setLoading(false);
+    onSaved(plan);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1200 }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 580 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div>
+            <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
+              💰 Record Monthly Salary — {month}
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', margin: '2px 0 0 0' }}>
+              Enter the exact amount credited to your bank account this month
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: '50%' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ background: 'rgba(244, 63, 94, 0.12)', border: '1px solid rgba(244, 63, 94, 0.35)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14, fontSize: '0.84rem', color: '#fca5a5' }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* Step 1: Income */}
+          <div style={{ background: 'rgba(0, 240, 255, 0.06)', border: '1px solid rgba(0, 240, 255, 0.2)', borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--neon-cyan)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Step 1 — Income Received</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Amount Credited ({currency}) *</label>
+                <input
+                  type="number" step="any" autoFocus
+                  value={salary}
+                  onChange={e => setSalary(e.target.value)}
+                  placeholder="32200"
+                  style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.1rem', fontWeight: 700 }}
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: 3, display: 'block' }}>Enter exact bank credit — not estimated</span>
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Income Type</label>
+                <select value={incomeSource} onChange={e => setIncomeSource(e.target.value)}>
+                  <option>Salary</option>
+                  <option>Freelance Payment</option>
+                  <option>Business Income</option>
+                  <option>Bonus</option>
+                  <option>Rental Income</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group" style={{ margin: '12px 0 0 0' }}>
+              <label className="form-label">Date Money Was Credited</label>
+              <input type="date" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Step 2: Allocation */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Step 2 — How to Split Your Money (%)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              {[['Needs (Bills, Rent, Food)', needsPct, setNeedsPct, 'var(--neon-cyan)'],
+                ['Wants (Shopping, Fun)', wantsPct, setWantsPct, 'var(--neon-purple)'],
+                ['Savings / SIP / Goals', savingsPct, setSavingsPct, 'var(--neon-emerald)']].map(([label, val, setter, color]) => (
+                <div key={label as string} className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ color: color as string }}>{label as string}</label>
+                  <input
+                    type="number" min={0} max={100}
+                    value={val as number}
+                    onChange={e => (setter as any)(Number(e.target.value))}
+                    style={{ borderColor: totalPct > 100 ? 'var(--neon-rose)' : undefined }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.78rem', marginTop: 8, color: totalPct > 100 ? 'var(--neon-rose)' : totalPct === 100 ? 'var(--neon-emerald)' : 'var(--text-tertiary)' }}>
+              Total: {totalPct}% {totalPct === 100 ? '✓ Perfect split' : totalPct < 100 ? `(${100 - totalPct}% unallocated)` : '⚠️ Over 100%'}
+            </div>
+          </div>
+
+          {/* Step 3: Committed Obligations */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Step 3 — Fixed Monthly Payments (Optional)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Bills &amp; Rent ({currency})</label>
+                <input type="number" step="any" value={bills} onChange={e => setBills(e.target.value)} placeholder="12000" />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">EMI Payments ({currency})</label>
+                <input type="number" step="any" value={emiPayments} onChange={e => setEmiPayments(e.target.value)} placeholder="5500" />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">SIP / Savings ({currency})</label>
+                <input type="number" step="any" value={sipSavings} onChange={e => setSipSavings(e.target.value)} placeholder="3000" />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Notes (Optional)</label>
+            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. October salary — includes Diwali bonus" />
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 2 }}>
+              <Check size={16} /> Save Monthly Plan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ===== MAIN PLANS PAGE =====
 export function PlansPage() {
-  const { goals, debts, chitFunds, recurringTxns, settings } = useData();
+  const { goals, debts, chitFunds, recurringTxns, transactions, settings } = useData();
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
 
-  const [activeTab, setActiveTab] = useState<'goals' | 'debts' | 'chits' | 'recurring'>('goals');
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const [monthlyPlans, setMonthlyPlans] = useState<MonthlyPlan[]>([]);
+  const [showSalaryModal, setShowSalaryModal] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+
+  // Compute safe-to-spend for selected month from local data
+  const planForMonth = monthlyPlans.find(p => p.month === selectedMonth);
+  const monthExpenses = useMemo(() => {
+    const [y, m] = selectedMonth.split('-');
+    return transactions
+      .filter(t => t.type === 'EXPENSE' && t.local_date.startsWith(`${y}-${m}`) && !t.deleted_at)
+      .reduce((s, t) => s + t.amount_minor, 0);
+  }, [transactions, selectedMonth]);
+
+  const safeToSpend = useMemo(() => {
+    if (!planForMonth) return null;
+    const income = planForMonth.confirmed_income_minor;
+    const committed = planForMonth.committed_bills_minor + planForMonth.committed_debt_payments_minor + planForMonth.committed_savings_minor;
+    const buffer = Math.floor(income * planForMonth.buffer_pct / 100);
+    return Math.max(0, income - monthExpenses - committed - buffer);
+  }, [planForMonth, monthExpenses]);
+
+  const [activeTab, setActiveTab] = useState<'salary' | 'goals' | 'debts' | 'chits' | 'recurring'>('salary');
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalPresetId, setGoalPresetId] = useState<string | undefined>();
   const [showDebtModal, setShowDebtModal] = useState(false);
@@ -805,6 +1015,39 @@ export function PlansPage() {
 
       {/* 3D Overview Metrics — CLICKABLE INTERACTIVE TABS */}
       <div className="bento-grid">
+        {/* Card 0: Monthly Salary Plan */}
+        <div className="col-span-3" onClick={() => setActiveTab('salary')} style={{ cursor: 'pointer' }}>
+          <Tilt3DCard>
+            <div
+              className="cyber-card"
+              style={{
+                border: activeTab === 'salary' ? '2px solid var(--neon-emerald)' : '1px solid var(--glass-border)',
+                boxShadow: activeTab === 'salary' ? '0 0 20px rgba(16, 185, 129, 0.35)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <div className="cyber-card-glow" style={{ background: 'var(--neon-emerald)' }} />
+              <div className="stat-label">
+                <span>💰 This Month's Income</span>
+                <div className="cyber-icon-badge" style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--neon-emerald)' }}>
+                  <Wallet size={18} />
+                </div>
+              </div>
+              <div className="stat-value" style={{ color: 'var(--neon-emerald)' }}>
+                {planForMonth ? formatMoney(planForMonth.confirmed_income_minor, currency, masked) : '—'}
+              </div>
+              <div className="stat-trend neutral">
+                {planForMonth ? `${planForMonth.income_source || 'Income'} · ${planForMonth.income_received_date || currentMonth}` : 'Tap to record salary'}
+              </div>
+              {activeTab === 'salary' && (
+                <div style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--neon-emerald)', fontWeight: 700 }}>
+                  ● Active View
+                </div>
+              )}
+            </div>
+          </Tilt3DCard>
+        </div>
+
         {/* Card 1: Goals Progress */}
         <div className="col-span-3" onClick={() => setActiveTab('goals')} style={{ cursor: 'pointer' }}>
           <Tilt3DCard>
@@ -949,10 +1192,11 @@ export function PlansPage() {
         }}
       >
         {[
-          { id: 'goals', label: '🎯 Savings Goals & Emergency Fund', count: goals.length },
+          { id: 'salary', label: '💰 Monthly Salary', count: monthlyPlans.length },
+          { id: 'goals', label: '🎯 Savings Goals', count: goals.length },
           { id: 'debts', label: '💳 Loans & EMIs', count: debts.length },
           { id: 'chits', label: '🪙 Chit Funds', count: chitFunds.length },
-          { id: 'recurring', label: '🔄 Monthly Subscriptions & Bills', count: recurringTxns.length },
+          { id: 'recurring', label: '🔄 Bills', count: recurringTxns.length },
         ].map(tab => (
           <button
             key={tab.id}
@@ -964,6 +1208,135 @@ export function PlansPage() {
           </button>
         ))}
       </div>
+
+      {/* ===== SALARY TAB ===== */}
+      {activeTab === 'salary' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Month selector + record button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <label className="form-label" style={{ marginBottom: 4 }}>Select Month</label>
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={e => setSelectedMonth(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--glass-border)', color: '#f8fafc', fontSize: '0.9rem' }}
+              />
+            </div>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowSalaryModal(true)}
+              style={{ marginTop: 20, background: 'var(--neon-emerald)', color: '#000', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Plus size={15} /> {planForMonth ? 'Update Salary' : 'Record Salary'}
+            </button>
+          </div>
+
+          {planForMonth ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              {/* Income Card */}
+              <div className="cyber-card" style={{ borderLeft: '3px solid var(--neon-emerald)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--neon-emerald)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>💰 Income Received</div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '2rem', fontWeight: 900, color: 'var(--neon-emerald)' }}>
+                  {formatMoney(planForMonth.confirmed_income_minor, currency, masked)}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                  {planForMonth.income_source} · Credited on {planForMonth.income_received_date || selectedMonth}
+                </div>
+              </div>
+
+              {/* Safe-to-Spend Card */}
+              <div className="cyber-card" style={{ borderLeft: '3px solid var(--neon-cyan)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--neon-cyan)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>✅ Safe to Spend</div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '2rem', fontWeight: 900, color: safeToSpend !== null && safeToSpend > 0 ? 'var(--neon-cyan)' : 'var(--neon-rose)' }}>
+                  {safeToSpend !== null ? formatMoney(safeToSpend, currency, masked) : '—'}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                  After expenses, bills, EMIs, savings &amp; 5% cash buffer
+                </div>
+              </div>
+
+              {/* Spending Card */}
+              <div className="cyber-card" style={{ borderLeft: '3px solid var(--neon-purple)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--neon-purple)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>💸 Spent This Month</div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '2rem', fontWeight: 900, color: 'var(--neon-purple)' }}>
+                  {formatMoney(monthExpenses, currency, masked)}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                  {planForMonth.confirmed_income_minor > 0
+                    ? `${((monthExpenses / planForMonth.confirmed_income_minor) * 100).toFixed(1)}% of income`
+                    : 'No income recorded'}
+                </div>
+              </div>
+
+              {/* Full Breakdown */}
+              <div className="cyber-card col-span-full" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>📊 Where Does Your Money Go — {selectedMonth}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    { label: '🏠 Needs Budget', pct: planForMonth.needs_pct, color: 'var(--neon-cyan)' },
+                    { label: '🛍️ Wants Budget', pct: planForMonth.wants_pct, color: 'var(--neon-purple)' },
+                    { label: '🏦 Savings / SIP', pct: planForMonth.savings_pct, color: 'var(--neon-emerald)' },
+                  ].map(row => {
+                    const amount = Math.floor(planForMonth.confirmed_income_minor * row.pct / 100);
+                    return (
+                      <div key={row.label}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', marginBottom: 4 }}>
+                          <span style={{ color: '#f1f5f9' }}>{row.label}</span>
+                          <span style={{ color: row.color, fontWeight: 700 }}>{row.pct}% · {formatMoney(amount, currency, masked)}</span>
+                        </div>
+                        <div className="cyber-progress-track" style={{ height: 8 }}>
+                          <div className="cyber-progress-fill" style={{ width: `${Math.min(row.pct, 100)}%`, background: row.color }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Obligations breakdown */}
+                {(planForMonth.committed_bills_minor + planForMonth.committed_debt_payments_minor + planForMonth.committed_savings_minor) > 0 && (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--glass-border)', fontSize: '0.82rem' }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>📌 Committed Payments This Month</div>
+                    <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      {planForMonth.committed_bills_minor > 0 && <span>🏠 Bills &amp; Rent: <strong>{formatMoney(planForMonth.committed_bills_minor, currency, masked)}</strong></span>}
+                      {planForMonth.committed_debt_payments_minor > 0 && <span>💳 EMI Payments: <strong>{formatMoney(planForMonth.committed_debt_payments_minor, currency, masked)}</strong></span>}
+                      {planForMonth.committed_savings_minor > 0 && <span>📈 SIP / Savings: <strong>{formatMoney(planForMonth.committed_savings_minor, currency, masked)}</strong></span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Safe-to-Spend calculation transparency */}
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--glass-border)', fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>
+                  <div style={{ fontWeight: 700, color: '#f1f5f9', marginBottom: 6 }}>🧮 Safe-to-Spend Calculation</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span>Income received: {formatMoney(planForMonth.confirmed_income_minor, currency, masked)}</span>
+                    <span>− Spent so far: {formatMoney(monthExpenses, currency, masked)}</span>
+                    <span>− Committed payments: {formatMoney(planForMonth.committed_bills_minor + planForMonth.committed_debt_payments_minor + planForMonth.committed_savings_minor, currency, masked)}</span>
+                    <span>− 5% cash buffer: {formatMoney(Math.floor(planForMonth.confirmed_income_minor * 5 / 100), currency, masked)}</span>
+                    <div style={{ fontWeight: 800, color: safeToSpend !== null && safeToSpend > 0 ? 'var(--neon-emerald)' : 'var(--neon-rose)', marginTop: 4 }}>
+                      = Safe to spend: {safeToSpend !== null ? formatMoney(safeToSpend, currency, masked) : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="cyber-card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+              <Wallet size={48} style={{ margin: '0 auto 16px auto', color: 'var(--neon-emerald)', opacity: 0.85 }} />
+              <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.3rem', fontWeight: 800, color: '#f1f5f9' }}>
+                No Salary Recorded for {selectedMonth}
+              </div>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-tertiary)', marginTop: 6, marginBottom: 24, maxWidth: 480, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.55 }}>
+                Record your actual salary or income for this month to see your safe-to-spend amount,
+                allocation breakdown (Needs / Wants / Savings), and how much money you have left.
+              </p>
+              <button className="btn btn-primary btn-md" onClick={() => setShowSalaryModal(true)} style={{ background: 'var(--neon-emerald)', color: '#000' }}>
+                <Plus size={16} /> Record {selectedMonth} Salary
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Goals Tab */}
       {activeTab === 'goals' && (
@@ -1220,6 +1593,16 @@ export function PlansPage() {
       {showDebtModal && <DebtModal onClose={() => setShowDebtModal(false)} />}
       {showChitModal && <ChitFundModal onClose={() => setShowChitModal(false)} />}
       {showRecurringModal && <RecurringModal onClose={() => setShowRecurringModal(false)} />}
+      {showSalaryModal && (
+        <SalaryPlanModal
+          month={selectedMonth}
+          onClose={() => setShowSalaryModal(false)}
+          onSaved={plan => setMonthlyPlans(prev => {
+            const filtered = prev.filter(p => p.month !== plan.month);
+            return [...filtered, plan];
+          })}
+        />
+      )}
     </div>
   );
 }

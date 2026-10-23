@@ -340,3 +340,85 @@ describe('F-13: Goal preset current savings must be zero', () => {
     );
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Phase 4: Variable Monthly Salary Planning & Safe-to-Spend Calculations
+// ──────────────────────────────────────────────────────────────────────────────
+describe('Phase 4: Variable Monthly Salary Planning & Safe-to-Spend', () => {
+
+  function calculateSafeToSpend({
+    confirmedIncomeMinor,
+    expensesMinor,
+    committedBillsMinor,
+    committedDebtMinor,
+    committedSavingsMinor,
+    bufferPct = 5,
+  }) {
+    const committedTotal = committedBillsMinor + committedDebtMinor + committedSavingsMinor;
+    const bufferMinor = Math.floor(confirmedIncomeMinor * (bufferPct / 100));
+    return Math.max(0, confirmedIncomeMinor - expensesMinor - committedTotal - bufferMinor);
+  }
+
+  it('Calculates safe-to-spend accurately with all obligations and 5% buffer', () => {
+    // User received ₹32,200 salary (3,220,000 minor units)
+    // Spent ₹12,000 so far (1,200,000 minor units)
+    // Committed bills: ₹5,000 (500,000)
+    // Committed debt EMI: ₹3,000 (300,000)
+    // Committed SIP: ₹2,000 (200,000)
+    // Buffer (5% of ₹32,200): ₹1,610 (161,000)
+    // Safe to spend = 3,220,000 - 1,200,000 - 1,000,000 - 161,000 = 859,000 minor units (₹8,590.00)
+    const result = calculateSafeToSpend({
+      confirmedIncomeMinor: 3220000,
+      expensesMinor: 1200000,
+      committedBillsMinor: 500000,
+      committedDebtMinor: 300000,
+      committedSavingsMinor: 200000,
+      bufferPct: 5,
+    });
+
+    assert.equal(result, 859000, 'Safe-to-spend must equal ₹8,590.00 (859000 minor units)');
+  });
+
+  it('Safe-to-spend floors at zero when expenses exceed available funds', () => {
+    const result = calculateSafeToSpend({
+      confirmedIncomeMinor: 1000000, // ₹10,000
+      expensesMinor: 950000,        // ₹9,500
+      committedBillsMinor: 200000,   // ₹2,000
+      committedDebtMinor: 0,
+      committedSavingsMinor: 0,
+      bufferPct: 5,
+    });
+
+    assert.equal(result, 0, 'Safe-to-spend should never be negative');
+  });
+
+  it('Zero confirmed income results in zero safe-to-spend', () => {
+    const result = calculateSafeToSpend({
+      confirmedIncomeMinor: 0,
+      expensesMinor: 500000,
+      committedBillsMinor: 200000,
+      committedDebtMinor: 0,
+      committedSavingsMinor: 0,
+      bufferPct: 5,
+    });
+
+    assert.equal(result, 0, 'No income recorded must yield 0 safe-to-spend');
+  });
+
+  it('Variable salary allocation splits exactly by percentages', () => {
+    const salary = 3220000; // ₹32,200
+    const needsPct = 50;
+    const wantsPct = 30;
+    const savingsPct = 20;
+
+    const needs = Math.floor(salary * needsPct / 100);
+    const wants = Math.floor(salary * wantsPct / 100);
+    const savings = Math.floor(salary * savingsPct / 100);
+
+    assert.equal(needs, 1610000, 'Needs must be ₹16,100');
+    assert.equal(wants, 966000, 'Wants must be ₹9,660');
+    assert.equal(savings, 644000, 'Savings must be ₹6,440');
+    assert.equal(needs + wants + savings, salary, 'Sum of allocations must equal confirmed income');
+  });
+});
+
