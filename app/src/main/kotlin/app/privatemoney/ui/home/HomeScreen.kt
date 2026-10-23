@@ -79,6 +79,8 @@ import java.time.LocalTime
 
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
 
 @Composable
 fun HomeRoute(
@@ -89,6 +91,7 @@ fun HomeRoute(
     onOpenAccounts: (() -> Unit)? = null,
     onOpenNotifications: (() -> Unit)? = null,
     onOpenCatchUp: (() -> Unit)? = null,
+    onOpenSync: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     HomeScreen(
@@ -99,6 +102,7 @@ fun HomeRoute(
         onOpenAccounts = onOpenAccounts,
         onOpenNotifications = onOpenNotifications,
         onOpenCatchUp = onOpenCatchUp,
+        onOpenSync = onOpenSync,
     )
 }
 
@@ -112,6 +116,7 @@ fun HomeScreen(
     onOpenAccounts: (() -> Unit)? = null,
     onOpenNotifications: (() -> Unit)? = null,
     onOpenCatchUp: (() -> Unit)? = null,
+    onOpenSync: (() -> Unit)? = null,
 ) {
     var showSafeSheet by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<TransactionType?>(null) }
@@ -168,6 +173,40 @@ fun HomeScreen(
                                 contentDescription = "Notification Center",
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+
+                    // Cloud Sync Status Pill
+                    if (onOpenSync != null) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(if (state.isCloudLoggedIn) finance.positive.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
+                                .border(
+                                    1.dp,
+                                    if (state.isCloudLoggedIn) finance.positive.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .clickable(onClick = onOpenSync)
+                                .padding(horizontal = 9.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (state.isCloudLoggedIn) Icons.Default.CloudDone else Icons.Default.CloudSync,
+                                contentDescription = "Cloud Sync",
+                                tint = if (state.isCloudLoggedIn) finance.positive else finance.muted,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                text = if (state.isCloudLoggedIn) "SYNCED" else "SYNC WITH WEB",
+                                style = TextStyle(
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (state.isCloudLoggedIn) finance.positive else finance.muted,
+                                    letterSpacing = 0.6.sp
+                                ),
                             )
                         }
                     }

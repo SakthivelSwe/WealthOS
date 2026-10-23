@@ -35,6 +35,8 @@ data class HomeUiState(
     val expenseMinor: Long = 0,
     val savedMinor: Long = 0,
     val recent: List<TransactionRowUi> = emptyList(),
+    val isCloudLoggedIn: Boolean = false,
+    val cloudUserEmail: String? = null,
 )
 
 class HomeViewModel(
@@ -133,6 +135,8 @@ class HomeViewModel(
                 expenseMinor = expense,
                 savedMinor = income - expense,
                 recent = recent.map { it.toRowUi(names) },
+                isCloudLoggedIn = !settings.supabaseUserId.isNullOrBlank() && !settings.supabaseAccessToken.isNullOrBlank(),
+                cloudUserEmail = settings.supabaseUserEmail,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState(currency = currency))
     }

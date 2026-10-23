@@ -27,6 +27,8 @@ data class SyncResult(
     val txnsPulled: Int = 0,
     val accountsPushed: Int = 0,
     val txnsPushed: Int = 0,
+    val chitsPulled: Int = 0,
+    val recurringPulled: Int = 0,
     val isSuccess: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -220,6 +222,49 @@ class SupabaseSyncService(
             )
         }
 
+        // 7. Chit Funds
+        val chitsJson = httpGet("$baseUrl/rest/v1/user_chit_funds?user_id=eq.$userId&active=eq.true", anonKey, token)
+        val chitEntities = mutableListOf<ChitFundEntity>()
+        for (i in 0 until chitsJson.length()) {
+            val o = chitsJson.getJSONObject(i)
+            chitEntities.add(
+                ChitFundEntity(
+                    id = o.optStringLenient("id", "id"),
+                    name = o.optStringLenient("name", "name"),
+                    totalMonths = o.optIntLenient("totalMonths", "total_months", 20),
+                    startMonth = o.optStringLenient("startMonth", "start_month", "2026-10"),
+                    monthlyContributionMinor = o.optLongLenient("monthlyContributionMinor", "monthly_contribution_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    active = o.optBooleanLenient("active", "active", true),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
+                )
+            )
+        }
+
+        // 8. Recurring Transactions
+        val recurringJson = httpGet("$baseUrl/rest/v1/user_recurring_transactions?user_id=eq.$userId&active=eq.true", anonKey, token)
+        val recurringEntities = mutableListOf<RecurringTxnEntity>()
+        for (i in 0 until recurringJson.length()) {
+            val o = recurringJson.getJSONObject(i)
+            recurringEntities.add(
+                RecurringTxnEntity(
+                    id = o.optStringLenient("id", "id"),
+                    type = o.optStringLenient("type", "type", "EXPENSE"),
+                    amountMinor = o.optLongLenient("amountMinor", "amount_minor", 0L),
+                    currency = o.optStringLenient("currency", "currency", "INR"),
+                    accountId = o.optStringLenient("accountId", "account_id"),
+                    categoryId = o.optNullableStringLenient("categoryId", "category_id"),
+                    description = o.optNullableStringLenient("description", "description"),
+                    frequency = o.optStringLenient("frequency", "frequency", "MONTHLY"),
+                    nextRunDate = o.optStringLenient("nextRunDate", "next_run_date", "2026-10-01"),
+                    active = o.optBooleanLenient("active", "active", true),
+                    createdAt = o.optLongLenient("createdAt", "created_at", System.currentTimeMillis()),
+                    updatedAt = o.optLongLenient("updatedAt", "updated_at", System.currentTimeMillis()),
+                )
+            )
+        }
+
         // Deduplicate transactions against local state
         val existingTxns = db.ledgerDao().getAllForBackup().map { it.id }.toSet()
         val newTxns = txnEntities.filterNot { existingTxns.contains(it.id) }
@@ -245,11 +290,19 @@ class SupabaseSyncService(
             if (debtEntities.isNotEmpty()) {
                 db.debtDao().restoreDebts(debtEntities)
             }
+            if (chitEntities.isNotEmpty()) {
+                db.chitFundDao().restoreChitFunds(chitEntities)
+            }
+            if (recurringEntities.isNotEmpty()) {
+                db.recurringTxnDao().restoreRecurringTxns(recurringEntities)
+            }
         }
 
         return SyncResult(
             accountsPulled = accountEntities.size,
             txnsPulled = newTxns.size,
+            chitsPulled = chitEntities.size,
+            recurringPulled = recurringEntities.size,
         )
     }
 
@@ -394,6 +447,51 @@ class SupabaseSyncService(
                 })
             }
             httpPostUpsert("$baseUrl/rest/v1/user_debts", anonKey, token, arr)
+        }
+
+        // Upsert chit funds
+        val chits = db.chitFundDao().getAllForBackup()
+        if (chits.isNotEmpty()) {
+            val arr = JSONArray()
+            chits.forEach { c ->
+                arr.put(JSONObject().apply {
+                    put("id", c.id)
+                    put("user_id", userId)
+                    put("name", c.name)
+                    put("total_months", c.totalMonths)
+                    put("start_month", c.startMonth)
+                    put("monthly_contribution_minor", c.monthlyContributionMinor)
+                    put("currency", c.currency)
+                    put("active", c.active)
+                    put("created_at", c.createdAt)
+                    put("updated_at", c.updatedAt)
+                })
+            }
+            httpPostUpsert("$baseUrl/rest/v1/user_chit_funds", anonKey, token, arr)
+        }
+
+        // Upsert recurring transactions
+        val recurring = db.recurringTxnDao().getAllForBackup()
+        if (recurring.isNotEmpty()) {
+            val arr = JSONArray()
+            recurring.forEach { r ->
+                arr.put(JSONObject().apply {
+                    put("id", r.id)
+                    put("user_id", userId)
+                    put("type", r.type)
+                    put("amount_minor", r.amountMinor)
+                    put("currency", r.currency)
+                    put("account_id", r.accountId)
+                    put("category_id", r.categoryId ?: JSONObject.NULL)
+                    put("description", r.description ?: JSONObject.NULL)
+                    put("frequency", r.frequency)
+                    put("next_run_date", r.nextRunDate)
+                    put("active", r.active)
+                    put("created_at", r.createdAt)
+                    put("updated_at", r.updatedAt)
+                })
+            }
+            httpPostUpsert("$baseUrl/rest/v1/user_recurring_transactions", anonKey, token, arr)
         }
 
         return SyncResult(

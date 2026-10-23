@@ -345,6 +345,7 @@ private fun MainShell(
                     onOpenAccounts = { managingAccounts = true },
                     onOpenNotifications = { showNotificationCenter = true },
                     onOpenCatchUp = { showCatchUpSheet = true },
+                    onOpenSync = { showLoginSheet = true },
                 )
                 Tab.LEDGER -> LedgerRoute(viewModel(factory = factory))
                 Tab.PLANS -> PlansRoute(viewModel(factory = factory))
