@@ -80,6 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithOtp = useCallback(async (target: string, isEmail: boolean = false) => {
+    // Dev/demo fallback is STRICTLY restricted to localhost — never activates in production.
+    const isLocalDev = typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
     try {
       const payload: any = isEmail
         ? {
@@ -93,24 +97,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         const isApiKeyError = error.message?.toLowerCase().includes('api key') ||
           error.message?.toLowerCase().includes('invalid');
-        const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-        if (isEmail && isApiKeyError && isLocalhost) {
-          console.warn('[WealthOS] Localhost testing: Supabase API key not configured, enabling localhost dev email simulation.');
+        // Email dev fallback: localhost only, never in production
+        if (isEmail && isApiKeyError && isLocalDev) {
+          console.warn('[WealthOS] Localhost dev: Supabase key not configured — enabling localhost email simulation.');
           setDemoPendingPhone(target);
           setIsDemoFallback(true);
           return { error: null, isDemoFallback: true };
         }
 
-        if (!isEmail) {
-          // Supabase SMS provider not configured – use dev/demo OTP fallback
+        if (isEmail && isApiKeyError && !isLocalDev) {
+          // Production: surface the real error — do not silently fall back
+          return { error: new Error('Authentication service configuration error. Please contact support.') };
+        }
+
+        if (!isEmail && isLocalDev) {
+          // SMS dev fallback: localhost only
           const isProviderError = error.message?.toLowerCase().includes('sms') ||
             error.message?.toLowerCase().includes('provider') ||
             error.message?.toLowerCase().includes('not enabled') ||
             error.message?.toLowerCase().includes('phone') ||
             error.status === 422;
           if (isProviderError) {
-            console.warn('[WealthOS] Supabase SMS provider not configured. Using dev OTP fallback.');
+            console.warn('[WealthOS] Localhost dev: SMS provider not configured — using dev OTP fallback (123456).');
             setDemoPendingPhone(target);
             setIsDemoFallback(true);
             return { error: null, isDemoFallback: true };
@@ -121,13 +130,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsDemoFallback(false);
       return { error: null, isDemoFallback: false };
     } catch (err: any) {
-      if (!isEmail) {
-        console.warn('[WealthOS] Network error sending OTP. Using dev fallback.');
+      // Network error SMS fallback: localhost only
+      if (!isEmail && isLocalDev) {
+        console.warn('[WealthOS] Localhost dev: Network error sending OTP — using dev fallback.');
         setDemoPendingPhone(target);
         setIsDemoFallback(true);
         return { error: null, isDemoFallback: true };
       }
-      return { error: new Error(err.message || 'Failed to send OTP') };
+      return { error: new Error(err.message || 'Failed to send OTP. Please check your connection and try again.') };
     }
   }, []);
 
@@ -282,17 +292,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Purge any encrypted backup objects stored in Supabase Storage for this user
+      // Storage cleanup failures are tracked and reported — not silently swallowed.
       try {
-        const { data: files } = await supabase.storage.from('backups').list(userId);
-        if (files && files.length > 0) {
+        const { data: files, error: listErr } = await supabase.storage.from('backups').list(userId);
+        if (listErr) {
+          failedTables.push(`storage/backups/list (${listErr.message})`);
+        } else if (files && files.length > 0) {
           const paths = files.map(f => `${userId}/${f.name}`);
           const { error: storageErr } = await supabase.storage.from('backups').remove(paths);
           if (storageErr) {
-            console.warn('Storage backup purge notice:', storageErr.message);
+            // This is a real failure — user's backup files remain in cloud storage.
+            failedTables.push(`storage/backups/remove (${storageErr.message})`);
           }
         }
-      } catch (storageErr) {
-        console.warn('Storage backup purge exception:', storageErr);
+      } catch (storageErr: any) {
+        failedTables.push(`storage/backups (${storageErr?.message || 'unexpected error'})`);
       }
 
       // If cloud deletion failed, preserve local data so user does not suffer unrecoverable data loss

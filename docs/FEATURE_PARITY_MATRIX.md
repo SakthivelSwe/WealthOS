@@ -21,7 +21,7 @@
 | **Encrypted Backup Restore & Staging** | Supported | Supported | Storage Bucket | Room Atomic / Web Ingest | Yes | Yes (PASS) | Verifies header magic, version, checksum, and previews entity counts before committing. Leaves DB untouched if tampered. |
 | **Bank Statement Import (CSV/Text)** | Supported | Supported | Edge Function | Parsed to Transaction Drafts | Yes | Yes (PASS) | Supports Indian comma numbers, DR/CR detection, reference number extraction, and duplicate candidate flagging. |
 | **Deterministic Financial Advice & Lens** | Supported | Supported | Local Engine | In-Memory / Cached | Yes | Yes (PASS) | Rule-based financial principles (Babylon, Psychology of Money, Ramit Sethi) with 0 third-party API exposure. |
-| **Live Multi-Device Row-Level Sync** | Roadmap | Roadmap | Supported (RLS) | N/A | N/A | NOT RUN | **Current state is Encrypted Snapshot Backup & Recovery**, NOT live continuous two-way row synchronization. |
+| **Live Multi-Device Row-Level Sync** | Experimental (`SupabaseSyncService`) | In-Memory Pull / Optimistic Write | Supported (RLS) | Room SQLite / Supabase Postgres | Partial (unit/build pass) | PARTIAL (Manual On-Demand Only) | Android has on-demand `SupabaseSyncService` for 6 entities (categories, accounts, txns, journal legs, goals, debts). **Not continuous, no conflict resolution/CRDTs, and does NOT sync budgets, chits, recurring, or settings.** Primary reliable mechanism remains **Encrypted Snapshot Vault (.wosenc)**. |
 | **Data Export (Encrypted & Plain CSV)** | Supported | Supported | Supabase API | Device File System / Browser Download | Yes | Yes (PASS) | Android exports encrypted envelope or CSV; Web exports RFC 4180 CSV with formula injection sanitization (`=`, `+`, `-`, `@`). |
 | **Account & Data Deletion** | Supported (Local DB drop) | Supported | Supported (RLS cascade) | SQLCipher / Supabase Postgres + Storage | Yes | Yes (PASS) | Web purges all 11 user tables in reverse dependency order and user storage objects under `${userId}/`. |
 
@@ -39,9 +39,9 @@
 - Local storage and in-memory caches are ephemeral UI performance caches, not the authoritative ledger.
 
 ### 2.3 Which features share server records?
-- **Zero features share live server records directly between Android and Web**.
-- Android does NOT read from or write to the web app's `user_transactions` or `user_accounts` tables.
-- The ONLY shared server touchpoint between Android and Web is the Supabase Storage bucket (`backups/<userId>/<fileName>.wosenc`), where encrypted snapshot blobs can be deposited or retrieved.
+- **Shared Snapshot Storage**: Both platforms support creating, depositing, and restoring encrypted snapshot archives (`.wosenc`) via the Supabase Storage bucket (`backups/<userId>/<fileName>.wosenc`).
+- **Experimental On-Demand Sync**: Android contains `SupabaseSyncService` (commit `8074bd7`) which can manually push/pull Room records to/from Supabase tables for 6 core entities (categories, accounts, txns, journal entries, goals, debts). However, it does NOT provide continuous real-time replication, conflict resolution, or coverage of budgets, chits, recurring rules, and settings.
+- **Authoritative Ledger Separation**: Without automated conflict resolution (CRDTs or vector clocks), concurrent edits on both platforms can diverge unless synchronized via export/import or clean on-demand sync.
 
 ### 2.4 Which features operate offline?
 - **Android**: 100% of core features (account creation, transaction logging, double-entry ledger balance computation, budget tracking, goal planning, chit funds, statement import, and local encrypted vault export) operate completely offline with no network connectivity required.

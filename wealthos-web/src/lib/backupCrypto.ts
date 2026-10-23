@@ -25,6 +25,8 @@ export interface BackupMetadata {
   debtCount: number;
   chitFundCount: number;
   recurringCount: number;
+  budgetCount: number;       // F-01 fix: was missing
+  hasSettings: boolean;      // F-01 fix: was missing
   checksumSha256: string;
 }
 
@@ -37,7 +39,8 @@ export interface BackupPayload {
   debts: any[];
   chits: any[];
   recurring: any[];
-  budgets?: any[];
+  budgets?: any[];            // explicitly optional — old backups may not have this
+  settings?: Record<string, any> | null;  // explicitly optional — old backups may not have this
   version?: string;
   exportedAt?: string;
   [key: string]: any;
@@ -250,6 +253,46 @@ export function normalizePayloadForExport(payload: BackupPayload) {
     updated_at: Number(r.updatedAt ?? r.updated_at ?? Date.now()),
   }));
 
+  // F-01 fix: budgets normalization — was completely omitted before
+  const budgets = (payload.budgets || []).map((b: any) => ({
+    id: b.id,
+    name: b.name,
+    period: b.period || 'MONTHLY',
+    basisIncomeMinor: Number(b.basisIncomeMinor ?? b.basis_income_minor ?? 0),
+    basis_income_minor: Number(b.basisIncomeMinor ?? b.basis_income_minor ?? 0),
+    needsPct: Number(b.needsPct ?? b.needs_pct ?? 50),
+    needs_pct: Number(b.needsPct ?? b.needs_pct ?? 50),
+    wantsPct: Number(b.wantsPct ?? b.wants_pct ?? 30),
+    wants_pct: Number(b.wantsPct ?? b.wants_pct ?? 30),
+    savingsPct: Number(b.savingsPct ?? b.savings_pct ?? 20),
+    savings_pct: Number(b.savingsPct ?? b.savings_pct ?? 20),
+    currency: b.currency || 'INR',
+    active: Boolean(b.active ?? true),
+    createdAt: Number(b.createdAt ?? b.created_at ?? Date.now()),
+    created_at: Number(b.createdAt ?? b.created_at ?? Date.now()),
+    updatedAt: Number(b.updatedAt ?? b.updated_at ?? Date.now()),
+    updated_at: Number(b.updatedAt ?? b.updated_at ?? Date.now()),
+  }));
+
+  // F-01 fix: settings pass-through — was completely omitted before
+  // Settings is a single object (not an array). Exclude sensitive fields: no tokens, no keys.
+  const settings = payload.settings
+    ? {
+        currency: payload.settings.currency || 'INR',
+        theme_mode: payload.settings.theme_mode || 'DARK',
+        mask_amounts: Boolean(payload.settings.mask_amounts ?? false),
+        user_name: payload.settings.user_name || 'WealthOS User',
+        phone_number: payload.settings.phone_number ?? null,
+        basis_income_minor: Number(payload.settings.basis_income_minor ?? 0),
+        needs_pct: Number(payload.settings.needs_pct ?? 50),
+        wants_pct: Number(payload.settings.wants_pct ?? 30),
+        savings_pct: Number(payload.settings.savings_pct ?? 20),
+        daily_reminder_enabled: Boolean(payload.settings.daily_reminder_enabled ?? true),
+        daily_reminder_hour: Number(payload.settings.daily_reminder_hour ?? 21),
+        // Explicitly excluded: access_token, refresh_token, session cookies, api_keys
+      }
+    : null;
+
   return {
     accounts,
     categories,
@@ -259,6 +302,8 @@ export function normalizePayloadForExport(payload: BackupPayload) {
     debts,
     chits,
     recurring,
+    budgets,   // F-01 fix
+    settings,  // F-01 fix
   };
 }
 
@@ -288,6 +333,8 @@ export async function createEncryptedBackupEnvelope(
     debtCount: rootJson.debts.length,
     chitFundCount: rootJson.chits.length,
     recurringCount: rootJson.recurring.length,
+    budgetCount: rootJson.budgets.length,   // F-01 fix
+    hasSettings: rootJson.settings !== null, // F-01 fix
     checksumSha256: checksum,
   };
 
