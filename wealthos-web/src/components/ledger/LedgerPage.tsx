@@ -2,9 +2,10 @@ import { useState, useMemo } from 'react';
 import { useData } from '../../hooks/useData';
 import { formatMoney, parseMoney, getCategoryDisplayName, formatAccountLabel, type Transaction, type TxnType, type NeedWant } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Clock, X, Check } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Clock, X, Check, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { CategoryPicker } from '../shared/CategoryPicker';
+import { ImportStatementModal } from './ImportStatementModal';
 
 const PAGE_SIZE = 40;
 
@@ -193,6 +194,7 @@ export function LedgerPage() {
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [page, setPage] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editTxn, setEditTxn] = useState<Transaction | undefined>();
 
   const currency = settings?.currency || 'INR';
@@ -251,12 +253,21 @@ export function LedgerPage() {
             All your income, expense, and transfer records in one place
           </p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => { setEditTxn(undefined); setShowModal(true); }}
-        >
-          <Plus size={16} /> New Transaction
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowImportModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Upload size={16} /> Import Statement
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => { setEditTxn(undefined); setShowModal(true); }}
+          >
+            <Plus size={16} /> New Transaction
+          </button>
+        </div>
       </div>
 
       {/* 3D Summary Cards */}
@@ -485,6 +496,7 @@ export function LedgerPage() {
       </div>
 
       {showModal && <TxnModal txn={editTxn} onClose={() => setShowModal(false)} />}
+      {showImportModal && <ImportStatementModal onClose={() => setShowImportModal(false)} />}
     </div>
   );
 }
