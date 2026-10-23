@@ -124,6 +124,7 @@ export function SettingsPage() {
         chits: chitFunds,
         recurring: recurringTxns,
         budgets: budgets || [],
+        settings: settings || null,  // F-01 fix: include settings in encrypted backup
       };
       const envelope = await createEncryptedBackupEnvelope(payload, trimmedPin);
       const blob = new Blob([envelope.buffer as ArrayBuffer], { type: 'application/octet-stream' });
@@ -311,9 +312,12 @@ export function SettingsPage() {
     try {
       const res = await importAllData(importPreviewData.payload);
       if (res.success) {
-        setImportStatus(`Successfully ingested ${res.count} records from ${importPreviewData.filename}!`);
+        setImportStatus(`Successfully imported ${res.localCount} records from ${importPreviewData.filename} — all synced to cloud.`);
+      } else if (res.partialSuccess) {
+        // F-03: Local import succeeded but cloud sync had failures. Be honest.
+        setImportStatus(`Imported ${res.localCount} records locally. Cloud sync partial — ${res.cloudFailedCount} items pending. Check your connection and re-sync.`);
       } else {
-        setImportStatus('Import failed: Invalid entity format.');
+        setImportStatus(`Import failed: ${res.errors.join('; ')}`);
       }
     } catch (err: any) {
       setImportStatus('Import failed: ' + err.message);
@@ -321,7 +325,7 @@ export function SettingsPage() {
       setIsIngesting(false);
       setImportPreviewData(null);
       setPendingImportFile(null);
-      setTimeout(() => setImportStatus(null), 5000);
+      setTimeout(() => setImportStatus(null), 8000);
     }
   };
 

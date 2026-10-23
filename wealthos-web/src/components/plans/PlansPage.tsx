@@ -18,6 +18,9 @@ interface GoalPreset {
   tip: string;
 }
 
+// F-13 fix: All current values set to '0'.
+// Previously presets had fabricated existing savings (₹25,000 – ₹100,000) that
+// misled users into believing they already had those funds. Users must enter real figures.
 const GOAL_PRESETS: GoalPreset[] = [
   {
     id: 'emergency',
@@ -25,10 +28,10 @@ const GOAL_PRESETS: GoalPreset[] = [
     badge: 'Emergency Fund',
     name: 'Emergency Fund (6 Months Safety Net)',
     target: '300000',
-    current: '25000',
+    current: '0',
     monthly: '10000',
     months: 12,
-    tip: 'Emergency Fund protects you and your family against sudden hospital bills, job changes, or house repairs. Aim for 3 to 6 months of living expenses.',
+    tip: 'Emergency Fund protects you and your family against sudden hospital bills, job changes, or house repairs. Aim for 3 to 6 months of living expenses. Enter your actual current savings above.',
   },
   {
     id: 'gold',
@@ -36,10 +39,10 @@ const GOAL_PRESETS: GoalPreset[] = [
     badge: 'Gold Savings',
     name: 'Gold Jewelry & SGB Savings',
     target: '250000',
-    current: '20000',
+    current: '0',
     monthly: '15000',
     months: 18,
-    tip: 'Traditional family wealth preservation for weddings, Akshaya Tritiya, or Sovereign Gold Bonds (SGB).',
+    tip: 'Traditional family wealth preservation for weddings, Akshaya Tritiya, or Sovereign Gold Bonds (SGB). Enter any gold or SGB savings you already hold above.',
   },
   {
     id: 'house',
@@ -47,10 +50,10 @@ const GOAL_PRESETS: GoalPreset[] = [
     badge: 'House / Land Plot',
     name: 'House Down Payment / Land Plot',
     target: '1000000',
-    current: '100000',
+    current: '0',
     monthly: '25000',
     months: 36,
-    tip: 'Accumulate the 20% down payment required to buy a flat, independent house, or residential plot.',
+    tip: 'Accumulate the 20% down payment required to buy a flat, independent house, or residential plot. Enter your actual current down-payment savings above.',
   },
   {
     id: 'vehicle',
@@ -58,10 +61,10 @@ const GOAL_PRESETS: GoalPreset[] = [
     badge: 'Bike / Car Purchase',
     name: 'New Two-Wheeler / Car Purchase',
     target: '150000',
-    current: '15000',
+    current: '0',
     monthly: '10000',
     months: 12,
-    tip: 'Save for down payment or direct purchase of a scooter, bike, or car with lower EMI burden.',
+    tip: 'Save for down payment or direct purchase of a scooter, bike, or car with lower EMI burden. Enter any amount you have already set aside above.',
   },
   {
     id: 'education',
@@ -69,10 +72,10 @@ const GOAL_PRESETS: GoalPreset[] = [
     badge: 'Child Education',
     name: 'School Fees & College Fund',
     target: '500000',
-    current: '50000',
+    current: '0',
     monthly: '15000',
     months: 24,
-    tip: 'Annual school fees, entrance coaching, or higher degree college admission fees.',
+    tip: 'Annual school fees, entrance coaching, or higher degree college admission fees. Enter your actual current education savings above.',
   },
   {
     id: 'tour',
@@ -80,12 +83,13 @@ const GOAL_PRESETS: GoalPreset[] = [
     badge: 'Tour & Vacation',
     name: 'Family Tour / Vacation Fund',
     target: '75000',
-    current: '10000',
+    current: '0',
     monthly: '8000',
     months: 8,
-    tip: 'Stress-free annual holiday, hill station trip, or family travel without taking credit card debt.',
+    tip: 'Stress-free annual holiday, hill station trip, or family travel without taking credit card debt. Enter any amount already saved for this trip above.',
   },
 ];
+
 
 function GoalModal({ initialPresetId, onClose }: { initialPresetId?: string; onClose: () => void }) {
   const { addGoal, settings } = useData();
@@ -220,7 +224,7 @@ function GoalModal({ initialPresetId, onClose }: { initialPresetId?: string; onC
                 step="any"
                 value={current}
                 onChange={e => setCurrent(e.target.value)}
-                placeholder="25000"
+                placeholder="0"
               />
             </div>
           </div>

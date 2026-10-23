@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { useData } from '../../hooks/useData';
 import { formatMoney, getCategoryDisplayName } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { BarChart2, TrendingUp, TrendingDown, Brain, Loader2, Sparkles, AlertTriangle, CheckCircle2, Lightbulb } from 'lucide-react';
+import { BarChart2, TrendingUp, TrendingDown, Brain, Loader2, Sparkles, AlertTriangle, CheckCircle2, Lightbulb, WifiOff } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { format, subMonths, startOfMonth, endOfMonth, subWeeks } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, subWeeks, startOfWeek, endOfWeek } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 
 const COLORS = [
@@ -76,13 +76,14 @@ export function InsightsPage() {
       .sort((a, b) => b.value - a.value);
   }, [periodTxns, categories]);
 
-  // Weekly spend
+  // F-11 fix: Weekly spend — previously wStart and wEnd were the same single day.
+  // Now each week spans Mon–Sun using startOfWeek/endOfWeek.
   const weeklyData = useMemo(() => {
     const weeks = [];
     for (let i = 3; i >= 0; i--) {
-      const wDate = subWeeks(now, i);
-      const wStart = format(wDate, 'yyyy-MM-dd');
-      const wEnd = format(wDate, 'yyyy-MM-dd');
+      const weekAnchor = subWeeks(now, i);
+      const wStart = format(startOfWeek(weekAnchor, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+      const wEnd = format(endOfWeek(weekAnchor, { weekStartsOn: 1 }), 'yyyy-MM-dd');
       const amount = periodTxns
         .filter(t => t.type === 'EXPENSE' && t.local_date >= wStart && t.local_date <= wEnd)
         .reduce((s, t) => s + t.amount_minor, 0);
@@ -125,20 +126,34 @@ Question: ${promptToUse}`;
       });
 
       if (error || !data) {
-        // Fallback intelligent simulation if Edge Function is offline
-        await new Promise(r => setTimeout(r, 900));
-        setAiResult({
-          insights: [
-            `Your savings rate of ${savingsRate}% is solid. Top spending is concentrated in ${categoryBreakdown[0]?.name || 'Living Expenses'} (${categoryBreakdown[0]?.pct || '0'}%).`,
-            `Discretionary spending ('Wants') constitutes ~${nwsBreakdown.find(n => n.name === 'Wants')?.value ? '28%' : 'low percentage'} of total outflows, well aligned with the 50/30/20 target.`,
-          ],
-          recommendations: [
-            `Automate a 5% increase in your monthly SIP transfer on salary day to lock in higher compounding.`,
-            `Review recurring subscriptions in your ${categoryBreakdown.find(c => c.name.toLowerCase().includes('entertainment') || c.name.toLowerCase().includes('shopping'))?.name || 'lifestyle'} category to trim idle burn.`,
-          ],
-          warnings: totalExpense > totalIncome ? ['Operating expenditure exceeded cash inflows during this timeframe.'] : [],
-          confidence: 0.94,
-        });
+        // F-12 fix: Do NOT show fabricated AI insights when the Edge Function is offline.
+        // Previously this returned hardcoded confidence: 0.94 and invented advice,
+        // which was indistinguishable from real AI output.
+        // Now we show an honest unavailability message and only genuine rule-based warnings.
+        const ruleWarnings: string[] = [];
+        const ruleInsights: string[] = [];
+
+        if (totalExpense > totalIncome && totalIncome > 0) {
+          ruleWarnings.push('Your expenses exceeded income in this period. Review the category breakdown above.');
+        }
+        if (totalIncome === 0) {
+          ruleInsights.push('No income recorded for this period. Add your salary or other income to see meaningful analysis.');
+        }
+        if (categoryBreakdown.length > 0) {
+          ruleInsights.push(`Your largest spending category is ${categoryBreakdown[0].name} at ${categoryBreakdown[0].pct}% of total expenses.`);
+        }
+
+        if (ruleWarnings.length > 0 || ruleInsights.length > 0) {
+          setAiResult({
+            insights: ruleInsights,
+            recommendations: [],
+            warnings: ruleWarnings,
+            confidence: 0,  // 0 = rules-based, not AI
+            source: 'rules-based',
+          } as any);
+        } else {
+          setAiError('AI Money Coach is currently unavailable. Your financial charts and data above are still accurate.');
+        }
       } else {
         setAiResult(data);
       }
@@ -392,7 +407,13 @@ Question: ${promptToUse}`;
           {aiResult && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>Confidence Score: {(aiResult.confidence * 100).toFixed(0)}%</span>
+                {(aiResult as any).source === 'rules-based' ? (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <WifiOff size={12} /> AI unavailable — showing rule-based observations only
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>Confidence Score: {(aiResult.confidence * 100).toFixed(0)}%</span>
+                )}
                 <span className="badge badge-cyan">{label}</span>
               </div>
 

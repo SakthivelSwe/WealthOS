@@ -48,6 +48,20 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
       return;
     }
 
+    // F-04 fix: Transfer requires a valid, distinct destination account.
+    // Without this, a transfer with no destination creates a one-legged journal entry
+    // (money leaves source, arrives nowhere), corrupting account balances.
+    if (type === 'TRANSFER') {
+      if (!toAccountId) {
+        setError('Please select a destination account for the transfer');
+        return;
+      }
+      if (accountId === toAccountId) {
+        setError('Source and destination accounts must be different');
+        return;
+      }
+    }
+
     const amountMinor = parseMoney(amountStr, currency);
     const txnId = 'txn_' + Date.now();
 
@@ -59,10 +73,9 @@ export function NewTransactionModal({ onClose }: NewTransactionModalProps) {
       journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: null, amount_minor: amountMinor });
       journalEntries.push({ txn_id: txnId, account_id: null, category_id: categoryId || null, amount_minor: -amountMinor });
     } else if (type === 'TRANSFER') {
+      // Both legs are required and guaranteed by validation above.
       journalEntries.push({ txn_id: txnId, account_id: accountId, category_id: null, amount_minor: -amountMinor });
-      if (toAccountId) {
-        journalEntries.push({ txn_id: txnId, account_id: toAccountId, category_id: null, amount_minor: amountMinor });
-      }
+      journalEntries.push({ txn_id: txnId, account_id: toAccountId, category_id: null, amount_minor: amountMinor });
     }
 
     await addTransaction({

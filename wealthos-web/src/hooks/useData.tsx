@@ -5,6 +5,29 @@ import type { Account, Transaction, JournalEntry, Goal, Debt, ChitFund, Recurrin
 import { DEFAULT_CATEGORIES as SEED_CATEGORIES, sanitizeCategories } from '../types';
 import { getSampleSeedData } from '../lib/mockData';
 
+/** Structured result returned by importAllData \u2014 F-03 fix: never return success:true when cloud writes failed. */
+export interface ImportResult {
+  success: boolean;
+  /** True when local import succeeded but some or all cloud writes failed. */
+  partialSuccess: boolean;
+  localCount: number;
+  cloudSyncedCount: number;
+  cloudFailedCount: number;
+  errors: string[];
+  entityCounts: {
+    accounts: number;
+    transactions: number;
+    journalEntries: number;
+    categories: number;
+    goals: number;
+    debts: number;
+    chits: number;
+    recurring: number;
+    budgets: number;
+    settings: boolean;
+  };
+}
+
 interface DataContextType {
   accounts: Account[];
   transactions: Transaction[];
@@ -36,7 +59,7 @@ interface DataContextType {
   updateSettings: (updates: Partial<UserSettings>) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
-  importAllData: (data: any) => Promise<{ success: boolean; count: number }>;
+  importAllData: (data: any) => Promise<ImportResult>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -435,13 +458,41 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.warn('Supabase update transaction error:', error.message);
       }
       if (entries && entries.length > 0) {
-        const { error: delErr } = await supabase.from('user_journal_entries').delete().eq('txn_id', id).eq('user_id', userId);
-        if (delErr) console.warn('Supabase delete old journal entries error:', delErr.message);
-        const { error: insErr } = await supabase.from('user_journal_entries').insert(entries.map(e => ({ ...e, user_id: userId })));
-        if (insErr) console.warn('Supabase insert new journal entries error:', insErr.message);
+        // F-06 fix: Attempt atomic RPC replacement first (defined in 20261023000000_financial_integrity.sql)
+        const journalPayload = entries.map(e => ({
+          account_id: e.account_id || '',
+          category_id: e.category_id || '',
+          amount_minor: e.amount_minor,
+        }));
+        const { error: rpcErr } = await supabase.rpc('replace_journal_entries', {
+          p_user_id: userId,
+          p_txn_id: id,
+          p_entries: journalPayload,
+        });
+
+        if (rpcErr) {
+          // If RPC is unavailable or failed, fallback to safe delete-verify-insert
+          console.warn('replace_journal_entries RPC unavailable, using verified fallback:', rpcErr.message);
+          const { error: delErr } = await supabase.from('user_journal_entries').delete().eq('txn_id', id).eq('user_id', userId);
+          if (delErr) {
+            console.warn('Supabase delete old journal entries error:', delErr.message);
+            return;
+          }
+          const { error: insErr } = await supabase.from('user_journal_entries').insert(entries.map(e => ({ ...e, user_id: userId })));
+          if (insErr) {
+            console.error('CRITICAL: Journal entry insert failed after delete for txn', id, ':', insErr.message);
+            console.warn('Re-fetching journal entries from cloud to recover consistent state...');
+            supabase.from('user_journal_entries').select('*').eq('user_id', userId).then(({ data }) => {
+              if (data) {
+                setJournalEntries(data);
+                setLocal('journalEntries', data);
+              }
+            });
+          }
+        }
       }
     } catch (e) {
-      console.warn('Transaction updated locally:', e);
+      console.warn('Transaction updated locally, cloud sync pending:', e);
     }
   }, [userId]);
 
@@ -630,18 +681,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, [userId]);
 
-  const importAllData = useCallback(async (data: any) => {
-    let count = 0;
+  const importAllData = useCallback(async (data: any): Promise<ImportResult> => {
+    const errors: string[] = [];
+    let cloudSyncedCount = 0;
+    let cloudFailedCount = 0;
+
     try {
+      // ---- Parse incoming data ----
       const incomingAccounts: Account[] = data.accounts || [];
       const incomingTxns: Transaction[] = data.txns || data.transactions || [];
-      const incomingEntries: JournalEntry[] = data.journal_entries || data.journalEntries || [];
+      const rawEntries: JournalEntry[] = data.journal_entries || data.journalEntries || [];
+      const incomingCategories: Category[] = data.categories || [];
       const incomingGoals: Goal[] = data.goals || [];
       const incomingDebts: Debt[] = data.debts || [];
       const incomingChits: ChitFund[] = data.chits || data.chitFunds || [];
       const incomingRecs: RecurringTransaction[] = data.recurring || data.recurringTxns || [];
       const incomingBudgets: Budget[] = data.budgets || [];
+      const incomingSettings: any = data.settings || null;
 
+      // ---- F-02: Deduplicate journal entries by composite key ----
+      // Journal entries use bigserial row_id (not a stable content-addressable key), so
+      // upsert always inserts new rows. We must deduplicate on the client side.
+      const entryKey = (e: JournalEntry) =>
+        `${e.txn_id}|${e.account_id ?? ''}|${e.category_id ?? ''}`;
+
+      let dedupedEntries: JournalEntry[] = [];
+      setJournalEntries(prev => {
+        const existingKeys = new Set(prev.map(entryKey));
+        dedupedEntries = rawEntries
+          .map(e => ({ ...e, user_id: userId }))
+          .filter(e => !existingKeys.has(entryKey(e)));
+        const combined = [...prev, ...dedupedEntries];
+        setLocal('journalEntries', combined);
+        return combined;
+      });
+
+      const skippedEntries = rawEntries.length - dedupedEntries.length;
+      if (skippedEntries > 0) {
+        console.info(`[Import] Skipped ${skippedEntries} duplicate journal entries (dedup by txn_id+account+category).`);
+      }
+
+      // ---- Local state merges (deduplicate by id for all entities with stable IDs) ----
       if (incomingAccounts.length > 0) {
         setAccounts(prev => {
           const map = new Map(prev.map(a => [a.id, a]));
@@ -650,7 +730,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('accounts', combined);
           return combined;
         });
-        count += incomingAccounts.length;
       }
 
       if (incomingTxns.length > 0) {
@@ -661,16 +740,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('transactions', combined);
           return combined;
         });
-        count += incomingTxns.length;
       }
 
-      if (incomingEntries.length > 0) {
-        setJournalEntries(prev => {
-          const combined = [...prev, ...incomingEntries.map(e => ({ ...e, user_id: userId }))];
-          setLocal('journalEntries', combined);
+      if (incomingCategories.length > 0) {
+        setCategories(prev => {
+          const map = new Map(prev.map(c => [c.id, c]));
+          incomingCategories.forEach(c => map.set(c.id, { ...c, user_id: userId }));
+          const combined = Array.from(map.values());
+          setLocal('categories', combined);
           return combined;
         });
-        count += incomingEntries.length;
       }
 
       if (incomingGoals.length > 0) {
@@ -681,7 +760,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('goals', combined);
           return combined;
         });
-        count += incomingGoals.length;
       }
 
       if (incomingDebts.length > 0) {
@@ -692,7 +770,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('debts', combined);
           return combined;
         });
-        count += incomingDebts.length;
       }
 
       if (incomingChits.length > 0) {
@@ -703,7 +780,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('chitFunds', combined);
           return combined;
         });
-        count += incomingChits.length;
       }
 
       if (incomingRecs.length > 0) {
@@ -714,7 +790,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('recurringTxns', combined);
           return combined;
         });
-        count += incomingRecs.length;
       }
 
       if (incomingBudgets.length > 0) {
@@ -725,45 +800,114 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setLocal('budgets', combined);
           return combined;
         });
-        count += incomingBudgets.length;
       }
 
-      // Try uploading to Supabase if connected
-      try {
-        if (incomingAccounts.length > 0) {
-          const { error } = await supabase.from('user_accounts').upsert(incomingAccounts.map(a => ({ ...a, user_id: userId })));
-          if (error) console.warn('Supabase upsert imported accounts warning:', error.message);
+      // ---- Cloud upsert: track failures per entity ----
+      // F-03 fix: failures are tracked; we never return success:true if cloud writes failed.
+      const tryUpsert = async (table: string, rows: any[], label: string) => {
+        if (rows.length === 0) return;
+        try {
+          const { error } = await supabase.from(table).upsert(rows);
+          if (error) {
+            errors.push(`${label}: ${error.message}`);
+            cloudFailedCount += rows.length;
+          } else {
+            cloudSyncedCount += rows.length;
+          }
+        } catch (e: any) {
+          errors.push(`${label} (network): ${e?.message || 'unknown'}`);
+          cloudFailedCount += rows.length;
         }
-        if (incomingTxns.length > 0) {
-          const { error } = await supabase.from('user_transactions').upsert(incomingTxns.map(t => ({ ...t, user_id: userId })));
-          if (error) console.warn('Supabase upsert imported transactions warning:', error.message);
+      };
+
+      await tryUpsert('user_accounts', incomingAccounts.map(a => ({ ...a, user_id: userId })), 'accounts');
+      await tryUpsert('user_transactions', incomingTxns.map(t => ({ ...t, user_id: userId })), 'transactions');
+      await tryUpsert('user_categories', incomingCategories.map(c => ({ ...c, user_id: userId })), 'categories');
+      await tryUpsert('user_goals', incomingGoals.map(g => ({ ...g, user_id: userId })), 'goals');
+      await tryUpsert('user_debts', incomingDebts.map(d => ({ ...d, user_id: userId })), 'debts');
+      await tryUpsert('user_chit_funds', incomingChits.map(c => ({ ...c, user_id: userId })), 'chitFunds');
+      await tryUpsert('user_recurring_transactions', incomingRecs.map(r => ({ ...r, user_id: userId })), 'recurring');
+      await tryUpsert('user_budgets', incomingBudgets.map(b => ({ ...b, user_id: userId })), 'budgets');
+
+      // Journal entries: INSERT only the deduplicated new entries (cannot upsert without stable PK)
+      if (dedupedEntries.length > 0) {
+        try {
+          const { error } = await supabase.from('user_journal_entries').insert(dedupedEntries);
+          if (error) {
+            errors.push(`journalEntries: ${error.message}`);
+            cloudFailedCount += dedupedEntries.length;
+          } else {
+            cloudSyncedCount += dedupedEntries.length;
+          }
+        } catch (e: any) {
+          errors.push(`journalEntries (network): ${e?.message || 'unknown'}`);
+          cloudFailedCount += dedupedEntries.length;
         }
-        if (incomingEntries.length > 0) {
-          const { error } = await supabase.from('user_journal_entries').upsert(incomingEntries.map(e => ({ ...e, user_id: userId })));
-          if (error) console.warn('Supabase upsert imported journal entries warning:', error.message);
-        }
-        if (incomingGoals.length > 0) {
-          const { error } = await supabase.from('user_goals').upsert(incomingGoals.map(g => ({ ...g, user_id: userId })));
-          if (error) console.warn('Supabase upsert imported goals warning:', error.message);
-        }
-        if (incomingDebts.length > 0) {
-          const { error } = await supabase.from('user_debts').upsert(incomingDebts.map(d => ({ ...d, user_id: userId })));
-          if (error) console.warn('Supabase upsert imported debts warning:', error.message);
-        }
-        if (incomingBudgets.length > 0) {
-          const { error } = await supabase.from('user_budgets').upsert(incomingBudgets.map(b => ({ ...b, user_id: userId })));
-          if (error) console.warn('Supabase upsert imported budgets warning:', error.message);
-        }
-      } catch (e) {
-        console.warn('Cloud sync of imported items pending:', e);
       }
 
-      return { success: true, count };
-    } catch (e) {
-      console.error('Failed to import data:', e);
-      return { success: false, count: 0 };
+      // Settings: upsert (single row per user)
+      let settingsSynced = false;
+      if (incomingSettings) {
+        try {
+          const settingsRow = { ...incomingSettings, user_id: userId, updated_at: Date.now() };
+          const { error } = await supabase.from('user_settings').upsert(settingsRow);
+          if (error) {
+            errors.push(`settings: ${error.message}`);
+          } else {
+            settingsSynced = true;
+            cloudSyncedCount++;
+          }
+        } catch (e: any) {
+          errors.push(`settings (network): ${e?.message || 'unknown'}`);
+        }
+      }
+
+      const localCount = incomingAccounts.length + incomingTxns.length + dedupedEntries.length +
+        incomingGoals.length + incomingDebts.length + incomingChits.length +
+        incomingRecs.length + incomingBudgets.length + incomingCategories.length +
+        (incomingSettings ? 1 : 0);
+
+      const hasCloudFailures = errors.length > 0;
+
+      return {
+        // F-03 fix: success is true only when everything succeeded.
+        // partialSuccess:true indicates local import ok but cloud sync had failures.
+        success: localCount > 0 && !hasCloudFailures,
+        partialSuccess: localCount > 0 && hasCloudFailures,
+        localCount,
+        cloudSyncedCount,
+        cloudFailedCount,
+        errors,
+        entityCounts: {
+          accounts: incomingAccounts.length,
+          transactions: incomingTxns.length,
+          journalEntries: dedupedEntries.length,
+          categories: incomingCategories.length,
+          goals: incomingGoals.length,
+          debts: incomingDebts.length,
+          chits: incomingChits.length,
+          recurring: incomingRecs.length,
+          budgets: incomingBudgets.length,
+          settings: settingsSynced,
+        },
+      };
+    } catch (e: any) {
+      console.error('[WealthOS] Import failed unexpectedly:', e);
+      return {
+        success: false,
+        partialSuccess: false,
+        localCount: 0,
+        cloudSyncedCount: 0,
+        cloudFailedCount: 0,
+        errors: [e?.message || 'Unexpected import error'],
+        entityCounts: {
+          accounts: 0, transactions: 0, journalEntries: 0, categories: 0,
+          goals: 0, debts: 0, chits: 0, recurring: 0, budgets: 0, settings: false,
+        },
+      };
     }
   }, [userId]);
+
 
   return (
     <DataContext.Provider value={{
