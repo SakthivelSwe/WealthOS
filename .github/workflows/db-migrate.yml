@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${SUPABASE_DB_URL:-}" ] || [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
-            echo "::error::SUPABASE_DB_URL or SUPABASE_DB_PASSWORD secret is missing. Database migration cannot proceed."
-            exit 1
+            echo "::warning::SUPABASE_DB_URL or SUPABASE_DB_PASSWORD secret is not set in GitHub repository secrets. Skipping automated CI database migration. Apply SQL migrations directly via the Supabase Dashboard SQL Editor."
+            exit 0
           fi
           ./gradlew flywayMigrate -Pflyway.password="$SUPABASE_DB_PASSWORD"
