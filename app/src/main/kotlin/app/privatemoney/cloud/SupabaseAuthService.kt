@@ -174,6 +174,24 @@ class SupabaseAuthService(
         }
     }
 
+    suspend fun signUpWithPassword(email: String, password: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val cleanEmail = email.trim()
+            if (!cleanEmail.contains("@") || !cleanEmail.contains(".")) {
+                throw IllegalArgumentException("Please enter a valid email address.")
+            }
+            if (password.length < 6) {
+                throw IllegalArgumentException("Password must be at least 6 characters.")
+            }
+            val client = getClient()
+            client.auth.signUpWith(io.github.jan.supabase.gotrue.providers.builtin.Email) {
+                this.email = cleanEmail
+                this.password = password
+            }
+            persistAuthenticatedSession(cleanEmail)
+        }
+    }
+
     private suspend fun resolveSessionFromHttpVerification(urlStr: String, client: SupabaseClient) = withContext(Dispatchers.IO) {
         val url = java.net.URL(urlStr)
         val conn = (url.openConnection() as java.net.HttpURLConnection).apply {

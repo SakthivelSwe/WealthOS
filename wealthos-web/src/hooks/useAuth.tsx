@@ -10,6 +10,8 @@ interface AuthContextType {
   isDemoFallback: boolean;
   signInWithOtp: (target: string, isEmail?: boolean) => Promise<{ error: Error | null; isDemoFallback?: boolean }>;
   verifyOtp: (target: string, token: string, isEmail?: boolean) => Promise<{ error: Error | null }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUpWithPassword: (email: string, password: string) => Promise<{ error: Error | null; user?: User | null }>;
   loginAsDemo: () => void;
   signOut: () => Promise<void>;
   deleteAllUserData: () => Promise<{ error: Error | null }>;
@@ -226,6 +228,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: new Error('Unable to verify OTP. Please request a new code.') };
   }, [isDemoFallback, demoPendingPhone]);
 
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    try {
+      const cleanEmail = email.trim();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        return { error: new Error('Please enter a valid email address.') };
+      }
+      if (!password) {
+        return { error: new Error('Please enter your password.') };
+      }
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+      if (error) {
+        return { error: new Error(error.message) };
+      }
+      if (data?.session) {
+        localStorage.removeItem(DEMO_SESSION_KEY);
+        setSession(data.session);
+        setIsDemoFallback(false);
+      }
+      return { error: null };
+    } catch (err: any) {
+      return { error: new Error(err.message || 'Failed to sign in. Please try again.') };
+    }
+  }, []);
+
+  const signUpWithPassword = useCallback(async (email: string, password: string) => {
+    try {
+      const cleanEmail = email.trim();
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        return { error: new Error('Please enter a valid email address.') };
+      }
+      if (!password || password.length < 6) {
+        return { error: new Error('Password must be at least 6 characters.') };
+      }
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+      });
+      if (error) {
+        return { error: new Error(error.message) };
+      }
+      if (data?.session) {
+        localStorage.removeItem(DEMO_SESSION_KEY);
+        setSession(data.session);
+        setIsDemoFallback(false);
+      }
+      return { error: null, user: data?.user ?? null };
+    } catch (err: any) {
+      return { error: new Error(err.message || 'Failed to create account. Please try again.') };
+    }
+  }, []);
+
   const loginAsDemo = useCallback(() => {
     const demoUser: User = {
       id: '00000000-0000-4000-8000-000000000001',
@@ -338,6 +394,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isDemoFallback,
       signInWithOtp,
       verifyOtp,
+      signInWithPassword,
+      signUpWithPassword,
       loginAsDemo,
       signOut,
       deleteAllUserData,

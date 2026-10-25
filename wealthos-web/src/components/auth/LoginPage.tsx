@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { Mail, Shield, Loader2, Sparkles, KeyRound, CheckCircle2, ArrowLeft, RefreshCw, Send, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Shield, Loader2, Sparkles, KeyRound, CheckCircle2, ArrowLeft, RefreshCw, Send, ChevronDown, ChevronUp, UserCheck, UserPlus, Key } from 'lucide-react';
 
 export function LoginPage() {
-  const { signInWithOtp, verifyOtp, loginAsDemo, isDemoFallback } = useAuth();
+  const { signInWithOtp, verifyOtp, signInWithPassword, signUpWithPassword, loginAsDemo, isDemoFallback } = useAuth();
+  const [authMode, setAuthMode] = useState<'password' | 'magiclink'>('password');
   const [step, setStep] = useState<'email' | 'sent'>('email');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [error, setError] = useState('');
@@ -21,6 +25,43 @@ export function LoginPage() {
     }
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  const handlePasswordAuth = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError('');
+    setInfoMsg('');
+
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password');
+      return;
+    }
+    if (isSignUp && password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    if (isSignUp) {
+      const result = await signUpWithPassword(cleanEmail, password);
+      setLoading(false);
+      if (result.error) {
+        setError(result.error.message);
+      } else {
+        setInfoMsg('Account created successfully! Welcome to WealthOS.');
+      }
+    } else {
+      const result = await signInWithPassword(cleanEmail, password);
+      setLoading(false);
+      if (result.error) {
+        setError(result.error.message);
+      }
+    }
+  };
 
   const handleSendLink = async () => {
     setError('');
@@ -133,7 +174,7 @@ export function LoginPage() {
         />
 
         {/* Brand Orb & Heading */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div
             style={{
               width: 58,
@@ -167,14 +208,205 @@ export function LoginPage() {
             WealthOS
           </h1>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
-            Private Money Manager • Encrypted Snapshot Backup
+            Private Money Manager • Cloud Ledger & Android Sync
           </p>
         </div>
 
-        {step === 'email' ? (
+        {/* Auth Mode Tabs */}
+        <div
+          style={{
+            display: 'flex',
+            background: 'rgba(255, 255, 255, 0.04)',
+            padding: 4,
+            borderRadius: 12,
+            marginBottom: 22,
+            border: '1px solid var(--border-subtle)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => { setAuthMode('password'); setError(''); setInfoMsg(''); }}
+            style={{
+              flex: 1,
+              padding: '9px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: authMode === 'password' ? 'var(--accent-forest, #10b981)' : 'transparent',
+              color: authMode === 'password' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: authMode === 'password' ? 700 : 500,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Key size={14} /> Password Sign-In
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAuthMode('magiclink'); setError(''); setInfoMsg(''); }}
+            style={{
+              flex: 1,
+              padding: '9px 12px',
+              borderRadius: 8,
+              border: 'none',
+              background: authMode === 'magiclink' ? 'var(--accent-forest, #10b981)' : 'transparent',
+              color: authMode === 'magiclink' ? '#ffffff' : 'var(--text-secondary)',
+              fontWeight: authMode === 'magiclink' ? 700 : 500,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Mail size={14} /> Magic Link / OTP
+          </button>
+        </div>
+
+        {authMode === 'password' ? (
+          <form onSubmit={handlePasswordAuth}>
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Mail size={14} style={{ color: 'var(--accent-forest, #10b981)' }} /> Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.95rem',
+                }}
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 20 }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Lock size={14} style={{ color: 'var(--accent-forest, #10b981)' }} /> Password
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-tertiary)',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  {showPassword ? <><EyeOff size={12} /> Hide</> : <><Eye size={12} /> Show</>}
+                </button>
+              </label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder={isSignUp ? 'Choose a password (min 6 chars)' : 'Enter your password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                style={{
+                  width: '100%',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.95rem',
+                }}
+              />
+            </div>
+
+            {error && (
+              <div style={{ color: 'var(--semantic-expense, #f43f5e)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'rgba(244, 63, 94, 0.1)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(244, 63, 94, 0.3)' }}>
+                {error}
+              </div>
+            )}
+
+            {infoMsg && (
+              <div style={{ color: 'var(--semantic-income, #10b981)', fontSize: '0.82rem', marginBottom: 14, textAlign: 'center', background: 'rgba(16, 185, 129, 0.1)', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                {infoMsg}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              disabled={loading}
+              style={{ width: '100%', marginBottom: 14 }}
+            >
+              {loading ? (
+                <Loader2 size={18} className="spinner" />
+              ) : isSignUp ? (
+                <><UserPlus size={16} /> Create Account & Sign In</>
+              ) : (
+                <><KeyRound size={16} /> Sign In with Password</>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); setInfoMsg(''); }}
+              style={{
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                color: 'var(--accent-forest, #10b981)',
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                textAlign: 'center',
+                marginBottom: 20,
+              }}
+            >
+              {isSignUp ? 'Already have an account? Sign in here' : "Don't have an account yet? Create one here"}
+            </button>
+
+            {/* Seamless Android Hint */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                background: 'rgba(16, 185, 129, 0.06)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                marginBottom: 20,
+              }}
+            >
+              <CheckCircle2 size={16} style={{ color: 'var(--accent-forest, #10b981)', flexShrink: 0 }} />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                <strong>Perfect Android Sync</strong>: Use the exact same email & password in the WealthOS Android app to sync immediately!
+              </span>
+            </div>
+
+            <div style={{ position: 'relative', margin: '16px 0', textAlign: 'center' }}>
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'var(--border-subtle)' }} />
+              <span style={{ position: 'relative', background: 'var(--bg-secondary, #131922)', padding: '0 12px', fontSize: '0.72rem', color: 'var(--text-tertiary)', letterSpacing: '0.08em' }}>
+                OR EXPLORE INSTANTLY
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary btn-lg"
+              onClick={loginAsDemo}
+              style={{ width: '100%', marginBottom: 16, borderColor: 'var(--border-default)', color: '#f1f5f9' }}
+            >
+              <Sparkles size={16} style={{ color: 'var(--accent-forest, #10b981)' }} /> Launch Instant Demo Mode
+            </button>
+          </form>
+        ) : step === 'email' ? (
           <>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 22, lineHeight: 1.6 }}>
-              Enter your email to receive a secure 1-click magic sign-in link. No password or OTP typing needed.
+              Enter your email to receive a secure 1-click magic sign-in link. No password typing needed.
             </p>
 
             <div className="form-group" style={{ marginBottom: 20 }}>

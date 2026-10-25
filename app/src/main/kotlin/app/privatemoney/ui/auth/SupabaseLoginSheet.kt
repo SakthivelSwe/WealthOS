@@ -86,7 +86,8 @@ fun SupabaseLoginSheet(
     var email by remember { mutableStateOf(app.authService.currentUserEmail() ?: "") }
     var verificationInput by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isPasswordMode by remember { mutableStateOf(false) }
+    var isPasswordMode by remember { mutableStateOf(true) }
+    var isSignUp by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var step by remember { mutableStateOf(if (isLoggedIn) "LOGGED_IN" else "EMAIL") }
     var isLoading by remember { mutableStateOf(false) }
@@ -324,15 +325,53 @@ fun SupabaseLoginSheet(
                 }
 
                 "EMAIL" -> {
+                    // Auth Mode Selector Tabs
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E293B))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Button(
+                            onClick = { isPasswordMode = true; errorMessage = null },
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPasswordMode) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (isPasswordMode) Color.White else finance.muted,
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Password Login", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = { isPasswordMode = false; errorMessage = null },
+                            modifier = Modifier.weight(1f).height(38.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!isPasswordMode) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                contentColor = if (!isPasswordMode) Color.White else finance.muted,
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Magic Link / OTP", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
                     Text(
                         text = if (isPasswordMode) {
-                            "Sign in with your email address and password to connect and sync your WealthOS cloud ledger."
+                            if (isSignUp) "Create your WealthOS Cloud account with email and password." else "Enter your email and password to connect and sync your ledger instantly."
                         } else {
-                            "Enter the email ID you used on WealthOS Web. We'll send you an instant sign-in link or 6-digit code to connect and sync your ledger."
+                            "Enter your email to receive a secure sign-in link or 6-digit verification code."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = finance.muted,
-                        lineHeight = 22.sp,
+                        lineHeight = 20.sp,
                     )
 
                     OutlinedTextField(
@@ -352,7 +391,7 @@ fun SupabaseLoginSheet(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("Your Password") },
+                            label = { Text(if (isSignUp) "Choose Password (min 6 chars)" else "Your Password") },
                             placeholder = { Text("••••••••") },
                             singleLine = true,
                             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = finance.muted) },
@@ -371,6 +410,22 @@ fun SupabaseLoginSheet(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading,
                         )
+
+                        GlassCard(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = finance.positive, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "Use this exact same email & password on WealthOS Web to sync balances seamlessly!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = finance.muted,
+                                    lineHeight = 16.sp,
+                                )
+                            }
+                        }
                     }
 
                     if (app.settings.supabaseAnonKey.isBlank()) {
@@ -389,7 +444,7 @@ fun SupabaseLoginSheet(
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(12.dp))
-                            Text(if (isPasswordMode) "Authenticating..." else "Sending sign-in email...", style = MaterialTheme.typography.bodyMedium)
+                            Text(if (isPasswordMode) "Authenticating & synchronizing..." else "Sending sign-in email...", style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
                         Button(
@@ -405,14 +460,22 @@ fun SupabaseLoginSheet(
                                         errorMessage = "Please enter your password."
                                         return@Button
                                     }
+                                    if (isSignUp && password.length < 6) {
+                                        errorMessage = "Password must be at least 6 characters."
+                                        return@Button
+                                    }
                                     isLoading = true
                                     errorMessage = null
                                     scope.launch(Dispatchers.IO) {
-                                        val res = app.authService.signInWithPassword(cleanEmail, password)
+                                        val res = if (isSignUp) {
+                                            app.authService.signUpWithPassword(cleanEmail, password)
+                                        } else {
+                                            app.authService.signInWithPassword(cleanEmail, password)
+                                        }
                                         if (res.isFailure) {
                                             withContext(Dispatchers.Main) {
                                                 isLoading = false
-                                                errorMessage = res.exceptionOrNull()?.message ?: "Invalid email or password"
+                                                errorMessage = res.exceptionOrNull()?.message ?: "Authentication failed"
                                             }
                                             return@launch
                                         }
@@ -420,7 +483,7 @@ fun SupabaseLoginSheet(
                                         withContext(Dispatchers.Main) {
                                             isLoading = false
                                             step = "LOGGED_IN"
-                                            successMessage = "Successfully connected as $cleanEmail! Pulled ${syncRes.accountsPulled} accounts."
+                                            successMessage = "Successfully connected as $cleanEmail! Pulled ${syncRes.accountsPulled} accounts from Web."
                                             onLoginSuccess(cleanEmail)
                                             Toast.makeText(context, "Account verified & synchronized!", Toast.LENGTH_LONG).show()
                                         }
@@ -450,20 +513,26 @@ fun SupabaseLoginSheet(
                             enabled = email.isNotBlank(),
                         ) {
                             Text(
-                                text = if (isPasswordMode) "Sign In with Password & Sync" else "Send Sign-in Link / Code",
+                                text = if (isPasswordMode) {
+                                    if (isSignUp) "Create Account & Sync" else "Sign In with Password & Sync"
+                                } else {
+                                    "Send Sign-in Link / Code"
+                                },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
                             )
                         }
 
-                        TextButton(
-                            onClick = {
-                                isPasswordMode = !isPasswordMode
-                                errorMessage = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(if (isPasswordMode) "← Switch back to Email Sign-In Link" else "Or Sign In with Password")
+                        if (isPasswordMode) {
+                            TextButton(
+                                onClick = {
+                                    isSignUp = !isSignUp
+                                    errorMessage = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(if (isSignUp) "Already have an account? Sign in here" else "New user? Create a cloud account")
+                            }
                         }
                     }
                 }
