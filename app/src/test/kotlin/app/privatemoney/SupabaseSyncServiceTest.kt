@@ -108,4 +108,121 @@ class SupabaseSyncServiceTest {
         }
         assertEquals("Journal entries must sum to exactly zero", 0L, sum)
     }
+
+    @Test
+    fun testSalaryCycleSchemaMapping() {
+        val cycle = app.privatemoney.data.local.SalaryCycleEntity(
+            id = "cycle_2026_10",
+            userId = "user_456",
+            cycleStartDate = "2026-10-05",
+            salaryPaise = 3220000L,
+            baselinePaise = 1771000L,
+            emiPaise = 500000L,
+            framework = "SIX_JAR",
+            jarAmountsJson = """{"NEEDS":2271000,"FREEDOM_SIP":322000,"EDUCATION":322000,"PLAY":0,"LONG_TERM":144000,"GIVING":161000}""",
+            daysInCycle = 30,
+            dailySafeUpiPaise = 0L,
+            netWorthSnapshotPaise = 5000000L,
+            checklistStateJson = """{"salaryAllocated":true}""",
+        )
+
+        val cycleJson = JSONObject().apply {
+            put("id", cycle.id)
+            put("user_id", cycle.userId)
+            put("cycle_start_date", cycle.cycleStartDate)
+            put("salary_paise", cycle.salaryPaise)
+            put("baseline_paise", cycle.baselinePaise)
+            put("emi_paise", cycle.emiPaise)
+            put("framework", cycle.framework)
+            put("jar_amounts", JSONObject(cycle.jarAmountsJson))
+            put("days_in_cycle", cycle.daysInCycle)
+            put("daily_safe_upi_paise", cycle.dailySafeUpiPaise)
+            put("net_worth_snapshot_paise", cycle.netWorthSnapshotPaise)
+        }
+
+        assertEquals("cycle_2026_10", cycleJson.getString("id"))
+        assertEquals(3220000L, cycleJson.getLong("salary_paise"))
+        assertEquals(1771000L, cycleJson.getLong("baseline_paise"))
+        assertEquals(500000L, cycleJson.getLong("emi_paise"))
+        assertEquals("SIX_JAR", cycleJson.getString("framework"))
+        assertEquals(30, cycleJson.getInt("days_in_cycle"))
+        assertEquals(0L, cycleJson.getLong("daily_safe_upi_paise"))
+        assertEquals(5000000L, cycleJson.getLong("net_worth_snapshot_paise"))
+        assertEquals(2271000L, cycleJson.getJSONObject("jar_amounts").getLong("NEEDS"))
+    }
+
+    @Test
+    fun testTransactionPhase3FieldsMapping() {
+        val txn = app.privatemoney.data.local.TxnEntity(
+            id = "txn_upi_001",
+            type = "EXPENSE",
+            amountMinor = 45000L,
+            currency = "INR",
+            localDate = "2026-10-06",
+            localTime = "13:45",
+            accountId = "acc_bank",
+            toAccountId = null,
+            categoryId = "cat_food",
+            merchant = "SWIGGY",
+            description = "Swiggy order",
+            notes = null,
+            paymentMethod = "UPI",
+            needWant = "WANT",
+            imported = true,
+            source = "CSV_IMPORT",
+            createdAt = 1728200000000L,
+            updatedAt = 1728200000000L,
+            deletedAt = null,
+            jarBucket = "PLAY",
+            spendEmotionTag = "PLANNED_WANT",
+            paymentRail = "UPI_P2M",
+            rrn = "327918291048",
+            counterpartyName = "SWIGGY",
+            vpa = "swiggy@hdfcbank",
+            importBatchId = "batch_001",
+            userOverridden = false,
+            isRecurringMandate = false,
+        )
+
+        assertEquals("PLAY", txn.jarBucket)
+        assertEquals("PLANNED_WANT", txn.spendEmotionTag)
+        assertEquals("UPI_P2M", txn.paymentRail)
+        assertEquals("327918291048", txn.rrn)
+        assertEquals("SWIGGY", txn.counterpartyName)
+        assertEquals("swiggy@hdfcbank", txn.vpa)
+        assertEquals("batch_001", txn.importBatchId)
+        assertFalse(txn.userOverridden)
+        assertFalse(txn.isRecurringMandate)
+    }
+
+    @Test
+    fun testAccountPhase3ExtensionsMapping() {
+        val acc = app.privatemoney.data.local.AccountEntity(
+            id = "acc_loan_001",
+            name = "HDFC Personal Loan",
+            type = "LOAN",
+            institution = "HDFC Bank",
+            lastFour = "4321",
+            openingBalanceMinor = -50000000L,
+            currency = "INR",
+            includeInNetWorth = true,
+            includeInStats = false,
+            archived = false,
+            createdAt = 1728000000000L,
+            updatedAt = 1728000000000L,
+            accountRole = "LIABILITY_LOAN",
+            bankName = "HDFC Bank",
+            interestRatePercentBps = 1250, // 12.5%
+            monthlyEmiPaise = 500000L, // ₹5,000
+            outstandingPaise = 50000000L,
+            isBnpl = false,
+        )
+
+        assertEquals("LIABILITY_LOAN", acc.accountRole)
+        assertEquals("HDFC Bank", acc.bankName)
+        assertEquals(1250, acc.interestRatePercentBps)
+        assertEquals(500000L, acc.monthlyEmiPaise)
+        assertEquals(50000000L, acc.outstandingPaise)
+        assertFalse(acc.isBnpl)
+    }
 }

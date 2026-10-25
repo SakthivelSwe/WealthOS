@@ -1,9 +1,18 @@
 /**
  * WealthOS Bank Statement Parser & Reconciliation Engine
- * Supports Axis Bank, HDFC, SBI, ICICI, and generic Indian bank CSV/text statements.
+ * Conforms to WEALTHOS_FINAL_SPEC.md v3 §6.
+ * Zero float. Supports Axis Bank, HDFC, SBI, ICICI, and generic Indian bank CSV/text statements.
  */
 
+import { parseMoney as parseMoneyInteger } from './money';
+import { readCsv } from './csvReader';
+import { discoverMapping, parseStatementDate, type ColumnMapping } from './columnMapper';
+import { decodeNarration, type PaymentRail } from './narrationDecoder';
+import { classifyTransaction, type SpendEmotionTag } from './classifier';
+import { computeDedupKey } from './duplicateDetector';
 import type { Transaction, TxnType, NeedWant } from '../types';
+
+export { parseStatementDate, type ColumnMapping };
 
 export interface ParsedStatementRow {
   id: string;
@@ -19,10 +28,16 @@ export interface ParsedStatementRow {
   balanceMinor: number | null;
   suggestedCategoryId: string | null;
   needWant: NeedWant | null;
+  jarBucket?: string;
+  emotionTag?: SpendEmotionTag;
+  paymentRail?: PaymentRail;
+  isRecurringMandate?: boolean;
   isDuplicate: boolean;
   duplicateReason?: string;
   isSelfTransfer: boolean;
   selected: boolean;
+  formatName?: string;
+  importBatchId?: string;
 }
 
 export interface StatementParseResult {
@@ -37,197 +52,55 @@ export interface StatementParseResult {
   hasReconciliation: boolean;
   duplicateCount: number;
   headers: string[];
+  smallScansTotalMinor?: number;
+  smallScansCount?: number;
+  detectedMandatesCount?: number;
+  mapping?: ColumnMapping | null;
+  detectedFormatName?: string;
+  mandates?: Array<{ name: string; amountMinor: number; count: number }>;
+  smallScansByMerchant?: Array<{ name: string; amountMinor: number; count: number }>;
+  importBatchId?: string;
 }
 
 /** Parse an Indian or international monetary string into integer minor units (paise/cents). */
 export function parseStatementAmount(raw: string | number | null | undefined): number {
-  if (raw === null || raw === undefined) return 0;
-  let str = String(raw).trim();
-  if (!str || str === '-' || str === '—') return 0;
-
-  // Handle trailing Dr/Cr or (parentheses)
-  const isNegative = str.startsWith('(') && str.endsWith(')') || str.endsWith('Dr') || str.endsWith('DR');
-  str = str.replace(/[^\d.-]/g, '');
-  if (!str) return 0;
-
-  const num = parseFloat(str);
-  if (isNaN(num)) return 0;
-  const minor = Math.round(Math.abs(num) * 100);
-  return isNegative ? -minor : minor;
+  return parseMoneyInteger(raw, 2);
 }
 
-/** Parse various date formats: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, DD-MMM-YYYY */
-export function parseStatementDate(raw: string): string | null {
-  if (!raw) return null;
-  const s = raw.trim();
-
-  // YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-
-  // DD/MM/YYYY or DD-MM-YYYY
-  const dmyMatch = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-  if (dmyMatch) {
-    const day = dmyMatch[1].padStart(2, '0');
-    const month = dmyMatch[2].padStart(2, '0');
-    const year = dmyMatch[3];
-    return `${year}-${month}-${day}`;
-  }
-
-  // DD-MMM-YYYY e.g. 05-Oct-2026 or 05 Oct 2026
-  const monthNames: Record<string, string> = {
-    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
-  };
-  const mmmMatch = s.match(/^(\d{1,2})[- ]([a-zA-Z]{3})[- ](\d{4})$/);
-  if (mmmMatch) {
-    const day = mmmMatch[1].padStart(2, '0');
-    const mStr = mmmMatch[2].toLowerCase();
-    const month = monthNames[mStr];
-    const year = mmmMatch[3];
-    if (month) return `${year}-${month}-${day}`;
-  }
-
-  return null;
+/** Legacy splitCsvLine helper for tests, backed by RFC 4180 parser */
+export function splitCsvLine(line: string, delimiter = ','): string[] {
+  const rows = readCsv(line, delimiter);
+  return rows[0] || [];
 }
 
 /** Extract merchant name, UPI ID, or reference number from common Indian bank narrations */
-export function cleanNarration(rawNarration: string): { merchant: string | null; reference: string | null; isSelfTransfer: boolean } {
-  let narration = rawNarration.trim();
-  let merchant: string | null = null;
-  let reference: string | null = null;
-  let isSelfTransfer = false;
-
-  const lower = narration.toLowerCase();
-
-  // Self transfer detection
-  if (
-    lower.includes('self transfer') ||
-    lower.includes('own a/c') ||
-    lower.includes('own account') ||
-    lower.includes('to own') ||
-    lower.includes('to self')
-  ) {
-    isSelfTransfer = true;
-  }
-
-  // UPI pattern: UPI/REV/123... or UPI/P2A/123.../Merchant/...
-  if (narration.toUpperCase().startsWith('UPI')) {
-    const parts = narration.split('/');
-    if (parts.length >= 4) {
-      reference = parts[2]?.trim() || null;
-      merchant = parts[3]?.trim() || null;
-    } else if (parts.length >= 3) {
-      merchant = parts[2]?.trim() || null;
-    }
-  }
-
-  // NEFT / IMPS pattern: NEFT/CMS... or IMPS/P2A/...
-  if (!reference) {
-    const refMatch = narration.match(/(?:UTR|CMS|REF|TXN|IMPS|NEFT)[\s/:-]*([A-Za-z0-9]{8,24})/i);
-    if (refMatch) reference = refMatch[1];
-  }
-
-  // Fallback merchant extraction
-  if (!merchant) {
-    const cleaned = narration
-      .replace(/^UPI\/[A-Z0-9]+\/[A-Z0-9]+\//i, '')
-      .replace(/^POS\s+\d+\s+/i, '')
-      .replace(/^ATM\s+WDL\s+/i, '')
-      .replace(/^ACH\s+D\s+/i, '')
-      .trim();
-    if (cleaned.length > 2 && cleaned.length < 40) {
-      merchant = cleaned;
-    }
-  }
-
-  return { merchant, reference, isSelfTransfer };
+export function cleanNarration(rawNarration: string): {
+  merchant: string | null;
+  reference: string | null;
+  isSelfTransfer: boolean;
+} {
+  const decoded = decodeNarration(rawNarration);
+  return {
+    merchant: decoded.cleanMerchantOrPayee,
+    reference: decoded.referenceOrRrn,
+    isSelfTransfer: decoded.isSelfTransfer,
+  };
 }
 
 /** Auto-suggest a WealthOS category and need/want classification based on narration */
-export function suggestCategory(narration: string, type: TxnType): { categoryId: string | null; needWant: NeedWant | null } {
-  const text = narration.toLowerCase();
-
-  if (type === 'INCOME') {
-    if (text.includes('salary') || text.includes('payroll') || text.includes('cms') || text.includes('wages')) {
-      return { categoryId: 'cat_income_0', needWant: null };
-    }
-    if (text.includes('interest') || text.includes('int.pd') || text.includes('dividend')) {
-      return { categoryId: 'cat_income_1', needWant: null };
-    }
-    if (text.includes('refund') || text.includes('cashback')) {
-      return { categoryId: 'cat_income_2', needWant: null };
-    }
-    return { categoryId: 'cat_income_0', needWant: null };
-  }
-
-  // EXPENSE classifications
-  if (text.includes('rent') || text.includes('house') || text.includes('pg') || text.includes('maintenance')) {
-    return { categoryId: 'cat_housing', needWant: 'NEED' };
-  }
-  if (text.includes('swiggy') || text.includes('zomato') || text.includes('restaurant') || text.includes('cafe') || text.includes('starbucks')) {
-    return { categoryId: 'cat_dining', needWant: 'WANT' };
-  }
-  if (text.includes('grocer') || text.includes('supermarket') || text.includes('zepto') || text.includes('blinkit') || text.includes('bigbasket') || text.includes('dmart')) {
-    return { categoryId: 'cat_groceries', needWant: 'NEED' };
-  }
-  if (text.includes('petrol') || text.includes('fuel') || text.includes('hpcl') || text.includes('bpcl') || text.includes('iocl') || text.includes('uber') || text.includes('ola')) {
-    return { categoryId: 'cat_transport', needWant: 'NEED' };
-  }
-  if (text.includes('bescom') || text.includes('tneb') || text.includes('electricity') || text.includes('airtel') || text.includes('jio') || text.includes('broadband') || text.includes('wifi')) {
-    return { categoryId: 'cat_utilities', needWant: 'NEED' };
-  }
-  if (text.includes('emi') || text.includes('loan') || text.includes('hdfc loan') || text.includes('sbi loan') || text.includes('bajaj')) {
-    return { categoryId: 'cat_debt', needWant: 'NEED' };
-  }
-  if (text.includes('chit') || text.includes('ksfe') || text.includes('shriram')) {
-    return { categoryId: 'cat_savings', needWant: 'NEED' };
-  }
-  if (text.includes('apollo') || text.includes('pharmacy') || text.includes('hospital') || text.includes('clinic') || text.includes('medplus')) {
-    return { categoryId: 'cat_health', needWant: 'NEED' };
-  }
-  if (text.includes('amazon') || text.includes('flipkart') || text.includes('myntra') || text.includes('zara')) {
-    return { categoryId: 'cat_shopping', needWant: 'WANT' };
-  }
-  if (text.includes('netflix') || text.includes('prime') || text.includes('hotstar') || text.includes('movie') || text.includes('pvr') || text.includes('inox')) {
-    return { categoryId: 'cat_entertainment', needWant: 'WANT' };
-  }
-
-  return { categoryId: 'cat_general', needWant: 'NEED' };
-}
-
-/** Check if row is a header candidate */
-function isHeaderRow(row: string[]): boolean {
-  const line = row.map(c => c.toLowerCase().trim()).join(' ');
-  return (
-    (line.includes('date') || line.includes('dt')) &&
-    (line.includes('narration') || line.includes('particular') || line.includes('description') || line.includes('detail') || line.includes('remarks'))
-  );
-}
-
-/** Split CSV lines properly accounting for quoted fields */
-export function splitCsvLine(line: string, delimiter = ','): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === delimiter && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current.trim());
-  return result;
+export function suggestCategory(
+  narration: string,
+  type: TxnType
+): { categoryId: string | null; needWant: NeedWant | null } {
+  const isCredit = type === 'INCOME';
+  const res = classifyTransaction(narration, 0, 'NON_UPI', isCredit);
+  const needWant: NeedWant | null = isCredit
+    ? null
+    : (res.emotionTag === 'NEED' ? 'NEED' : 'WANT');
+  return {
+    categoryId: res.categoryId,
+    needWant,
+  };
 }
 
 /**
@@ -237,10 +110,14 @@ export function splitCsvLine(line: string, delimiter = ','): string[] {
 export function parseBankStatement(
   text: string,
   existingTxns: Transaction[] = [],
-  accountId?: string
+  accountId?: string,
+  smallScanThresholdPaise: number = 20000, // ₹200
+  customMapping?: Partial<ColumnMapping>
 ): StatementParseResult {
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-  if (lines.length === 0) {
+  const rawRows = readCsv(text);
+  const importBatchId = 'batch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
+  if (rawRows.length === 0) {
     return {
       rows: [],
       totalCreditsMinor: 0,
@@ -253,60 +130,60 @@ export function parseBankStatement(
       hasReconciliation: false,
       duplicateCount: 0,
       headers: [],
+      smallScansTotalMinor: 0,
+      smallScansCount: 0,
+      detectedMandatesCount: 0,
+      mapping: null,
+      detectedFormatName: 'Unknown',
+      mandates: [],
+      smallScansByMerchant: [],
+      importBatchId,
     };
   }
 
-  // Detect delimiter: comma, tab, or semicolon
-  const firstFew = lines.slice(0, 10).join('\n');
-  const commaCount = (firstFew.match(/,/g) || []).length;
-  const tabCount = (firstFew.match(/\t/g) || []).length;
-  const delimiter = tabCount > commaCount ? '\t' : ',';
+  const discovered = discoverMapping(rawRows);
+  const mapping: ColumnMapping | null = customMapping
+    ? {
+        headerRowIndex: customMapping.headerRowIndex ?? (discovered?.headerRowIndex ?? 0),
+        dateCol: customMapping.dateCol ?? (discovered?.dateCol ?? 0),
+        descriptionCol: customMapping.descriptionCol ?? (discovered?.descriptionCol ?? 1),
+        debitCol: customMapping.debitCol ?? (discovered?.debitCol ?? -1),
+        creditCol: customMapping.creditCol ?? (discovered?.creditCol ?? -1),
+        amountCol: customMapping.amountCol ?? (discovered?.amountCol ?? -1),
+        indicatorCol: customMapping.indicatorCol ?? (discovered?.indicatorCol ?? -1),
+        balanceCol: customMapping.balanceCol ?? (discovered?.balanceCol ?? -1),
+        referenceCol: customMapping.referenceCol ?? (discovered?.referenceCol ?? -1),
+        confidence: customMapping.confidence ?? (discovered?.confidence ?? 'HIGH'),
+      }
+    : discovered;
 
-  const rawRows = lines.map(line => splitCsvLine(line, delimiter));
-
-  // Find header row
-  let headerIndex = -1;
-  let dateCol = -1;
-  let descCol = -1;
-  let refCol = -1;
-  let debitCol = -1;
-  let creditCol = -1;
-  let amountCol = -1;
-  let balanceCol = -1;
-
-  for (let i = 0; i < Math.min(25, rawRows.length); i++) {
-    if (isHeaderRow(rawRows[i])) {
-      headerIndex = i;
-      const headers = rawRows[i].map(h => h.toLowerCase().trim());
-
-      dateCol = headers.findIndex(h => h.includes('date') || h === 'dt');
-      descCol = headers.findIndex(h => h.includes('particular') || h.includes('narration') || h.includes('description') || h.includes('detail') || h.includes('remarks'));
-      refCol = headers.findIndex(h => h.includes('chq') || h.includes('ref') || h.includes('cheque') || h.includes('utr'));
-      debitCol = headers.findIndex(h => h.includes('withdrawal') || h.includes('debit') || h === 'dr');
-      creditCol = headers.findIndex(h => h.includes('deposit') || h.includes('credit') || h === 'cr');
-      amountCol = headers.findIndex(h => h === 'amount' || h.includes('net amount') || h.includes('txn amount'));
-      balanceCol = headers.findIndex(h => h.includes('balance') || h.includes('closing'));
-      break;
-    }
-  }
-
-  if (headerIndex === -1) {
-    // Fallback: assume row 0 has headers
-    headerIndex = 0;
-    dateCol = 0;
-    descCol = 1;
-    amountCol = 2;
-  }
-
+  const headerIndex = mapping?.headerRowIndex ?? 0;
   const headers = rawRows[headerIndex] || [];
-  const parsedRows: ParsedStatementRow[] = [];
-  let runningBalances: number[] = [];
 
-  // Build existing lookup for duplicate detection
-  const existingSet = new Set<string>();
+  const dateCol = mapping?.dateCol ?? 0;
+  const descCol = mapping?.descriptionCol ?? 1;
+  const debitCol = mapping?.debitCol ?? -1;
+  const creditCol = mapping?.creditCol ?? -1;
+  const amountCol = mapping?.amountCol ?? -1;
+  const indicatorCol = mapping?.indicatorCol ?? -1;
+  const balanceCol = mapping?.balanceCol ?? -1;
+  const refCol = mapping?.referenceCol ?? -1;
+
+  const parsedRows: ParsedStatementRow[] = [];
+  const runningBalances: number[] = [];
+
+  // Existing lookup sets
+  const existingRrnSet = new Set<string>();
+  const existingFallbackSet = new Set<string>();
+
   existingTxns.forEach(t => {
     if (accountId && t.account_id !== accountId) return;
-    existingSet.add(`${t.local_date}|${t.amount_minor}|${t.type}`);
+    const rrn = (t as any).rrn || null;
+    if (rrn) {
+      existingRrnSet.add(rrn);
+    }
+    const key = `${t.local_date}|${t.amount_minor}|${t.type}`;
+    existingFallbackSet.add(key);
   });
 
   for (let i = headerIndex + 1; i < rawRows.length; i++) {
@@ -315,27 +192,45 @@ export function parseBankStatement(
 
     const rawDate = cols[dateCol] || '';
     const parsedDate = parseStatementDate(rawDate);
-    if (!parsedDate) continue; // Skip footer or notes lines
+    if (!parsedDate) continue;
 
     const narration = cols[descCol] || '';
-    const rawRef = refCol >= 0 ? cols[refCol] : null;
+    if (!narration.trim()) continue;
 
     let debitMinor = debitCol >= 0 ? parseStatementAmount(cols[debitCol]) : 0;
     let creditMinor = creditCol >= 0 ? parseStatementAmount(cols[creditCol]) : 0;
 
+    // Single amount column logic
     if (debitMinor === 0 && creditMinor === 0 && amountCol >= 0) {
-      const amt = parseStatementAmount(cols[amountCol]);
-      if (amt < 0) debitMinor = Math.abs(amt);
-      else creditMinor = amt;
+      const amtStr = cols[amountCol] || '';
+      const indicatorStr = indicatorCol >= 0 ? (cols[indicatorCol] || '').toUpperCase().trim() : '';
+      const isNegativeByFormat = amtStr.startsWith('-') || (amtStr.startsWith('(') && amtStr.endsWith(')')) || amtStr.endsWith('Dr');
+      const isDebitIndicator = indicatorStr === 'DR' || indicatorStr === 'D' || indicatorStr === 'DEBIT' || indicatorStr === 'W';
+      const isCreditIndicator = indicatorStr === 'CR' || indicatorStr === 'C' || indicatorStr === 'CREDIT' || indicatorStr === 'DEP';
+
+      const amt = parseStatementAmount(amtStr);
+      if (isCreditIndicator) {
+        creditMinor = amt;
+      } else if (isDebitIndicator || isNegativeByFormat || amt < 0) {
+        debitMinor = Math.abs(amt);
+      } else {
+        creditMinor = amt; // default positive to credit
+      }
     }
 
     if (debitMinor === 0 && creditMinor === 0) continue;
 
-    const balanceMinor = balanceCol >= 0 ? parseStatementAmount(cols[balanceCol]) : null;
-    if (balanceMinor !== null) runningBalances.push(balanceMinor);
+    const balanceMinor = balanceCol >= 0 && cols[balanceCol]
+      ? parseStatementAmount(cols[balanceCol])
+      : null;
+    if (balanceMinor !== null) {
+      runningBalances.push(balanceMinor);
+    }
 
-    const { merchant, reference: extractedRef, isSelfTransfer } = cleanNarration(narration);
-    const reference = rawRef || extractedRef;
+    // Decode narration
+    const decoded = decodeNarration(narration);
+    const rawRef = refCol >= 0 && cols[refCol] ? cols[refCol].trim() : null;
+    const reference = rawRef || decoded.referenceOrRrn;
 
     let type: TxnType = 'EXPENSE';
     let amountMinor = debitMinor;
@@ -343,44 +238,101 @@ export function parseBankStatement(
     if (creditMinor > 0) {
       type = 'INCOME';
       amountMinor = creditMinor;
-    } else if (isSelfTransfer) {
+    } else if (decoded.isSelfTransfer) {
       type = 'TRANSFER';
       amountMinor = debitMinor;
     }
 
-    // Duplicate detection
-    const matchKey = `${parsedDate}|${amountMinor}|${type}`;
-    const isDuplicate = existingSet.has(matchKey);
-    const duplicateReason = isDuplicate ? 'Exact match found in ledger on this date' : undefined;
+    // Classify
+    const isCredit = type === 'INCOME';
+    const classification = classifyTransaction(
+      decoded.cleanMerchantOrPayee,
+      amountMinor,
+      decoded.paymentRail,
+      isCredit
+    );
 
-    const { categoryId, needWant } = suggestCategory(narration, type);
+    const needWant: NeedWant | null = isCredit
+      ? null
+      : (classification.emotionTag === 'NEED' ? 'NEED' : 'WANT');
+
+    // Duplicate Detection
+    let isDuplicate = false;
+    let duplicateReason: string | undefined = undefined;
+
+    if (reference && existingRrnSet.has(reference)) {
+      isDuplicate = true;
+      duplicateReason = `Exact RRN/UTR match (${reference}) already recorded in ledger`;
+    } else {
+      const fallbackKey = `${parsedDate}|${amountMinor}|${type}`;
+      if (existingFallbackSet.has(fallbackKey)) {
+        isDuplicate = true;
+        duplicateReason = 'Exact match found in ledger on this date';
+      }
+    }
 
     parsedRows.push({
-      id: `stmt_${i}_${Date.now()}`,
+      id: `stmt_${i}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       date: parsedDate,
       rawDate,
       description: narration,
-      merchant,
+      merchant: decoded.cleanMerchantOrPayee,
       reference,
       debitMinor,
       creditMinor,
       amountMinor,
       type,
       balanceMinor,
-      suggestedCategoryId: categoryId,
+      suggestedCategoryId: classification.categoryId,
       needWant,
+      jarBucket: classification.jarBucket,
+      emotionTag: classification.emotionTag,
+      paymentRail: decoded.paymentRail,
+      isRecurringMandate: decoded.isRecurringMandate || classification.isRecurringMandate,
       isDuplicate,
       duplicateReason,
-      isSelfTransfer,
+      isSelfTransfer: decoded.isSelfTransfer,
       selected: !isDuplicate,
+      formatName: decoded.formatName,
+      importBatchId,
     });
   }
 
   // Summary calculations
-  const totalCreditsMinor = parsedRows.reduce((sum, r) => sum + r.creditMinor, 0);
-  const totalDebitsMinor = parsedRows.reduce((sum, r) => sum + r.debitMinor, 0);
+  const totalCreditsMinor = parsedRows.filter(r => r.type === 'INCOME').reduce((sum, r) => sum + r.amountMinor, 0);
+  const totalDebitsMinor = parsedRows.filter(r => r.type === 'EXPENSE' || r.type === 'TRANSFER').reduce((sum, r) => sum + r.amountMinor, 0);
   const netCashflowMinor = totalCreditsMinor - totalDebitsMinor;
   const duplicateCount = parsedRows.filter(r => r.isDuplicate).length;
+
+  const smallScans = parsedRows.filter(r => r.type === 'EXPENSE' && r.amountMinor <= smallScanThresholdPaise);
+  const smallScansTotalMinor = smallScans.reduce((sum, r) => sum + r.amountMinor, 0);
+  const detectedMandatesCount = parsedRows.filter(r => r.isRecurringMandate).length;
+
+  // Group mandates
+  const mandateMap: Record<string, { amountMinor: number; count: number }> = {};
+  parsedRows.filter(r => r.isRecurringMandate).forEach(r => {
+    const name = (r.merchant || r.description || 'Recurring Mandate').trim();
+    if (!mandateMap[name]) mandateMap[name] = { amountMinor: 0, count: 0 };
+    mandateMap[name].amountMinor += r.amountMinor;
+    mandateMap[name].count++;
+  });
+  const mandates = Object.entries(mandateMap).map(([name, val]) => ({
+    name,
+    amountMinor: val.amountMinor,
+    count: val.count,
+  })).sort((a, b) => b.amountMinor - a.amountMinor);
+
+  // Group small scans by merchant
+  const smallScanMerchantMap: Record<string, { amountMinor: number; count: number }> = {};
+  smallScans.forEach(r => {
+    const name = (r.merchant || r.description || 'Small Scan').trim();
+    if (!smallScanMerchantMap[name]) smallScanMerchantMap[name] = { amountMinor: 0, count: 0 };
+    smallScanMerchantMap[name].amountMinor += r.amountMinor;
+    smallScanMerchantMap[name].count++;
+  });
+  const smallScansByMerchant = Object.entries(smallScanMerchantMap)
+    .map(([name, val]) => ({ name, amountMinor: val.amountMinor, count: val.count }))
+    .sort((a, b) => b.amountMinor - a.amountMinor);
 
   // Mathematical Reconciliation Check
   let openingBalanceMinor: number | null = null;
@@ -389,21 +341,20 @@ export function parseBankStatement(
   let discrepancyMinor: number | null = null;
   let hasReconciliation = false;
 
-  if (runningBalances.length >= 2) {
-    // If chronological (oldest to newest): opening is first row balance minus its net effect
+  if (runningBalances.length >= 2 && parsedRows.length > 0) {
     const firstRow = parsedRows[0];
     const lastRow = parsedRows[parsedRows.length - 1];
 
     if (firstRow.balanceMinor !== null && lastRow.balanceMinor !== null) {
-      // Determine if ascending or descending order
       const isAscending = firstRow.date <= lastRow.date;
 
       if (isAscending) {
-        // First row's previous balance = row.balance - row.credit + row.debit
-        openingBalanceMinor = firstRow.balanceMinor - firstRow.creditMinor + firstRow.debitMinor;
+        const firstEffect = firstRow.type === 'INCOME' ? firstRow.amountMinor : -firstRow.amountMinor;
+        openingBalanceMinor = firstRow.balanceMinor - firstEffect;
         closingBalanceMinor = lastRow.balanceMinor;
       } else {
-        openingBalanceMinor = lastRow.balanceMinor - lastRow.creditMinor + lastRow.debitMinor;
+        const lastEffect = lastRow.type === 'INCOME' ? lastRow.amountMinor : -lastRow.amountMinor;
+        openingBalanceMinor = lastRow.balanceMinor - lastEffect;
         closingBalanceMinor = firstRow.balanceMinor;
       }
 
@@ -412,6 +363,8 @@ export function parseBankStatement(
       hasReconciliation = true;
     }
   }
+
+  const detectedFormatName = parsedRows[0]?.formatName || (discovered ? 'Generic Bank CSV' : 'Custom Mapped CSV');
 
   return {
     rows: parsedRows,
@@ -425,5 +378,13 @@ export function parseBankStatement(
     hasReconciliation,
     duplicateCount,
     headers,
+    smallScansTotalMinor,
+    smallScansCount: smallScans.length,
+    detectedMandatesCount,
+    mapping,
+    detectedFormatName,
+    mandates,
+    smallScansByMerchant,
+    importBatchId,
   };
 }

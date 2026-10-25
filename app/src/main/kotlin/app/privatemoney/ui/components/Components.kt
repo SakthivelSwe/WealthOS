@@ -225,7 +225,18 @@ fun TransactionRow(
         },
     )
     val title = row.merchant?.ifBlank { null } ?: row.description?.ifBlank { null } ?: row.categoryName ?: typeWord
-    val meta = listOfNotNull(row.categoryName ?: typeWord, dateLabel(row.date)).joinToString(" • ")
+    val tagLabel = when (row.spendEmotionTag) {
+        "REGRET_LEAK" -> "💔 Joyless"
+        "PLANNED_WANT" -> "✨ Want"
+        "NEED" -> "🛡️ Need"
+        else -> null
+    }
+    val meta = listOfNotNull(
+        row.categoryName ?: typeWord,
+        row.paymentRail,
+        tagLabel,
+        dateLabel(row.date),
+    ).joinToString(" • ")
     val signed = when (row.type) {
         TransactionType.EXPENSE -> -row.amountMinor
         else -> row.amountMinor

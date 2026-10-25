@@ -1,0 +1,31 @@
+{
+  "description": "Appendix A.3 SIP Milestone Golden Values from WEALTHOS_FINAL_SPEC.md v3",
+  "startSipPaise": 1000000,
+  "stepUpPct": 10,
+  "milestones": [
+    {
+      "name": "₹10L",
+      "targetPaise": 100000000,
+      "expectedMonths12Pct": 61,
+      "marginOfSafetyMonths8Pct": 65
+    },
+    {
+      "name": "₹50L",
+      "targetPaise": 500000000,
+      "expectedMonths12Pct": 144,
+      "marginOfSafetyMonths8Pct": 162
+    },
+    {
+      "name": "₹1Cr",
+      "targetPaise": 1000000000,
+      "expectedMonths12Pct": 190,
+      "marginOfSafetyMonths8Pct": 216
+    },
+    {
+      "name": "₹1.5Cr",
+      "targetPaise": 1500000000,
+      "expectedMonths12Pct": 219,
+      "marginOfSafetyMonths8Pct": 251
+    }
+  ]
+}

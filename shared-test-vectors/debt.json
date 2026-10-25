@@ -1,0 +1,38 @@
+{
+  "description": "Appendix A.4 Debt Payoff Golden Values from WEALTHOS_FINAL_SPEC.md v3",
+  "loans": [
+    {
+      "name": "Card",
+      "balancePaise": 6000000,
+      "annualRateBps": 3600,
+      "minimumPaymentPaise": 300000
+    },
+    {
+      "name": "Personal",
+      "balancePaise": 2000000,
+      "annualRateBps": 1800,
+      "minimumPaymentPaise": 150000
+    },
+    {
+      "name": "Vehicle",
+      "balancePaise": 12000000,
+      "annualRateBps": 1400,
+      "minimumPaymentPaise": 400000
+    }
+  ],
+  "extraPaymentPaise": 200000,
+  "snowball": {
+    "targetOrder": ["Personal", "Card", "Vehicle"],
+    "months": 24,
+    "totalInterestPaise": 4165614
+  },
+  "avalanche": {
+    "targetOrder": ["Card", "Personal", "Vehicle"],
+    "months": 23,
+    "totalInterestPaise": 3970646
+  },
+  "avalancheSavings": {
+    "interestSavedPaise": 194968,
+    "monthsSaved": 1
+  }
+}

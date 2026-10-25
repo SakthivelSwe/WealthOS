@@ -1,11 +1,29 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
-import type { Account, Transaction, JournalEntry, Goal, Debt, ChitFund, RecurringTransaction, Category, UserSettings, AppNotification, Budget } from '../types';
+import type {
+  Account,
+  Transaction,
+  JournalEntry,
+  Goal,
+  Debt,
+  ChitFund,
+  RecurringTransaction,
+  Category,
+  UserSettings,
+  AppNotification,
+  Budget,
+  SalaryCycle,
+  UserFinancialProfile,
+  SinkingFund,
+  MerchantRule,
+  Mandate,
+} from '../types';
 import { DEFAULT_CATEGORIES as SEED_CATEGORIES, sanitizeCategories } from '../types';
 import { getSampleSeedData } from '../lib/mockData';
+import { isWithinPaydayWindow, type CycleDefinition } from '../lib/cycle';
 
-/** Structured result returned by importAllData \u2014 F-03 fix: never return success:true when cloud writes failed. */
+/** Structured result returned by importAllData — F-03 fix: never return success:true when cloud writes failed. */
 export interface ImportResult {
   success: boolean;
   /** True when local import succeeded but some or all cloud writes failed. */
@@ -25,7 +43,18 @@ export interface ImportResult {
     recurring: number;
     budgets: number;
     settings: boolean;
+    salaryCycles?: number;
+    financialProfile?: boolean;
+    sinkingFunds?: number;
+    mandates?: number;
+    merchantRules?: number;
   };
+}
+
+export interface DailyUpiMeter {
+  guiltFreePaise: number;
+  needsAllowancePaise: number;
+  totalPaise: number;
 }
 
 interface DataContextType {
@@ -40,6 +69,16 @@ interface DataContextType {
   budgets: Budget[];
   settings: UserSettings | null;
   notifications: AppNotification[];
+  salaryCycles: SalaryCycle[];
+  activeCycle: SalaryCycle | null;
+  financialProfile: UserFinancialProfile | null;
+  sinkingFunds: SinkingFund[];
+  mandates: Mandate[];
+  merchantRules: MerchantRule[];
+  dailyUpiMeter: DailyUpiMeter;
+  isSurvivalMode: boolean;
+  survivalDailyCapPaise: number | null;
+  isSalaryWindowActive: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
   // CRUD operations
@@ -61,6 +100,17 @@ interface DataContextType {
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
   importAllData: (data: any) => Promise<ImportResult>;
+  // Phase 4 additions (§4.1 - §4.7, §5.4 - §5.5)
+  addSalaryCycle: (cycle: Omit<SalaryCycle, 'user_id'>) => Promise<void>;
+  updateFinancialProfile: (updates: Partial<UserFinancialProfile>) => Promise<void>;
+  addSinkingFund: (fund: Omit<SinkingFund, 'user_id'>) => Promise<void>;
+  updateSinkingFund: (id: string, updates: Partial<SinkingFund>) => Promise<void>;
+  deleteSinkingFund: (id: string) => Promise<void>;
+  addMandate: (mandate: Omit<Mandate, 'user_id'>) => Promise<void>;
+  updateMandate: (id: string, updates: Partial<Mandate>) => Promise<void>;
+  deleteMandate: (id: string) => Promise<void>;
+  addMerchantRule: (rule: Omit<MerchantRule, 'user_id'>) => Promise<void>;
+  deleteMerchantRule: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -99,7 +149,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [salaryCycles, setSalaryCycles] = useState<SalaryCycle[]>([]);
+  const [financialProfile, setFinancialProfile] = useState<UserFinancialProfile | null>(null);
+  const [sinkingFunds, setSinkingFunds] = useState<SinkingFund[]>([]);
+  const [mandates, setMandates] = useState<Mandate[]>([]);
+  const [merchantRules, setMerchantRules] = useState<MerchantRule[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const defaultFinancialProfile: UserFinancialProfile = useMemo(() => ({
+    user_id: userId,
+    income_schedule_type: 'VARIABLE_WINDOW',
+    payday_window_start_day: 2,
+    payday_window_end_day: 5,
+    expected_salary_min_paise: null,
+    expected_salary_max_paise: null,
+    fixed_baseline_paise: null,
+    baseline_method: 'ESTIMATE_55_PERCENT',
+    lifestyle_creep_lock: true,
+    needs_buffer_paise: 150000,
+    allocation_framework: 'SIX_JAR',
+    custom_bps: null,
+    play_to_long_term_shift: false,
+    upi_needs_allowance_paise: 0,
+    emergency_target_months: 7,
+    survival_threshold_paise: null,
+    small_scan_threshold_paise: 20000,
+    ego_check_threshold_paise: 200000,
+    cooldown_hours: 48,
+    currency: 'INR',
+    locale: 'en-IN',
+    timezone: 'Asia/Kolkata',
+    language: 'en',
+    updated_at: Date.now(),
+  }), [userId]);
 
   const fetchAll = useCallback(async () => {
     if (!userId) return;
@@ -138,6 +220,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const sanitizedSeed = sanitizeCategories(defaultCategories);
         setCategories(sanitizedSeed);
         setSettings(defaultSettings);
+        setFinancialProfile(defaultFinancialProfile);
 
         setLocal('accounts', sample.accounts);
         setLocal('transactions', sample.transactions);
@@ -149,6 +232,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setLocal('notifications', sample.notifications);
         setLocal('categories', sanitizedSeed);
         setLocal('settings', defaultSettings);
+        setLocal('financialProfile', defaultFinancialProfile);
       } else {
         setAccounts(cachedAccounts);
         const cachedTxns = getLocal<Transaction[]>('transactions', []);
@@ -172,6 +256,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setLocal('categories', cachedCats);
         setSettings(getLocal('settings', null));
         setNotifications(getLocal('notifications', []));
+        setSalaryCycles(getLocal('salaryCycles', []));
+        setFinancialProfile(getLocal('financialProfile', defaultFinancialProfile));
+        setSinkingFunds(getLocal('sinkingFunds', []));
+        setMandates(getLocal('mandates', []));
+        setMerchantRules(getLocal('merchantRules', []));
       }
       setLoading(false);
       return;
@@ -180,7 +269,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // REAL USER PATH: load from cloud, or start completely clean starting today
     let supabaseLoaded = false;
     try {
-      const [accts, txns, entries, cats, gls, dts, chts, recs, bdgs, sttgs, notifs] = await Promise.allSettled([
+      const [
+        accts, txns, entries, cats, gls, dts, chts, recs, bdgs, sttgs, notifs,
+        cycles, profile, funds, mnds, rules
+      ] = await Promise.allSettled([
         supabase.from('user_accounts').select('*').eq('user_id', userId).eq('archived', false).order('name'),
         supabase.from('user_transactions').select('*').eq('user_id', userId).is('deleted_at', null).order('local_date', { ascending: false }).limit(500),
         supabase.from('user_journal_entries').select('*').eq('user_id', userId),
@@ -192,6 +284,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         supabase.from('user_budgets').select('*').eq('user_id', userId).eq('active', true),
         supabase.from('user_settings').select('*').eq('user_id', userId).single(),
         supabase.from('user_notifications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('salary_cycles').select('*').eq('user_id', userId).order('cycle_start_date', { ascending: false }),
+        supabase.from('user_financial_profiles').select('*').eq('user_id', userId).single(),
+        supabase.from('sinking_funds').select('*').eq('user_id', userId).eq('archived', false).order('created_at', { ascending: false }),
+        supabase.from('mandates').select('*').eq('user_id', userId).eq('active', true).order('next_deduction_date'),
+        supabase.from('merchant_rules').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
       ]);
 
       if (accts.status === 'fulfilled' && accts.value.data) {
@@ -251,6 +348,26 @@ export function DataProvider({ children }: { children: ReactNode }) {
           supabase.from('user_categories').delete().eq('id', 'cat_salary').eq('user_id', userId).then(() => {}, () => {});
         }
       }
+      if (cycles.status === 'fulfilled' && cycles.value.data) {
+        setSalaryCycles(cycles.value.data);
+        setLocal('salaryCycles', cycles.value.data);
+      }
+      if (profile.status === 'fulfilled' && profile.value.data) {
+        setFinancialProfile(profile.value.data);
+        setLocal('financialProfile', profile.value.data);
+      }
+      if (funds.status === 'fulfilled' && funds.value.data) {
+        setSinkingFunds(funds.value.data);
+        setLocal('sinkingFunds', funds.value.data);
+      }
+      if (mnds.status === 'fulfilled' && mnds.value.data) {
+        setMandates(mnds.value.data);
+        setLocal('mandates', mnds.value.data);
+      }
+      if (rules.status === 'fulfilled' && rules.value.data) {
+        setMerchantRules(rules.value.data);
+        setLocal('merchantRules', rules.value.data);
+      }
     } catch (err) {
       console.warn('Supabase fetch notice, falling back to local storage:', err);
     }
@@ -309,8 +426,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setLocal('categories', cachedCats);
       setSettings(getLocal('settings', defaultSettings));
       setNotifications(getLocal('notifications', [welcomeNotification]));
+      setSalaryCycles(getLocal('salaryCycles', []));
+      setFinancialProfile(getLocal('financialProfile', defaultFinancialProfile));
+      setSinkingFunds(getLocal('sinkingFunds', []));
+      setMandates(getLocal('mandates', []));
+      setMerchantRules(getLocal('merchantRules', []));
     } else {
-      // Supabase is active: Ensure default categories, settings, and welcome notification if new
+      // Supabase is active: Ensure default categories, settings, profile and welcome notification if new
       setCategories(prev => {
         const sanitized = sanitizeCategories(prev);
         if (sanitized.length === 0) {
@@ -330,6 +452,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
         return prev;
       });
+      setFinancialProfile(prev => {
+        if (!prev) {
+          setLocal('financialProfile', defaultFinancialProfile);
+          supabase.from('user_financial_profiles').upsert(defaultFinancialProfile).then(() => {}, () => {});
+          return defaultFinancialProfile;
+        }
+        return prev;
+      });
       setNotifications(prev => {
         if (prev.length === 0) {
           setLocal('notifications', [welcomeNotification]);
@@ -340,7 +470,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
 
     setLoading(false);
-  }, [userId, isDemo, user, getLocal, setLocal]);
+  }, [userId, isDemo, user, defaultFinancialProfile, getLocal, setLocal]);
 
   // Subscribe to real-time changes
   useEffect(() => {
@@ -354,6 +484,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_goals', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_debts', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_settings', filter: `user_id=eq.${userId}` }, () => fetchAll())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'salary_cycles', filter: `user_id=eq.${userId}` }, () => fetchAll())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_financial_profiles', filter: `user_id=eq.${userId}` }, () => fetchAll())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sinking_funds', filter: `user_id=eq.${userId}` }, () => fetchAll())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'mandates', filter: `user_id=eq.${userId}` }, () => fetchAll())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'merchant_rules', filter: `user_id=eq.${userId}` }, () => fetchAll())
         .subscribe((status) => {
           console.log('[Supabase Realtime] Channel status:', status);
         });
@@ -380,7 +515,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Saved to local storage, cloud sync pending:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const updateAccount = useCallback(async (id: string, updates: Partial<Account>) => {
     setAccounts(prev => {
@@ -396,7 +531,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Updated in local storage, cloud sync pending:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const deleteAccount = useCallback(async (id: string) => {
     setAccounts(prev => {
@@ -412,7 +547,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Deleted locally, cloud sync pending:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const addTransaction = useCallback(async (txn: Omit<Transaction, 'user_id'>, entries: Omit<JournalEntry, 'user_id'>[]) => {
     const newTxn: Transaction = { ...txn, user_id: userId };
@@ -445,7 +580,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Transaction stored locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>, entries?: Omit<JournalEntry, 'user_id'>[]) => {
     setTransactions(prev => {
@@ -454,58 +589,47 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return updated;
     });
 
-    if (entries && entries.length > 0) {
+    if (entries !== undefined) {
+      const newEntries: JournalEntry[] = entries.map(e => ({ ...e, user_id: userId, txn_id: id }));
       setJournalEntries(prev => {
-        const filtered = prev.filter(je => je.txn_id !== id);
-        const updated = [...filtered, ...entries.map(e => ({ ...e, user_id: userId }))];
+        const withoutOld = prev.filter(je => je.txn_id !== id);
+        const updated = [...withoutOld, ...newEntries];
         setLocal('journalEntries', updated);
         return updated;
       });
     }
 
     try {
-      const { error } = await supabase.from('user_transactions').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
-      if (error) {
-        console.warn('Supabase update transaction error:', error.message);
+      const { error: txnErr } = await supabase.from('user_transactions').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (txnErr) {
+        console.warn('Supabase update transaction error:', txnErr.message);
       }
-      if (entries && entries.length > 0) {
-        // F-06 fix: Attempt atomic RPC replacement first (defined in 20261023000000_financial_integrity.sql)
-        const journalPayload = entries.map(e => ({
-          account_id: e.account_id || '',
-          category_id: e.category_id || '',
-          amount_minor: e.amount_minor,
-        }));
+
+      if (entries !== undefined) {
+        const newEntries: JournalEntry[] = entries.map(e => ({ ...e, user_id: userId, txn_id: id }));
         const { error: rpcErr } = await supabase.rpc('replace_journal_entries', {
           p_user_id: userId,
           p_txn_id: id,
-          p_entries: journalPayload,
+          p_entries: newEntries,
         });
 
         if (rpcErr) {
-          // If RPC is unavailable or failed, fallback to safe delete-verify-insert
-          console.warn('replace_journal_entries RPC unavailable, using verified fallback:', rpcErr.message);
+          console.warn('replace_journal_entries RPC failed, falling back to delete+insert:', rpcErr.message);
           const { error: delErr } = await supabase.from('user_journal_entries').delete().eq('txn_id', id).eq('user_id', userId);
           if (delErr) {
             console.warn('Supabase delete old journal entries error:', delErr.message);
-            return;
-          }
-          const { error: insErr } = await supabase.from('user_journal_entries').insert(entries.map(e => ({ ...e, user_id: userId })));
-          if (insErr) {
-            console.error('CRITICAL: Journal entry insert failed after delete for txn', id, ':', insErr.message);
-            console.warn('Re-fetching journal entries from cloud to recover consistent state...');
-            supabase.from('user_journal_entries').select('*').eq('user_id', userId).then(({ data }) => {
-              if (data) {
-                setJournalEntries(data);
-                setLocal('journalEntries', data);
-              }
-            });
+          } else if (newEntries.length > 0) {
+            const { error: insErr } = await supabase.from('user_journal_entries').insert(newEntries);
+            if (insErr) {
+              console.warn('Supabase insert replacement journal entries error:', insErr.message);
+            }
           }
         }
       }
     } catch (e) {
       console.warn('Transaction updated locally, cloud sync pending:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const deleteTransaction = useCallback(async (id: string) => {
     setTransactions(prev => {
@@ -530,7 +654,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Transaction deleted locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const addGoal = useCallback(async (goal: Omit<Goal, 'user_id'>) => {
     const newGoal: Goal = { ...goal, user_id: userId };
@@ -545,7 +669,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Goal saved locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const updateGoal = useCallback(async (id: string, updates: Partial<Goal>) => {
     setGoals(prev => {
@@ -559,7 +683,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Goal updated locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const addDebt = useCallback(async (debt: Omit<Debt, 'user_id'>) => {
     const newDebt: Debt = { ...debt, user_id: userId };
@@ -574,7 +698,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Debt saved locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const updateDebt = useCallback(async (id: string, updates: Partial<Debt>) => {
     setDebts(prev => {
@@ -588,7 +712,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Debt updated locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const addChitFund = useCallback(async (chit: Omit<ChitFund, 'user_id'>) => {
     const newChit: ChitFund = { ...chit, user_id: userId };
@@ -603,7 +727,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Chit fund saved locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const addRecurring = useCallback(async (rec: Omit<RecurringTransaction, 'user_id'>) => {
     const newRec: RecurringTransaction = { ...rec, user_id: userId };
@@ -618,7 +742,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Recurring txn saved locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const addBudget = useCallback(async (budget: Omit<Budget, 'user_id'>) => {
     const newBudget: Budget = { ...budget, user_id: userId };
@@ -633,7 +757,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Budget saved locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const updateCategoryBudget = useCallback(async (categoryId: string, limitMinor: number | null) => {
     const savedBudgets = getLocal<Record<string, number>>('category_budgets', {});
@@ -686,7 +810,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Settings updated locally:', e);
     }
-  }, [userId, user?.phone]);
+  }, [userId, user?.phone, setLocal]);
 
   const markNotificationRead = useCallback(async (id: string) => {
     setNotifications(prev => {
@@ -700,7 +824,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Notification marked read locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
 
   const markAllNotificationsRead = useCallback(async () => {
     setNotifications(prev => {
@@ -714,7 +838,247 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('All notifications marked read locally:', e);
     }
-  }, [userId]);
+  }, [userId, setLocal]);
+
+  // Phase 4 CRUD operations (§4.1 - §4.7)
+  const addSalaryCycle = useCallback(async (cycle: Omit<SalaryCycle, 'user_id'>) => {
+    const newCycle: SalaryCycle = { ...cycle, user_id: userId };
+    setSalaryCycles(prev => {
+      const filtered = prev.filter(c => c.id !== newCycle.id);
+      const updated = [newCycle, ...filtered].sort((a, b) => b.cycle_start_date.localeCompare(a.cycle_start_date));
+      setLocal('salaryCycles', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('salary_cycles').upsert(newCycle);
+      if (error) console.warn('Supabase upsert salary_cycle failed:', error.message);
+    } catch (e) {
+      console.warn('Salary cycle saved locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const updateFinancialProfile = useCallback(async (updates: Partial<UserFinancialProfile>) => {
+    setFinancialProfile(prev => {
+      const base = prev || defaultFinancialProfile;
+      const updated: UserFinancialProfile = {
+        ...base,
+        ...updates,
+        user_id: userId,
+        updated_at: Date.now(),
+      };
+      setLocal('financialProfile', updated);
+      return updated;
+    });
+    try {
+      const profileRow = {
+        ...(financialProfile || defaultFinancialProfile),
+        ...updates,
+        user_id: userId,
+        updated_at: Date.now(),
+      };
+      const { error } = await supabase.from('user_financial_profiles').upsert(profileRow);
+      if (error) console.warn('Supabase upsert financial_profile failed:', error.message);
+    } catch (e) {
+      console.warn('Financial profile saved locally, sync pending:', e);
+    }
+  }, [userId, financialProfile, defaultFinancialProfile, setLocal]);
+
+  const addSinkingFund = useCallback(async (fund: Omit<SinkingFund, 'user_id'>) => {
+    const newFund: SinkingFund = { ...fund, user_id: userId };
+    setSinkingFunds(prev => {
+      const updated = [...prev, newFund];
+      setLocal('sinkingFunds', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('sinking_funds').insert(newFund);
+      if (error) console.warn('Supabase insert sinking_fund failed:', error.message);
+    } catch (e) {
+      console.warn('Sinking fund saved locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const updateSinkingFund = useCallback(async (id: string, updates: Partial<SinkingFund>) => {
+    setSinkingFunds(prev => {
+      const updated = prev.map(f => f.id === id ? { ...f, ...updates, updated_at: Date.now() } : f);
+      setLocal('sinkingFunds', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('sinking_funds').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase update sinking_fund failed:', error.message);
+    } catch (e) {
+      console.warn('Sinking fund updated locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const deleteSinkingFund = useCallback(async (id: string) => {
+    setSinkingFunds(prev => {
+      const updated = prev.filter(f => f.id !== id);
+      setLocal('sinkingFunds', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('sinking_funds').update({ archived: true, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase delete sinking_fund failed:', error.message);
+    } catch (e) {
+      console.warn('Sinking fund archived locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const addMandate = useCallback(async (mandate: Omit<Mandate, 'user_id'>) => {
+    const newMandate: Mandate = { ...mandate, user_id: userId };
+    setMandates(prev => {
+      const updated = [...prev, newMandate];
+      setLocal('mandates', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('mandates').insert(newMandate);
+      if (error) console.warn('Supabase insert mandate failed:', error.message);
+    } catch (e) {
+      console.warn('Mandate saved locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const updateMandate = useCallback(async (id: string, updates: Partial<Mandate>) => {
+    setMandates(prev => {
+      const updated = prev.map(m => m.id === id ? { ...m, ...updates, updated_at: Date.now() } : m);
+      setLocal('mandates', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('mandates').update({ ...updates, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase update mandate failed:', error.message);
+    } catch (e) {
+      console.warn('Mandate updated locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const deleteMandate = useCallback(async (id: string) => {
+    setMandates(prev => {
+      const updated = prev.filter(m => m.id !== id);
+      setLocal('mandates', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('mandates').update({ active: false, updated_at: Date.now() }).eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase delete mandate failed:', error.message);
+    } catch (e) {
+      console.warn('Mandate deactivated locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const addMerchantRule = useCallback(async (rule: Omit<MerchantRule, 'user_id'>) => {
+    const newRule: MerchantRule = { ...rule, user_id: userId };
+    setMerchantRules(prev => {
+      const updated = [...prev, newRule];
+      setLocal('merchantRules', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('merchant_rules').insert(newRule);
+      if (error) console.warn('Supabase insert merchant_rule failed:', error.message);
+    } catch (e) {
+      console.warn('Merchant rule saved locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  const deleteMerchantRule = useCallback(async (id: string) => {
+    setMerchantRules(prev => {
+      const updated = prev.filter(r => r.id !== id);
+      setLocal('merchantRules', updated);
+      return updated;
+    });
+    try {
+      const { error } = await supabase.from('merchant_rules').delete().eq('id', id).eq('user_id', userId);
+      if (error) console.warn('Supabase delete merchant_rule failed:', error.message);
+    } catch (e) {
+      console.warn('Merchant rule deleted locally, sync pending:', e);
+    }
+  }, [userId, setLocal]);
+
+  // Reactive state computations (§5.3 - §5.5)
+  const activeCycle = useMemo(() => {
+    if (salaryCycles.length === 0) return null;
+    return [...salaryCycles].sort((a, b) => b.cycle_start_date.localeCompare(a.cycle_start_date))[0] || null;
+  }, [salaryCycles]);
+
+  const dailyUpiMeter = useMemo((): DailyUpiMeter => {
+    const guiltFreePaise = activeCycle ? (activeCycle.daily_safe_upi_paise || 0) : 0;
+    const upiNeeds = financialProfile?.upi_needs_allowance_paise || 0;
+    const daysInCycle = activeCycle?.days_in_cycle || 30;
+    const needsAllowancePaise = (activeCycle && daysInCycle > 0)
+      ? Math.floor(upiNeeds / daysInCycle)
+      : 0;
+    return {
+      guiltFreePaise,
+      needsAllowancePaise,
+      totalPaise: guiltFreePaise + needsAllowancePaise,
+    };
+  }, [activeCycle, financialProfile]);
+
+  // Compute live account balances for liquid and survival spendable calculation
+  const computedAccounts = useMemo(() => {
+    const deletedTxnIds = new Set(transactions.filter(t => t.deleted_at).map(t => t.id));
+    return accounts.map(acc => {
+      const journalSum = journalEntries
+        .filter(je => je.account_id === acc.id && !deletedTxnIds.has(je.txn_id))
+        .reduce((sum, je) => sum + je.amount_minor, 0);
+      return { ...acc, current_balance_minor: acc.opening_balance_minor + journalSum };
+    });
+  }, [accounts, journalEntries, transactions]);
+
+  const liquidBalance = useMemo(() => {
+    const liquidTypes = ['BANK', 'CASH', 'UPI_WALLET', 'SAVINGS'];
+    return computedAccounts
+      .filter(a => liquidTypes.includes(a.type))
+      .reduce((sum, a) => sum + (a.current_balance_minor || 0), 0);
+  }, [computedAccounts]);
+
+  const effectiveSpendable = useMemo(() => {
+    const vaultAndUpiBalance = computedAccounts
+      .filter(a => a.account_role === 'DAILY_UPI_SPEND' || a.account_role === 'INCOME_VAULT')
+      .reduce((sum, a) => sum + Math.max(0, a.current_balance_minor || 0), 0);
+    return vaultAndUpiBalance > 0 ? vaultAndUpiBalance : liquidBalance;
+  }, [computedAccounts, liquidBalance]);
+
+  const survivalThreshold = useMemo(() => {
+    if (financialProfile?.survival_threshold_paise != null) {
+      return financialProfile.survival_threshold_paise;
+    }
+    const baseline = financialProfile?.fixed_baseline_paise;
+    return Math.min(200000, baseline ? Math.floor(baseline / 10) : 200000);
+  }, [financialProfile]);
+
+  const isSurvivalMode = useMemo(() => {
+    return effectiveSpendable > 0 && effectiveSpendable <= survivalThreshold;
+  }, [effectiveSpendable, survivalThreshold]);
+
+  const survivalDailyCapPaise = useMemo(() => {
+    if (!isSurvivalMode) return null;
+    let daysUntilNextPayday = 30;
+    if (activeCycle && activeCycle.days_in_cycle > 0) {
+      try {
+        const start = new Date(activeCycle.cycle_start_date);
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        daysUntilNextPayday = Math.max(1, activeCycle.days_in_cycle - diffDays);
+      } catch {
+        daysUntilNextPayday = 30;
+      }
+    }
+    return Math.floor(effectiveSpendable / daysUntilNextPayday);
+  }, [isSurvivalMode, effectiveSpendable, activeCycle]);
+
+  const isSalaryWindowActive = useMemo(() => {
+    const cycleDef: CycleDefinition = {
+      scheduleType: financialProfile?.income_schedule_type || 'VARIABLE_WINDOW',
+      paydayWindowStartDay: financialProfile?.payday_window_start_day ?? 2,
+      paydayWindowEndDay: financialProfile?.payday_window_end_day ?? 5,
+    };
+    return isWithinPaydayWindow(new Date(), cycleDef);
+  }, [financialProfile]);
 
   const importAllData = useCallback(async (data: any): Promise<ImportResult> => {
     const errors: string[] = [];
@@ -733,10 +1097,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const incomingRecs: RecurringTransaction[] = data.recurring || data.recurringTxns || [];
       const incomingBudgets: Budget[] = data.budgets || [];
       const incomingSettings: any = data.settings || null;
+      const incomingCycles: SalaryCycle[] = data.salary_cycles || data.salaryCycles || [];
+      const incomingProfile: UserFinancialProfile | null = data.user_financial_profiles || data.financialProfile || null;
+      const incomingFunds: SinkingFund[] = data.sinking_funds || data.sinkingFunds || [];
+      const incomingMandates: Mandate[] = data.mandates || [];
+      const incomingRules: MerchantRule[] = data.merchant_rules || data.merchantRules || [];
 
       // ---- F-02: Deduplicate journal entries by composite key ----
-      // Journal entries use bigserial row_id (not a stable content-addressable key), so
-      // upsert always inserts new rows. We must deduplicate on the client side.
       const entryKey = (e: JournalEntry) =>
         `${e.txn_id}|${e.account_id ?? ''}|${e.category_id ?? ''}`;
 
@@ -753,7 +1120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const skippedEntries = rawEntries.length - dedupedEntries.length;
       if (skippedEntries > 0) {
-        console.info(`[Import] Skipped ${skippedEntries} duplicate journal entries (dedup by txn_id+account+category).`);
+        console.info(`[Import] Skipped ${skippedEntries} duplicate journal entries.`);
       }
 
       // ---- Local state merges (deduplicate by id for all entities with stable IDs) ----
@@ -781,7 +1148,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setCategories(prev => {
           const map = new Map(prev.map(c => [c.id, c]));
           incomingCategories.forEach(c => map.set(c.id, { ...c, user_id: userId }));
-          const combined = Array.from(map.values());
+          const combined = sanitizeCategories(Array.from(map.values()));
           setLocal('categories', combined);
           return combined;
         });
@@ -837,8 +1204,66 @@ export function DataProvider({ children }: { children: ReactNode }) {
         });
       }
 
+      if (incomingCycles.length > 0) {
+        setSalaryCycles(prev => {
+          const map = new Map(prev.map(c => [c.id, c]));
+          incomingCycles.forEach(c => map.set(c.id, { ...c, user_id: userId }));
+          const combined = Array.from(map.values()).sort((a, b) => b.cycle_start_date.localeCompare(a.cycle_start_date));
+          setLocal('salaryCycles', combined);
+          return combined;
+        });
+      }
+
+      if (incomingProfile) {
+        const mergedProfile = { ...incomingProfile, user_id: userId, updated_at: Date.now() };
+        setFinancialProfile(mergedProfile);
+        setLocal('financialProfile', mergedProfile);
+      }
+
+      if (incomingFunds.length > 0) {
+        setSinkingFunds(prev => {
+          const map = new Map(prev.map(f => [f.id, f]));
+          incomingFunds.forEach(f => map.set(f.id, { ...f, user_id: userId }));
+          const combined = Array.from(map.values());
+          setLocal('sinkingFunds', combined);
+          return combined;
+        });
+      }
+
+      if (incomingMandates.length > 0) {
+        setMandates(prev => {
+          const map = new Map(prev.map(m => [m.id, m]));
+          incomingMandates.forEach(m => map.set(m.id, { ...m, user_id: userId }));
+          const combined = Array.from(map.values());
+          setLocal('mandates', combined);
+          return combined;
+        });
+      }
+
+      if (incomingRules.length > 0) {
+        setMerchantRules(prev => {
+          const map = new Map(prev.map(r => [r.id, r]));
+          incomingRules.forEach(r => map.set(r.id, { ...r, user_id: userId }));
+          const combined = Array.from(map.values());
+          setLocal('merchantRules', combined);
+          return combined;
+        });
+      }
+
+      if (incomingSettings) {
+        setSettings(prev => {
+          const combined: UserSettings = {
+            ...(prev || {}),
+            ...incomingSettings,
+            user_id: userId,
+            updated_at: Date.now(),
+          };
+          setLocal('settings', combined);
+          return combined;
+        });
+      }
+
       // ---- Cloud upsert: track failures per entity ----
-      // F-03 fix: failures are tracked; we never return success:true if cloud writes failed.
       const tryUpsert = async (table: string, rows: any[], label: string) => {
         if (rows.length === 0) return;
         try {
@@ -863,8 +1288,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       await tryUpsert('user_chit_funds', incomingChits.map(c => ({ ...c, user_id: userId })), 'chitFunds');
       await tryUpsert('user_recurring_transactions', incomingRecs.map(r => ({ ...r, user_id: userId })), 'recurring');
       await tryUpsert('user_budgets', incomingBudgets.map(b => ({ ...b, user_id: userId })), 'budgets');
+      await tryUpsert('salary_cycles', incomingCycles.map(c => ({ ...c, user_id: userId })), 'salaryCycles');
+      await tryUpsert('sinking_funds', incomingFunds.map(f => ({ ...f, user_id: userId })), 'sinkingFunds');
+      await tryUpsert('mandates', incomingMandates.map(m => ({ ...m, user_id: userId })), 'mandates');
+      await tryUpsert('merchant_rules', incomingRules.map(r => ({ ...r, user_id: userId })), 'merchantRules');
 
-      // Journal entries: INSERT only the deduplicated new entries (cannot upsert without stable PK)
+      if (incomingProfile) {
+        await tryUpsert('user_financial_profiles', [{ ...incomingProfile, user_id: userId, updated_at: Date.now() }], 'financialProfile');
+      }
+
+      // Journal entries: INSERT only the deduplicated new entries
       if (dedupedEntries.length > 0) {
         try {
           const { error } = await supabase.from('user_journal_entries').insert(dedupedEntries);
@@ -880,7 +1313,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Settings: upsert (single row per user)
+      // Settings: upsert
       let settingsSynced = false;
       if (incomingSettings) {
         try {
@@ -900,13 +1333,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const localCount = incomingAccounts.length + incomingTxns.length + dedupedEntries.length +
         incomingGoals.length + incomingDebts.length + incomingChits.length +
         incomingRecs.length + incomingBudgets.length + incomingCategories.length +
-        (incomingSettings ? 1 : 0);
+        incomingCycles.length + incomingFunds.length + incomingMandates.length + incomingRules.length +
+        (incomingProfile ? 1 : 0) + (incomingSettings ? 1 : 0);
 
       const hasCloudFailures = errors.length > 0;
 
       return {
-        // F-03 fix: success is true only when everything succeeded.
-        // partialSuccess:true indicates local import ok but cloud sync had failures.
         success: localCount > 0 && !hasCloudFailures,
         partialSuccess: localCount > 0 && hasCloudFailures,
         localCount,
@@ -924,6 +1356,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           recurring: incomingRecs.length,
           budgets: incomingBudgets.length,
           settings: settingsSynced,
+          salaryCycles: incomingCycles.length,
+          financialProfile: incomingProfile ? !errors.some(e => e.startsWith('financialProfile')) : undefined,
+          sinkingFunds: incomingFunds.length,
+          mandates: incomingMandates.length,
+          merchantRules: incomingRules.length,
         },
       };
     } catch (e: any) {
@@ -941,20 +1378,61 @@ export function DataProvider({ children }: { children: ReactNode }) {
         },
       };
     }
-  }, [userId]);
-
+  }, [userId, setLocal]);
 
   return (
     <DataContext.Provider value={{
-      accounts, transactions, journalEntries, categories, goals, debts, chitFunds,
-      recurringTxns, budgets, settings, notifications, loading,
+      accounts,
+      transactions,
+      journalEntries,
+      categories,
+      goals,
+      debts,
+      chitFunds,
+      recurringTxns,
+      budgets,
+      settings,
+      notifications,
+      salaryCycles,
+      activeCycle,
+      financialProfile,
+      sinkingFunds,
+      mandates,
+      merchantRules,
+      dailyUpiMeter,
+      isSurvivalMode,
+      survivalDailyCapPaise,
+      isSalaryWindowActive,
+      loading,
       refresh: fetchAll,
-      addAccount, updateAccount, deleteAccount,
-      addTransaction, updateTransaction, deleteTransaction,
-      addGoal, updateGoal, addDebt, updateDebt,
-      addChitFund, addRecurring, addBudget, updateCategoryBudget,
-      updateSettings, markNotificationRead, markAllNotificationsRead,
+      addAccount,
+      updateAccount,
+      deleteAccount,
+      addTransaction,
+      updateTransaction,
+      deleteTransaction,
+      addGoal,
+      updateGoal,
+      addDebt,
+      updateDebt,
+      addChitFund,
+      addRecurring,
+      addBudget,
+      updateCategoryBudget,
+      updateSettings,
+      markNotificationRead,
+      markAllNotificationsRead,
       importAllData,
+      addSalaryCycle,
+      updateFinancialProfile,
+      addSinkingFund,
+      updateSinkingFund,
+      deleteSinkingFund,
+      addMandate,
+      updateMandate,
+      deleteMandate,
+      addMerchantRule,
+      deleteMerchantRule,
     }}>
       {children}
     </DataContext.Provider>

@@ -71,6 +71,10 @@ data class BudgetSplit(val needsPct: Int, val wantsPct: Int, val savingsPct: Int
 
 data class LaneAllocation(val needsMinor: Long, val wantsMinor: Long, val savingsMinor: Long)
 
+@Deprecated(
+    message = "Superseded by AllocationEngine.allocate conforming to WEALTHOS_FINAL_SPEC.md v3 §5.3",
+    replaceWith = ReplaceWith("AllocationEngine.allocate(incomeMinor, FrameworkDefinition.FIFTY_THIRTY_TWENTY)")
+)
 object BudgetAllocator {
     /** Floors needs and wants; savings takes the remainder so allocations always sum to income. */
     fun allocate(incomeMinor: Long, split: BudgetSplit): LaneAllocation {

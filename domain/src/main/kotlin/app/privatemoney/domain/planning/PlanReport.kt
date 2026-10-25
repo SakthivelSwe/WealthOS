@@ -31,6 +31,7 @@ object PlanReport {
      * everything is integer arithmetic. Savings is a target rather than a limit, so callers must word
      * "projected below planned" differently for [Lane.SAVINGS].
      */
+    @Suppress("DEPRECATION")
     fun build(
         basisIncomeMinor: Long,
         split: BudgetSplit,

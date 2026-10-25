@@ -190,12 +190,12 @@ private fun PlansSetupScreen(
 
         Button(
             onClick = {
-                val inc = (incomeStr.toDoubleOrNull() ?: 0.0) * 100
+                val inc = Money.parseIndian(incomeStr).amountMinor
                 if (total == 100 && inc > 0) {
-                    onSave(inc.toLong(), BudgetSplit(n, w, s))
+                    onSave(inc, BudgetSplit(n, w, s))
                 }
             },
-            enabled = total == 100 && (incomeStr.toDoubleOrNull() ?: 0.0) > 0,
+            enabled = total == 100 && Money.parseIndian(incomeStr).amountMinor > 0,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(16.dp),
         ) {

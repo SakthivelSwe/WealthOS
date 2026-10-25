@@ -44,6 +44,7 @@ class PlanningTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun allocationAlwaysSumsToIncome() {
         for (income in listOf(0L, 1L, 99L, 3_220_001L, 9_999_999L)) {
             for (split in listOf(BudgetSplit.DEFAULT, BudgetSplit(60, 20, 20), BudgetSplit(45, 25, 30))) {

@@ -22,6 +22,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import app.privatemoney.data.local.SalaryCycleEntity
+import app.privatemoney.domain.planning.AllocationEngine
+import app.privatemoney.domain.planning.AllocationResult
+import app.privatemoney.domain.planning.FrameworkDefinition
+import app.privatemoney.domain.planning.FrameworkType
 import java.time.YearMonth
 
 data class PlansUiState(
@@ -36,13 +41,16 @@ data class PlansUiState(
     val debts: List<DebtEntity> = emptyList(),
     val chitFunds: List<ChitFundEntity> = emptyList(),
     val recurringTxns: List<RecurringTxnEntity> = emptyList(),
+    val activeCycle: SalaryCycleEntity? = null,
+    val allocationResult: AllocationResult? = null,
 )
 
 data class PlanningData(
     val goals: List<GoalEntity>,
     val debts: List<DebtEntity>,
     val chitFunds: List<ChitFundEntity>,
-    val recurringTxns: List<RecurringTxnEntity>
+    val recurringTxns: List<RecurringTxnEntity>,
+    val cycles: List<SalaryCycleEntity> = emptyList(),
 )
 
 class PlansViewModel(
@@ -58,9 +66,10 @@ class PlansViewModel(
         planning.observeGoals(),
         planning.observeDebts(),
         planning.observeChitFunds(),
-        planning.observeRecurringTxns()
-    ) { goals, debts, chitFunds, recurringTxns ->
-        PlanningData(goals, debts, chitFunds, recurringTxns)
+        planning.observeRecurringTxns(),
+        planning.observeSalaryCycles(),
+    ) { goals, debts, chitFunds, recurringTxns, cycles ->
+        PlanningData(goals, debts, chitFunds, recurringTxns, cycles)
     }
 
     val uiState: StateFlow<PlansUiState> = combine(
@@ -101,6 +110,27 @@ class PlansViewModel(
             )
         } else emptyList()
 
+        val latestCycle = pData.cycles.maxByOrNull { it.cycleStartDate }
+        val effectiveSalary = latestCycle?.salaryPaise ?: (if (actualIncome > 0) actualIncome else income)
+        val allocResult = if (effectiveSalary > 0) {
+            val fwType = runCatching {
+                FrameworkType.valueOf(settings.allocationFramework)
+            }.getOrDefault(FrameworkType.SIX_JAR)
+            val fw = FrameworkDefinition.fromType(fwType)
+
+            runCatching {
+                AllocationEngine.allocate(
+                    salaryPaise = effectiveSalary,
+                    framework = fw,
+                    baselinePaise = settings.fixedBaselinePaise ?: (income * 55 / 100),
+                    emiPaise = pData.debts.sumOf { it.expectedMonthlyPaymentMinor },
+                    creepLock = settings.lifestyleCreepLock,
+                    shiftPlayToLongTerm = settings.playToLongTermShift,
+                    daysInCycle = latestCycle?.daysInCycle ?: 30,
+                )
+            }.getOrNull()
+        } else null
+
         PlansUiState(
             basisIncomeMinor = income,
             actualIncomeMinor = actualIncome,
@@ -113,6 +143,8 @@ class PlansViewModel(
             debts = pData.debts,
             chitFunds = pData.chitFunds,
             recurringTxns = pData.recurringTxns,
+            activeCycle = latestCycle,
+            allocationResult = allocResult,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlansUiState(0L, 0L, BudgetSplit.DEFAULT, settings.currency, false))
 

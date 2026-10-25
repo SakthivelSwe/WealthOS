@@ -336,17 +336,39 @@ interface NotificationDao {
     suspend fun clearAll()
 }
 
+@Dao
+interface SalaryCycleDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(cycle: SalaryCycleEntity)
+
+    @Query("SELECT * FROM salary_cycles ORDER BY cycleStartDate DESC")
+    fun observeAll(): Flow<List<SalaryCycleEntity>>
+
+    @Query("SELECT * FROM salary_cycles ORDER BY cycleStartDate DESC LIMIT 1")
+    suspend fun getLatest(): SalaryCycleEntity?
+
+    @Query("SELECT * FROM salary_cycles WHERE cycleStartDate <= :date ORDER BY cycleStartDate DESC LIMIT 1")
+    suspend fun getForDate(date: String): SalaryCycleEntity?
+
+    @Query("SELECT * FROM salary_cycles WHERE id = :id")
+    suspend fun getById(id: String): SalaryCycleEntity?
+
+    @Query("DELETE FROM salary_cycles WHERE id = :id")
+    suspend fun delete(id: String)
+}
+
 @Database(
     entities = [
         AccountEntity::class, CategoryEntity::class, TxnEntity::class, JournalEntryEntity::class,
         GoalEntity::class, DebtEntity::class, ChitFundEntity::class, RecurringTxnEntity::class,
-        AppNotificationEntity::class,
+        AppNotificationEntity::class, SalaryCycleEntity::class,
     ],
-    version = 4,
+    version = 5,
     autoMigrations = [
         androidx.room.AutoMigration(from = 1, to = 2),
         androidx.room.AutoMigration(from = 2, to = 3),
         androidx.room.AutoMigration(from = 3, to = 4),
+        androidx.room.AutoMigration(from = 4, to = 5),
     ],
     exportSchema = true,
 )
@@ -359,5 +381,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun chitFundDao(): ChitFundDao
     abstract fun recurringTxnDao(): RecurringTxnDao
     abstract fun notificationDao(): NotificationDao
+    abstract fun salaryCycleDao(): SalaryCycleDao
 }
+
 

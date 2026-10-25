@@ -5,6 +5,11 @@ import { formatMoney, parseMoney, type Goal, type Debt, type ChitFund, type Recu
 import { Tilt3DCard } from '../shared/Tilt3DCard';
 import { Target, CreditCard, Coins, Repeat, Plus, X, Check, ShieldAlert, Sparkles, HelpCircle, Info, Wallet, TrendingUp, BadgeIndianRupee, Sliders } from 'lucide-react';
 import { format, addMonths, startOfMonth } from 'date-fns';
+import { AllocationSimulatorTab } from './AllocationSimulatorTab';
+import { SipSimulatorTab } from './SipSimulatorTab';
+import { DebtSimulatorTab } from './DebtSimulatorTab';
+import { EmiSimulatorTab } from './EmiSimulatorTab';
+import { SinkingFundsTab } from './SinkingFundsTab';
 
 // ===== GOAL MODAL =====
 interface GoalPreset {
@@ -1112,7 +1117,9 @@ export function PlansPage() {
     return expenseCategories.filter(c => (c.budget_limit_minor || 0) > 0).length;
   }, [expenseCategories]);
 
-  const [activeTab, setActiveTab] = useState<'salary' | 'budgets' | 'goals' | 'debts' | 'chits' | 'recurring'>('salary');
+  const [activeTab, setActiveTab] = useState<
+    'salary' | 'allocation' | 'sip' | 'debt_payoff' | 'emi_simulator' | 'sinking_funds' | 'budgets' | 'goals' | 'debts' | 'chits' | 'recurring'
+  >('salary');
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalPresetId, setGoalPresetId] = useState<string | undefined>();
   const [showDebtModal, setShowDebtModal] = useState(false);
@@ -1411,7 +1418,12 @@ export function PlansPage() {
         }}
       >
         {[
-          { id: 'salary', label: '💰 Monthly Salary', count: monthlyPlans.length },
+          { id: 'salary', label: '💰 Salary Cycle', count: monthlyPlans.length },
+          { id: 'allocation', label: '🍯 Jars & Allocator' },
+          { id: 'sip', label: '📈 SIP Projections' },
+          { id: 'debt_payoff', label: '⚡ Debt Elimination' },
+          { id: 'emi_simulator', label: '🧮 EMI Simulator' },
+          { id: 'sinking_funds', label: '⛱️ Sinking Funds' },
           { id: 'budgets', label: '📊 Category Limits', count: activeBudgetCount },
           { id: 'goals', label: '🎯 Savings Goals', count: goals.length },
           { id: 'debts', label: '💳 Loans & EMIs', count: debts.length },
@@ -1422,9 +1434,9 @@ export function PlansPage() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`btn btn-sm ${activeTab === tab.id ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: 'var(--radius-pill)', fontSize: '0.82rem', padding: '7px 18px', fontWeight: 700 }}
+            style={{ borderRadius: 'var(--radius-pill)', fontSize: '0.82rem', padding: '7px 16px', fontWeight: 700 }}
           >
-            {tab.label} ({tab.count})
+            {tab.label} {tab.count !== undefined ? `(${tab.count})` : ''}
           </button>
         ))}
       </div>
@@ -1557,6 +1569,21 @@ export function PlansPage() {
           )}
         </div>
       )}
+
+      {/* ===== JARS & ALLOCATION SIMULATOR TAB (§5.3, §8.3) ===== */}
+      {activeTab === 'allocation' && <AllocationSimulatorTab />}
+
+      {/* ===== SIP PROJECTION & MILESTONES TAB (§5.8) ===== */}
+      {activeTab === 'sip' && <SipSimulatorTab />}
+
+      {/* ===== DEBT ELIMINATION SIMULATOR TAB (§5.9) ===== */}
+      {activeTab === 'debt_payoff' && <DebtSimulatorTab />}
+
+      {/* ===== EMI AFFORDABILITY SIMULATOR TAB (§5.10) ===== */}
+      {activeTab === 'emi_simulator' && <EmiSimulatorTab />}
+
+      {/* ===== SINKING FUNDS PLANNER TAB (§5.11) ===== */}
+      {activeTab === 'sinking_funds' && <SinkingFundsTab />}
 
       {/* ===== CATEGORY BUDGETS TAB ===== */}
       {activeTab === 'budgets' && (

@@ -225,4 +225,27 @@ class LedgerIntegrityValidatorTest {
         assertEquals(1, report.warningCount)
         assertTrue(report.violations.any { it.code == "CURRENCY_MISMATCH" && it.severity == ViolationSeverity.WARNING })
     }
+
+    @Test
+    fun testDuplicateRrnFailsIntegrityCheck() {
+        val txns = listOf(
+            ValidationTxn("txn_1", TransactionType.EXPENSE, 50000L, inr, "acc_bank", categoryId = "cat_groceries", rrn = "327918291048"),
+            ValidationTxn("txn_2", TransactionType.EXPENSE, 50000L, inr, "acc_bank", categoryId = "cat_groceries", rrn = "327918291048"),
+        )
+        val legs = listOf(
+            JournalEntry("txn_1", "acc_bank", null, -50000L),
+            JournalEntry("txn_1", null, "cat_groceries", 50000L),
+            JournalEntry("txn_2", "acc_bank", null, -50000L),
+            JournalEntry("txn_2", null, "cat_groceries", 50000L),
+        )
+        val report = LedgerIntegrityValidator.validate(
+            transactions = txns,
+            journalEntries = legs,
+            accounts = accounts,
+            validCategoryIds = validCategories,
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.violations.any { it.code == "DUPLICATE_RRN" })
+    }
 }

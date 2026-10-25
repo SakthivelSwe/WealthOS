@@ -20,6 +20,12 @@ data class TransactionRowUi(
     val accountId: String = "",
     val toAccountId: String? = null,
     val categoryId: String? = null,
+    val rrn: String? = null,
+    val paymentRail: String? = null,
+    val spendEmotionTag: String? = null,
+    val jarBucket: String? = null,
+    val isRecurringMandate: Boolean = false,
+    val importBatchId: String? = null,
 )
 
 internal fun TxnEntity.toRowUi(categoryNames: Map<String, String>): TransactionRowUi = TransactionRowUi(
@@ -35,4 +41,10 @@ internal fun TxnEntity.toRowUi(categoryNames: Map<String, String>): TransactionR
     accountId = accountId,
     toAccountId = toAccountId,
     categoryId = categoryId,
+    rrn = rrn,
+    paymentRail = paymentRail,
+    spendEmotionTag = spendEmotionTag,
+    jarBucket = jarBucket,
+    isRecurringMandate = isRecurringMandate,
+    importBatchId = importBatchId,
 )

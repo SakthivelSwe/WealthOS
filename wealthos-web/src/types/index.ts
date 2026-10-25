@@ -8,6 +8,7 @@ export type CategoryKind = 'EXPENSE' | 'INCOME';
 export type NeedWant = 'NEED' | 'WANT' | 'SAVING';
 export type Frequency = 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 export type ThemeMode = 'DARK' | 'LIGHT' | 'MIDNIGHT';
+export type AccountRole = 'INCOME_VAULT' | 'DAILY_UPI_SPEND' | 'EMERGENCY_RESERVE' | 'WEALTH_PORTFOLIO' | 'LIABILITY_LOAN';
 
 export interface Account {
   id: string;
@@ -23,6 +24,12 @@ export interface Account {
   archived: boolean;
   created_at: number;
   updated_at: number;
+  account_role?: AccountRole | null;
+  bank_name?: string | null;
+  interest_rate_percent_bps?: number;
+  monthly_emi_paise?: number;
+  outstanding_paise?: number;
+  is_bnpl?: boolean;
   // computed
   current_balance_minor?: number;
 }
@@ -63,6 +70,96 @@ export interface Transaction {
   created_at: number;
   updated_at: number;
   deleted_at: number | null;
+  jar_bucket?: string | null;
+  spend_emotion_tag?: 'NEED' | 'PLANNED_WANT' | 'REGRET_LEAK' | 'UNPLANNED_TRANSFER' | 'INCOME' | 'UNCATEGORISED' | null;
+  payment_rail?: 'UPI_P2M' | 'UPI_P2A' | 'UPI_AUTOPAY' | 'IMPS_NEFT_RTGS' | 'NON_UPI' | null;
+  rrn?: string | null;
+  counterparty_name?: string | null;
+  vpa?: string | null;
+  import_batch_id?: string | null;
+  user_overridden?: boolean;
+  is_recurring_mandate?: boolean;
+}
+
+export interface SalaryCycle {
+  id: string;
+  user_id: string;
+  cycle_start_date: string;
+  salary_paise: number;
+  baseline_paise: number;
+  emi_paise: number;
+  framework: 'SIX_JAR' | 'THREE_BOX' | 'FIFTY_THIRTY_TWENTY' | 'CUSTOM';
+  jar_amounts: Record<string, number>;
+  days_in_cycle: number;
+  daily_safe_upi_paise: number;
+  net_worth_snapshot_paise: number | null;
+  checklist_state: Record<string, boolean>;
+  created_at: number;
+}
+
+export interface UserFinancialProfile {
+  user_id: string;
+  income_schedule_type: 'VARIABLE_WINDOW' | 'FIXED_DATE' | 'IRREGULAR';
+  payday_window_start_day: number;
+  payday_window_end_day: number;
+  expected_salary_min_paise: number | null;
+  expected_salary_max_paise: number | null;
+  fixed_baseline_paise: number | null;
+  baseline_method: 'USER_ENTERED' | 'HISTORY_MEDIAN' | 'ESTIMATE_55_PERCENT';
+  lifestyle_creep_lock: boolean;
+  needs_buffer_paise: number;
+  allocation_framework: 'SIX_JAR' | 'THREE_BOX' | 'FIFTY_THIRTY_TWENTY' | 'CUSTOM';
+  custom_bps: Record<string, number> | null;
+  play_to_long_term_shift: boolean;
+  upi_needs_allowance_paise: number;
+  emergency_target_months: number;
+  survival_threshold_paise: number | null;
+  small_scan_threshold_paise: number;
+  ego_check_threshold_paise: number;
+  cooldown_hours: number;
+  currency: string;
+  locale: string;
+  timezone: string;
+  language: 'en' | 'ta';
+  updated_at: number;
+}
+
+export interface SinkingFund {
+  id: string;
+  user_id: string;
+  name: string;
+  target_paise: number;
+  current_paise: number;
+  target_date: string;
+  monthly_allocation_paise: number;
+  archived: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface MerchantRule {
+  id: string;
+  user_id: string;
+  merchant_pattern: string;
+  category_id: string | null;
+  jar_bucket: string | null;
+  spend_emotion_tag: string | null;
+  is_recurring_mandate: boolean;
+  created_at: number;
+}
+
+export interface Mandate {
+  id: string;
+  user_id: string;
+  merchant_name: string;
+  amount_paise: number;
+  frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+  next_deduction_date: string;
+  account_id: string | null;
+  payment_rail: string;
+  active: boolean;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface JournalEntry {
@@ -234,10 +331,35 @@ export function formatMoney(amountMinor: number, currencyCode: string = 'INR', m
 }
 
 export function parseMoney(text: string, currencyCode: string = 'INR'): number {
+  if (!text) return 0;
   const info = getCurrencyInfo(currencyCode);
-  const num = parseFloat(text.replace(/[^0-9.-]/g, ''));
-  if (isNaN(num)) return 0;
-  return Math.round(num * Math.pow(10, info.minorUnit));
+  const s = String(text).trim();
+  if (!s || s === '-' || s === '—') return 0;
+
+  const isNegative = (s.startsWith('(') && s.endsWith(')')) ||
+    s.endsWith('Dr') || s.endsWith('DR') || s.endsWith('dr') ||
+    s.startsWith('-');
+
+  const clean = s.replace(/[^0-9.]/g, '');
+  if (!clean) return 0;
+
+  const parts = clean.split('.');
+  const intPart = BigInt(parts[0] || '0');
+  let fracPart = 0n;
+
+  if (parts.length > 1 && info.minorUnit > 0) {
+    const fracStr = parts[1].slice(0, info.minorUnit).padEnd(info.minorUnit, '0');
+    fracPart = BigInt(fracStr || '0');
+  }
+
+  let multiplier = 1n;
+  for (let i = 0; i < info.minorUnit; i++) {
+    multiplier *= 10n;
+  }
+
+  const totalMinor = intPart * multiplier + fracPart;
+  const num = Number(totalMinor);
+  return isNegative ? -num : num;
 }
 
 // Account type helpers

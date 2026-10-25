@@ -151,4 +151,19 @@ class PlanningRepository(private val db: AppDatabase, private val clock: () -> L
     suspend fun deleteRecurringTxn(id: String) {
         db.recurringTxnDao().delete(id)
     }
+
+    // --- Salary Cycles (§4.5, §5.4) ---
+    fun observeSalaryCycles(): Flow<List<app.privatemoney.data.local.SalaryCycleEntity>> = db.salaryCycleDao().observeAll()
+
+    suspend fun getLatestSalaryCycle(): app.privatemoney.data.local.SalaryCycleEntity? = db.salaryCycleDao().getLatest()
+
+    suspend fun getSalaryCycleForDate(date: String): app.privatemoney.data.local.SalaryCycleEntity? = db.salaryCycleDao().getForDate(date)
+
+    suspend fun saveSalaryCycle(cycle: app.privatemoney.data.local.SalaryCycleEntity) {
+        db.salaryCycleDao().insert(cycle)
+    }
+
+    suspend fun deleteSalaryCycle(id: String) {
+        db.salaryCycleDao().delete(id)
+    }
 }

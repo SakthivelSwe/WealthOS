@@ -43,6 +43,7 @@ data class ValidationTxn(
     val toAccountId: String? = null,
     val categoryId: String? = null,
     val isDeleted: Boolean = false,
+    val rrn: String? = null,
 )
 
 data class ValidationAccount(
@@ -263,6 +264,25 @@ object LedgerIntegrityValidator {
                         entityId = key,
                     )
                 )
+            }
+        }
+
+        // 9. Unique RRN Invariant: Unique non-null RRN across active transactions (Spec §4.6)
+        val seenRrn = mutableMapOf<String, String>() // rrn -> txnId
+        transactions.filter { !it.isDeleted && !it.rrn.isNullOrBlank() }.forEach { txn ->
+            val cleanRrn = txn.rrn!!.trim()
+            val existing = seenRrn[cleanRrn]
+            if (existing != null) {
+                violations.add(
+                    IntegrityViolation(
+                        severity = ViolationSeverity.CRITICAL,
+                        code = "DUPLICATE_RRN",
+                        message = "Duplicate RRN '$cleanRrn' found in active transactions $existing and ${txn.id}",
+                        entityId = txn.id,
+                    )
+                )
+            } else {
+                seenRrn[cleanRrn] = txn.id
             }
         }
 

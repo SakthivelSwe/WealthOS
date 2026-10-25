@@ -261,4 +261,64 @@ class FinancialIntegrityTest {
         val jpy = Currency.fromCode("JPY") ?: Currency("JPY", 2)
         assertEquals(0, jpy.minorUnit)
     }
+
+    @Test
+    fun testPhase4DailyUpiMeterAndSurvivalMode() {
+        // Spec §5.3: Allocation produces guilt-free daily paise
+        val salaryPaise = 32_200_00L
+        val baselinePaise = 17_710_00L
+        val daysInCycle = 30
+
+        val alloc = app.privatemoney.domain.planning.AllocationEngine.allocate(
+            salaryPaise = salaryPaise,
+            framework = app.privatemoney.domain.planning.FrameworkDefinition.SIX_JAR,
+            baselinePaise = baselinePaise,
+            daysInCycle = daysInCycle,
+        )
+
+        val guiltFreeDaily = alloc.dailySafePaise
+        assertEquals(10733L, guiltFreeDaily)
+
+        val upiNeedsAllowancePaise = 300_000L // ₹3,000 monthly allowance for UPI needs
+        val needsDaily = upiNeedsAllowancePaise / daysInCycle.toLong()
+        assertEquals(10000L, needsDaily)
+
+        val totalDailyUpi = guiltFreeDaily + needsDaily
+        assertEquals(20733L, totalDailyUpi)
+
+        // Spec §5.5: Survival mode trigger on the ₹800 scenario
+        val effectiveSpendablePaise = 80_000L // ₹800
+        val defaultSurvivalThreshold = minOf(200_000L, baselinePaise / 10L) // 177,100 paise (₹1,771)
+        assertEquals(177_100L, defaultSurvivalThreshold)
+
+        val isSurvival = effectiveSpendablePaise in 1..defaultSurvivalThreshold
+        assertTrue(isSurvival)
+
+        // 17 days passed in 30 days cycle -> 13 days left
+        val daysLeft = 30 - 17
+        val survivalDailyCap = effectiveSpendablePaise / daysLeft
+        assertEquals(6153L, survivalDailyCap) // ₹61.53/day integer floor
+    }
+
+    @Test
+    fun testPhase4CyclePaydayWindows() {
+        val cycleDef = app.privatemoney.domain.planning.CycleDefinition(
+            scheduleType = app.privatemoney.domain.planning.IncomeScheduleType.VARIABLE_WINDOW,
+            paydayWindowStartDay = 2,
+            paydayWindowEndDay = 5,
+        )
+
+        assertFalse(app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(LocalDate.of(2026, 10, 1), cycleDef))
+        assertTrue(app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(LocalDate.of(2026, 10, 2), cycleDef))
+        assertTrue(app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(LocalDate.of(2026, 10, 5), cycleDef))
+        assertFalse(app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(LocalDate.of(2026, 10, 6), cycleDef))
+
+        val fixedDef = app.privatemoney.domain.planning.CycleDefinition(
+            scheduleType = app.privatemoney.domain.planning.IncomeScheduleType.FIXED_DATE,
+            fixedPaydayOfMonth = 1,
+        )
+        assertTrue(app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(LocalDate.of(2026, 10, 1), fixedDef))
+        assertFalse(app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(LocalDate.of(2026, 10, 2), fixedDef))
+    }
 }
+

@@ -4,6 +4,7 @@ import {
   parseBankStatement,
   type ParsedStatementRow,
   type StatementParseResult,
+  type ColumnMapping,
 } from '../../lib/statementParser';
 import { formatMoney, getCategoryDisplayName, type Transaction } from '../../types';
 import {
@@ -16,6 +17,11 @@ import {
   ArrowUpRight,
   Sparkles,
   HelpCircle,
+  SlidersHorizontal,
+  RotateCcw,
+  ShieldAlert,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface ImportStatementModalProps {
@@ -31,7 +37,7 @@ const SAMPLE_AXIS_CSV = `Tran Date,Particulars,Chq No,Withdrawal (Dr),Deposit (C
 20-10-2026,UPI/Self Transfer to Secondary Bank,628211,10000.00,-,800.00`;
 
 export function ImportStatementModal({ onClose, onImportComplete }: ImportStatementModalProps) {
-  const { accounts, categories, transactions, addTransaction, settings } = useData();
+  const { accounts, categories, transactions, addTransaction, deleteTransaction, settings } = useData();
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
 
@@ -42,7 +48,11 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
   const [rows, setRows] = useState<ParsedStatementRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [importSuccess, setImportSuccess] = useState<number | null>(null);
+  const [importedTxnIds, setImportedTxnIds] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [showColumnMapper, setShowColumnMapper] = useState(false);
+  const [customMapping, setCustomMapping] = useState<Partial<ColumnMapping>>({});
+  const [showMandateHelp, setShowMandateHelp] = useState(false);
 
   // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,19 +64,19 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
       const text = evt.target?.result as string;
       if (text) {
         setStatementText(text);
-        analyzeText(text);
+        analyzeText(text, customMapping);
       }
     };
     reader.readAsText(file);
   };
 
   // Analyze text
-  const analyzeText = (text: string) => {
+  const analyzeText = (text: string, mappingOverride?: Partial<ColumnMapping>) => {
     setError('');
     try {
-      const result = parseBankStatement(text, transactions, selectedAccountId);
+      const result = parseBankStatement(text, transactions, selectedAccountId, 20000, mappingOverride);
       if (result.rows.length === 0) {
-        setError('Could not find transaction rows. Please ensure your file has Date, Particulars/Description, and Debit/Credit columns.');
+        setError('Could not find transaction rows. Please check file format or adjust column mapping.');
         setParsedResult(null);
         setRows([]);
         return;
@@ -83,7 +93,15 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
   const handleLoadSample = () => {
     setFileName('sample_axis_bank_oct2026.csv');
     setStatementText(SAMPLE_AXIS_CSV);
-    analyzeText(SAMPLE_AXIS_CSV);
+    analyzeText(SAMPLE_AXIS_CSV, customMapping);
+  };
+
+  const handleUpdateMappingCol = (key: keyof ColumnMapping, colIdx: number) => {
+    const updated = { ...customMapping, [key]: colIdx };
+    setCustomMapping(updated);
+    if (statementText) {
+      analyzeText(statementText, updated);
+    }
   };
 
   const toggleSelectAll = (select: boolean) => {
@@ -108,7 +126,7 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
 
   const selectedCount = useMemo(() => rows.filter(r => r.selected).length, [rows]);
 
-  // Execute import
+  // Execute atomic import
   const handleCommitImport = async () => {
     const selectedRows = rows.filter(r => r.selected);
     if (selectedRows.length === 0) {
@@ -122,6 +140,9 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
 
     setImporting(true);
     setError('');
+
+    const batchId = parsedResult?.importBatchId || `batch_${Date.now()}`;
+    const newlyImportedIds: string[] = [];
 
     try {
       let imported = 0;
@@ -144,7 +165,7 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
           },
         ];
 
-        const newTxn: Omit<Transaction, 'user_id'> = {
+        const newTxn: any = {
           id: txnId,
           type: row.type,
           amount_minor: row.amountMinor,
@@ -157,24 +178,51 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
           merchant: row.merchant || null,
           description: row.description,
           notes: row.reference ? `Ref: ${row.reference}` : null,
-          payment_method: row.description.toUpperCase().includes('UPI') ? 'UPI' : 'NET_BANKING',
+          payment_method: row.paymentRail?.startsWith('UPI') ? 'UPI' : 'NET_BANKING',
           need_want: row.needWant,
-          tags: ['statement_import'],
+          tags: ['statement_import', batchId],
           imported: true,
           source: 'BANK_STATEMENT',
           created_at: now,
           updated_at: now,
           deleted_at: null,
+          // Spec §4 & §6 fields
+          rrn: row.reference || null,
+          payment_rail: row.paymentRail || null,
+          spend_emotion_tag: row.emotionTag || null,
+          jar_bucket: row.jarBucket || null,
+          import_batch_id: batchId,
+          is_recurring_mandate: row.isRecurringMandate || false,
         };
 
         await addTransaction(newTxn, journalEntries);
+        newlyImportedIds.push(txnId);
         imported++;
       }
 
+      setImportedTxnIds(newlyImportedIds);
       setImportSuccess(imported);
       if (onImportComplete) onImportComplete();
     } catch (err: any) {
       setError(err?.message || 'Error saving transactions.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Undo entire batch
+  const handleUndoImport = async () => {
+    if (importedTxnIds.length === 0) return;
+    setImporting(true);
+    try {
+      for (const id of importedTxnIds) {
+        await deleteTransaction(id);
+      }
+      setImportSuccess(null);
+      setImportedTxnIds([]);
+      setError('Import undone successfully.');
+    } catch (err: any) {
+      setError(err?.message || 'Error undoing import.');
     } finally {
       setImporting(false);
     }
@@ -185,16 +233,23 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
       <div
         className="modal-content"
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: 840, maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ maxWidth: 860, maxHeight: '90vh', overflowY: 'auto' }}
       >
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
-            <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.35rem', fontWeight: 800, margin: 0 }}>
-              📥 Import Bank Statement &amp; Reconcile
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.35rem', fontWeight: 800, margin: 0 }}>
+                📥 Import Bank Statement &amp; Reconcile
+              </h2>
+              {parsedResult?.detectedFormatName && (
+                <span className="badge badge-cyan" style={{ fontSize: '0.74rem' }}>
+                  {parsedResult.detectedFormatName}
+                </span>
+              )}
+            </div>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', margin: '4px 0 0 0' }}>
-              Import CSV or text statements from Axis Bank, HDFC, SBI, or ICICI with automatic math check
+              Multi-bank statement ingestion with double-entry reconciliation &amp; mandate radar
             </p>
           </div>
           <button type="button" onClick={onClose} className="btn-ghost" style={{ padding: 6, borderRadius: '50%' }}>
@@ -209,11 +264,28 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
               Successfully Imported {importSuccess} Transactions!
             </h3>
             <p style={{ fontSize: '0.88rem', color: 'var(--text-tertiary)', marginTop: 6, marginBottom: 24 }}>
-              Your ledger and account balance have been updated with double-entry journal records.
+              Your ledger has been updated with double-entry journal records. Batch ID:{' '}
+              <code style={{ color: 'var(--neon-cyan)', fontSize: '0.8rem' }}>{parsedResult?.importBatchId}</code>
             </p>
-            <button className="btn btn-primary btn-md" onClick={onClose} style={{ background: 'var(--neon-emerald)', color: '#000' }}>
-              Back to Transactions
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-md"
+                onClick={handleUndoImport}
+                disabled={importing}
+                style={{ color: 'var(--neon-rose)', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+              >
+                <RotateCcw size={16} /> Undo This Import
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-md"
+                onClick={onClose}
+                style={{ background: 'var(--neon-emerald)', color: '#000' }}
+              >
+                Done &amp; View Ledger
+              </button>
+            </div>
           </div>
         ) : (
           <div>
@@ -267,14 +339,14 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <label className="form-label" style={{ margin: 0 }}>Or Paste Statement Text (CSV / Tab-Separated)</label>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Supports Axis Bank copy-paste</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Supports Axis, HDFC, SBI copy-paste</span>
                 </div>
                 <textarea
                   rows={4}
                   value={statementText}
                   onChange={e => {
                     setStatementText(e.target.value);
-                    if (e.target.value.trim().length > 20) analyzeText(e.target.value);
+                    if (e.target.value.trim().length > 20) analyzeText(e.target.value, customMapping);
                   }}
                   placeholder="Tran Date,Particulars,Chq No,Withdrawal (Dr),Deposit (Cr),Balance&#10;05-10-2026,SALARY CREDIT CMS3948,-,32200.00,32200.00"
                   style={{
@@ -300,6 +372,106 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
             {/* Parsed Result & Reconciliation Section */}
             {parsedResult && (
               <div>
+                {/* Column Mapper Toggle & Fallback Panel */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    onClick={() => setShowColumnMapper(!showColumnMapper)}
+                    style={{ color: 'var(--neon-cyan)', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    <SlidersHorizontal size={14} />
+                    {showColumnMapper ? 'Hide Column Mapping' : 'Adjust Column Mapping (Fallback)'}
+                  </button>
+
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                    Confidence: <strong style={{ color: 'var(--neon-emerald)' }}>{parsedResult.mapping?.confidence || 'HIGH'}</strong>
+                  </span>
+                </div>
+
+                {showColumnMapper && (
+                  <div
+                    style={{
+                      padding: 14,
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--glass-border)',
+                      marginBottom: 16,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <label style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'block', marginBottom: 4 }}>Date Col</label>
+                      <select
+                        value={customMapping.dateCol ?? parsedResult.mapping?.dateCol ?? 0}
+                        onChange={e => handleUpdateMappingCol('dateCol', Number(e.target.value))}
+                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                      >
+                        {parsedResult.headers.map((h, i) => (
+                          <option key={i} value={i}>Col {i + 1}: {h || `Column ${i}`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'block', marginBottom: 4 }}>Narration Col</label>
+                      <select
+                        value={customMapping.descriptionCol ?? parsedResult.mapping?.descriptionCol ?? 1}
+                        onChange={e => handleUpdateMappingCol('descriptionCol', Number(e.target.value))}
+                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                      >
+                        {parsedResult.headers.map((h, i) => (
+                          <option key={i} value={i}>Col {i + 1}: {h || `Column ${i}`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'block', marginBottom: 4 }}>Debit Col</label>
+                      <select
+                        value={customMapping.debitCol ?? parsedResult.mapping?.debitCol ?? -1}
+                        onChange={e => handleUpdateMappingCol('debitCol', Number(e.target.value))}
+                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                      >
+                        <option value={-1}>None / Single Amount</option>
+                        {parsedResult.headers.map((h, i) => (
+                          <option key={i} value={i}>Col {i + 1}: {h || `Column ${i}`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'block', marginBottom: 4 }}>Credit Col</label>
+                      <select
+                        value={customMapping.creditCol ?? parsedResult.mapping?.creditCol ?? -1}
+                        onChange={e => handleUpdateMappingCol('creditCol', Number(e.target.value))}
+                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                      >
+                        <option value={-1}>None / Single Amount</option>
+                        {parsedResult.headers.map((h, i) => (
+                          <option key={i} value={i}>Col {i + 1}: {h || `Column ${i}`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'block', marginBottom: 4 }}>Balance Col</label>
+                      <select
+                        value={customMapping.balanceCol ?? parsedResult.mapping?.balanceCol ?? -1}
+                        onChange={e => handleUpdateMappingCol('balanceCol', Number(e.target.value))}
+                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                      >
+                        <option value={-1}>None</option>
+                        {parsedResult.headers.map((h, i) => (
+                          <option key={i} value={i}>Col {i + 1}: {h || `Column ${i}`}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 {/* Summary & Math Check Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
                   {/* Credits */}
@@ -356,6 +528,56 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
                   </div>
                 </div>
 
+                {/* Mandate Radar Banner (Spec §6.8) */}
+                {parsedResult.mandates && parsedResult.mandates.length > 0 && (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(6, 182, 212, 0.08)',
+                      border: '1px solid rgba(6, 182, 212, 0.25)',
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--neon-cyan)', fontWeight: 700, fontSize: '0.82rem' }}>
+                        <ShieldAlert size={16} /> Mandate Radar: {parsedResult.mandates.length} Recurring Mandate(s) Detected
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => setShowMandateHelp(!showMandateHelp)}
+                        style={{ fontSize: '0.74rem', color: 'var(--neon-cyan)', padding: '2px 6px' }}
+                      >
+                        {showMandateHelp ? 'Hide Guidance' : 'How to Pause Mandates'}
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {parsedResult.mandates.map((m, idx) => (
+                        <span key={idx} className="badge badge-cyan" style={{ fontSize: '0.74rem' }}>
+                          {m.name}: {formatMoney(m.amountMinor, currency, masked)}
+                        </span>
+                      ))}
+                    </div>
+
+                    {showMandateHelp && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6, lineHeight: 1.4 }}>
+                        💡 <strong>To pause or cancel mandates</strong>: Open your UPI app (GPay / PhonePe / Paytm / BHIM) → Navigate to Profile / Payment Settings → Select Autopay or Mandates → Pause or Revoke.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Small Scans Aggregation (Spec §6.6) */}
+                {parsedResult.smallScansCount && parsedResult.smallScansCount > 0 && (
+                  <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 'var(--radius-md)', padding: '8px 12px', marginBottom: 14, fontSize: '0.78rem', color: '#fde68a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>
+                      ☕ <strong>Small UPI scans aggregation</strong>: {formatMoney(parsedResult.smallScansTotalMinor || 0, currency, masked)} across {parsedResult.smallScansCount} scans (≤ ₹200).
+                    </span>
+                  </div>
+                )}
+
                 {/* Duplicates notice if any */}
                 {parsedResult.duplicateCount > 0 && (
                   <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14, fontSize: '0.8rem', color: '#fde68a', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -399,8 +621,12 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
                           key={row.id}
                           style={{
                             borderBottom: '1px solid rgba(255,255,255,0.03)',
-                            background: row.selected ? 'rgba(0, 240, 255, 0.03)' : 'transparent',
-                            opacity: row.isDuplicate && !row.selected ? 0.6 : 1,
+                            background: row.isDuplicate
+                              ? 'rgba(245, 158, 11, 0.04)'
+                              : row.selected
+                              ? 'transparent'
+                              : 'rgba(0,0,0,0.2)',
+                            opacity: row.selected ? 1 : 0.6,
                           }}
                         >
                           <td style={{ padding: '8px 12px' }}>
@@ -411,37 +637,37 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
                               style={{ cursor: 'pointer' }}
                             />
                           </td>
-                          <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
+                          <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
                             {row.date}
                           </td>
-                          <td style={{ padding: '8px 12px' }}>
-                            <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                          <td style={{ padding: '8px 12px', maxWidth: 300 }}>
+                            <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
                               {row.merchant || row.description}
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', maxWidth: 280, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                              {row.description}
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'flex', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                              {row.reference && <span>RRN: {row.reference}</span>}
+                              {row.paymentRail && <span className="badge badge-purple" style={{ fontSize: '0.65rem' }}>{row.paymentRail}</span>}
+                              {row.emotionTag && <span className="badge badge-cyan" style={{ fontSize: '0.65rem' }}>{row.emotionTag}</span>}
+                              {row.isRecurringMandate && <span className="badge badge-rose" style={{ fontSize: '0.65rem' }}>MANDATE</span>}
                             </div>
-                            {row.isDuplicate && (
-                              <span style={{ fontSize: '0.68rem', color: 'var(--neon-amber)', fontWeight: 600 }}>
-                                ● Duplicate detected
-                              </span>
-                            )}
                           </td>
-                          <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', fontWeight: 700, color: row.type === 'INCOME' ? 'var(--neon-emerald)' : 'var(--neon-rose)' }}>
+                          <td style={{ padding: '8px 12px', whiteSpace: 'nowrap', fontFamily: 'var(--font-outfit)', fontWeight: 700, color: row.type === 'INCOME' ? 'var(--neon-emerald)' : 'var(--neon-rose)' }}>
                             {row.type === 'INCOME' ? '+' : '-'}{formatMoney(row.amountMinor, currency, masked)}
                           </td>
                           <td style={{ padding: '8px 12px' }}>
                             <select
                               value={row.suggestedCategoryId || ''}
                               onChange={e => updateRowCategory(idx, e.target.value)}
-                              style={{ padding: '3px 8px', fontSize: '0.76rem', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.06)', border: '1px solid var(--glass-border)', color: '#f8fafc', maxWidth: 160 }}
+                              style={{ fontSize: '0.76rem', padding: '4px 6px', width: 140 }}
                             >
-                              <option value="">Uncategorized</option>
-                              {categories.filter(c => !c.archived).map(c => (
-                                <option key={c.id} value={c.id}>
-                                  {getCategoryDisplayName(c.id, categories)}
-                                </option>
-                              ))}
+                              <option value="">Uncategorised</option>
+                              {categories
+                                .filter(c => (row.type === 'INCOME' ? c.kind === 'INCOME' : c.kind === 'EXPENSE'))
+                                .map(c => (
+                                  <option key={c.id} value={c.id}>
+                                    {getCategoryDisplayName(c.id, categories)}
+                                  </option>
+                                ))}
                             </select>
                           </td>
                         </tr>
@@ -450,19 +676,20 @@ export function ImportStatementModal({ onClose, onImportComplete }: ImportStatem
                   </table>
                 </div>
 
-                {/* Footer buttons */}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn btn-secondary" onClick={onClose} disabled={importing}>
+                {/* Footer action bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--glass-border)', paddingTop: 14 }}>
+                  <button type="button" className="btn btn-ghost btn-md" onClick={onClose}>
                     Cancel
                   </button>
+
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-primary btn-md"
                     onClick={handleCommitImport}
                     disabled={importing || selectedCount === 0}
-                    style={{ background: 'var(--neon-emerald)', color: '#000', fontWeight: 700 }}
+                    style={{ background: 'var(--neon-emerald)', color: '#000', fontWeight: 800 }}
                   >
-                    {importing ? 'Saving to Ledger...' : `Import ${selectedCount} Transactions to Ledger`}
+                    {importing ? 'Importing...' : `Commit Import (${selectedCount} Records)`}
                   </button>
                 </div>
               </div>

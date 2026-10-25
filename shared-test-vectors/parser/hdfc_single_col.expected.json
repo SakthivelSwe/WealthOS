@@ -1,0 +1,19 @@
+{
+  "description": "Expected parse results for hdfc_single_col.csv",
+  "totalRows": 2,
+  "totalCreditsMinor": 4500000,
+  "totalDebitsMinor": 35000,
+  "firstRow": {
+    "date": "2026-10-01",
+    "amountMinor": 35000,
+    "type": "EXPENSE",
+    "merchant": "SWIGGY",
+    "reference": "482910394857"
+  },
+  "secondRow": {
+    "date": "2026-10-02",
+    "amountMinor": 4500000,
+    "type": "INCOME",
+    "reference": "CMS987654321"
+  }
+}

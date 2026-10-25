@@ -13,13 +13,44 @@ data class DuplicateCandidate(
     val description: String? = null,
 )
 
-enum class Likelihood { NONE, POSSIBLE, LIKELY }
+enum class Likelihood { NONE, POSSIBLE, LIKELY, EXACT }
+
+data class DedupKey(
+    val rrn: String?,
+    val fallbackHash: String,
+)
 
 /**
- * Multi-signal duplicate detection. It only ever labels a suspicion; nothing is deleted or skipped
- * without the user confirming it.
+ * Multi-signal duplicate detection. Conforms to WEALTHOS_FINAL_SPEC.md v3 §4.6.
+ * Primary: unique (user_id, rrn) where rrn is not null.
+ * Fallback: hash of (date, amountPaise, normalisedCounterparty, rail).
  */
 object DuplicateDetector {
+
+    /**
+     * Primary dedup key based on RRN with deterministic fallback hash.
+     */
+    fun computeDedupKey(
+        date: LocalDate,
+        amountMinor: Long,
+        counterparty: String,
+        rail: String,
+        rrn: String? = null
+    ): DedupKey {
+        val cleanRrn = rrn?.trim()?.takeIf { it.isNotBlank() }
+        val canonical = listOf(
+            date.toString(),
+            amountMinor.toString(),
+            normalize(counterparty),
+            rail.uppercase().trim()
+        ).joinToString("|")
+
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+
+        return DedupKey(rrn = cleanRrn, fallbackHash = hash)
+    }
 
     fun compare(a: DuplicateCandidate, b: DuplicateCandidate): Likelihood {
         if (a.amountMinor != b.amountMinor) return Likelihood.NONE

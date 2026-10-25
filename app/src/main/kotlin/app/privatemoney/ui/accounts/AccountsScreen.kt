@@ -240,16 +240,61 @@ private fun AccountWalletCard(item: app.privatemoney.data.local.AccountWithBalan
                     }
                 }
 
-                // Status Pill
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (account.accountRole == "INCOME_VAULT") {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0x33F59E0B))
+                                .border(1.dp, Color(0x80F59E0B), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                "VAULT 🛡️",
+                                style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFBBF24)),
+                            )
+                        }
+                    } else if (!account.accountRole.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0x2600F0FF))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                account.accountRole.replace('_', ' '),
+                                style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF67E8F9)),
+                            )
+                        }
+                    }
+
+                    // Status Pill
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0x26FFFFFF))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            if (account.isLiability) "LIABILITY" else "ASSET",
+                            style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (account.isLiability) Color(0xFFFDA4AF) else Color(0xFF6EE7B7)),
+                        )
+                    }
+                }
+            }
+
+            if (account.accountRole == "INCOME_VAULT") {
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x26FFFFFF))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0x26F59E0B))
+                        .border(1.dp, Color(0x66F59E0B), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     Text(
-                        if (account.isLiability) "LIABILITY" else "ASSET",
-                        style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (account.isLiability) Color(0xFFFDA4AF) else Color(0xFF6EE7B7)),
+                        "⚠️ Income Vault: Do not link daily UPI apps here to prevent balance drain.",
+                        style = TextStyle(fontSize = 10.sp, color = Color(0xFFFEF3C7), fontWeight = FontWeight.SemiBold),
                     )
                 }
             }

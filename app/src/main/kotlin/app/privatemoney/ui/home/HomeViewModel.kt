@@ -37,6 +37,13 @@ data class HomeUiState(
     val recent: List<TransactionRowUi> = emptyList(),
     val isCloudLoggedIn: Boolean = false,
     val cloudUserEmail: String? = null,
+    val activeCycle: app.privatemoney.data.local.SalaryCycleEntity? = null,
+    val isSurvivalMode: Boolean = false,
+    val survivalDailyCapPaise: Long? = null,
+    val isSalaryWindowActive: Boolean = false,
+    val dailyUpiMeterGuiltFreePaise: Long = 0L,
+    val dailyUpiMeterNeedsPaise: Long = 0L,
+    val dailyUpiMeterTotalPaise: Long = 0L,
 )
 
 class HomeViewModel(
@@ -65,6 +72,7 @@ class HomeViewModel(
         val debtsFlow = planning?.observeDebts() ?: flowOf(emptyList())
         val goalsFlow = planning?.observeGoals() ?: flowOf(emptyList())
         val accountsFlow = accounts?.observeActiveWithBalances() ?: flowOf(emptyList())
+        val cyclesFlow = planning?.observeSalaryCycles() ?: flowOf(emptyList())
 
         combine(
             refreshTrigger,
@@ -77,6 +85,7 @@ class HomeViewModel(
             debtsFlow,
             goalsFlow,
             accountsFlow,
+            cyclesFlow,
         ) { args ->
             val liquid = args[1] as Long
             val income = args[2] as Long
@@ -93,6 +102,8 @@ class HomeViewModel(
             val goalsList = args[8] as List<app.privatemoney.data.local.GoalEntity>
             @Suppress("UNCHECKED_CAST")
             val acctBalances = args[9] as List<app.privatemoney.data.local.AccountWithBalance>
+            @Suppress("UNCHECKED_CAST")
+            val cyclesList = args[10] as List<app.privatemoney.data.local.SalaryCycleEntity>
 
             val names = cats.associate { it.id to it.name }
 
@@ -126,6 +137,44 @@ class HomeViewModel(
                 SafeToSpendEngine.calculate(safeInput, today)
             }.getOrNull()
 
+            val latestCycle = cyclesList.maxByOrNull { it.cycleStartDate }
+            val guiltFreeDaily = latestCycle?.dailySafeUpiPaise ?: (safe?.safeTodayMinor ?: 0L)
+            val needsAllowanceDaily = if (latestCycle != null && latestCycle.daysInCycle > 0) {
+                settings.upiNeedsAllowancePaise / latestCycle.daysInCycle
+            } else 0L
+            val totalDailyUpi = guiltFreeDaily + needsAllowanceDaily
+
+            // Survival mode (§5.5)
+            val vaultAndUpiBalance = acctBalances
+                .filter { it.account.accountRole == "DAILY_UPI_SPEND" || it.account.accountRole == "INCOME_VAULT" }
+                .sumOf { maxOf(0L, it.currentBalanceMinor) }
+            val effectiveSpendable = if (vaultAndUpiBalance > 0L) vaultAndUpiBalance else liquid
+            val defaultThreshold = minOf(200000L, if (settings.fixedBaselinePaise != null) settings.fixedBaselinePaise!! / 10L else 200000L)
+            val survivalThreshold = settings.survivalThresholdPaise ?: defaultThreshold
+            val isSurvival = effectiveSpendable in 1..survivalThreshold
+
+            val daysUntilNextPayday = if (latestCycle != null && latestCycle.daysInCycle > 0) {
+                try {
+                    val start = LocalDate.parse(latestCycle.cycleStartDate)
+                    val passed = java.time.temporal.ChronoUnit.DAYS.between(start, today).toInt()
+                    maxOf(1, latestCycle.daysInCycle - passed)
+                } catch (_: Exception) {
+                    30
+                }
+            } else 30
+            val survivalDailyCap = if (isSurvival) effectiveSpendable / daysUntilNextPayday else null
+
+            // Payday window (§5.4)
+            val schedType = runCatching {
+                app.privatemoney.domain.planning.IncomeScheduleType.valueOf(settings.incomeScheduleType)
+            }.getOrDefault(app.privatemoney.domain.planning.IncomeScheduleType.VARIABLE_WINDOW)
+            val cycleDef = app.privatemoney.domain.planning.CycleDefinition(
+                scheduleType = schedType,
+                paydayWindowStartDay = settings.paydayWindowStartDay,
+                paydayWindowEndDay = settings.paydayWindowEndDay,
+            )
+            val isWindowActive = app.privatemoney.domain.planning.CycleEngine.isWithinPaydayWindow(today, cycleDef)
+
             HomeUiState(
                 isLoading = false,
                 currency = currency,
@@ -137,6 +186,13 @@ class HomeViewModel(
                 recent = recent.map { it.toRowUi(names) },
                 isCloudLoggedIn = !settings.supabaseUserId.isNullOrBlank() && !settings.supabaseAccessToken.isNullOrBlank(),
                 cloudUserEmail = settings.supabaseUserEmail,
+                activeCycle = latestCycle,
+                isSurvivalMode = isSurvival,
+                survivalDailyCapPaise = survivalDailyCap,
+                isSalaryWindowActive = isWindowActive,
+                dailyUpiMeterGuiltFreePaise = guiltFreeDaily,
+                dailyUpiMeterNeedsPaise = needsAllowanceDaily,
+                dailyUpiMeterTotalPaise = totalDailyUpi,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState(currency = currency))
     }

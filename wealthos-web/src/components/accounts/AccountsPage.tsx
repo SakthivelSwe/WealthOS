@@ -1,26 +1,74 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../hooks/useData';
-import { formatMoney, parseMoney, ACCOUNT_TYPE_LABELS, POPULAR_BANKS, getBankColor, type Account, type AccountType } from '../../types';
+import { formatMoney, parseMoney, ACCOUNT_TYPE_LABELS, POPULAR_BANKS, getBankColor, type Account, type AccountType, type AccountRole } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { Plus, Edit2, Archive, Wallet, TrendingUp, CreditCard, X, Shield, Building2 } from 'lucide-react';
+import { NightlyCheckInModal } from '../shared/NightlyCheckInModal';
+import {
+  Plus,
+  Edit2,
+  Archive,
+  Wallet,
+  TrendingUp,
+  CreditCard,
+  X,
+  Shield,
+  Building2,
+  AlertTriangle,
+  ArrowRight,
+  ArrowDownRight,
+  CheckCircle2,
+  Moon,
+  Zap,
+  Sliders,
+  Copy,
+  Info,
+} from 'lucide-react';
 
 const ACCOUNT_TYPES: AccountType[] = ['BANK','CASH','UPI_WALLET','SAVINGS','CREDIT_CARD','INVESTMENT','LOAN','OTHER_ASSET','OTHER_LIABILITY'];
-const ACCOUNT_TYPE_COLORS: Record<string, string> = {
-  BANK: 'var(--neon-cyan)',
-  CASH: 'var(--neon-emerald)',
-  UPI_WALLET: 'var(--neon-indigo)',
-  SAVINGS: 'var(--neon-cyan)',
-  CREDIT_CARD: 'var(--neon-amber)',
-  INVESTMENT: 'var(--neon-purple)',
-  LOAN: 'var(--neon-rose)',
-  OTHER_ASSET: 'var(--neon-cyan)',
-  OTHER_LIABILITY: 'var(--neon-rose)',
-};
+
+export const ACCOUNT_ROLES: { id: AccountRole; label: string; desc: string; badge: string; color: string }[] = [
+  {
+    id: 'INCOME_VAULT',
+    label: 'Income Vault (Salary Account)',
+    desc: 'Primary salary credit account. Do NOT link daily UPI apps here.',
+    badge: 'Vault 🛡️',
+    color: 'var(--neon-amber)',
+  },
+  {
+    id: 'DAILY_UPI_SPEND',
+    label: 'Daily UPI Spend Account',
+    desc: 'Linked to UPI & UPI Lite apps for everyday scans and groceries.',
+    badge: 'Daily UPI ⚡',
+    color: 'var(--neon-cyan)',
+  },
+  {
+    id: 'EMERGENCY_RESERVE',
+    label: 'Emergency Reserve Account',
+    desc: 'Auto-sweep FD, RD, or liquid fund for 3–7 months safety runway.',
+    badge: 'Emergency 🛟',
+    color: 'var(--neon-emerald)',
+  },
+  {
+    id: 'WEALTH_PORTFOLIO',
+    label: 'Wealth & Investment Account',
+    desc: 'Mutual funds, index SIPs, gold, long-term wealth growth.',
+    badge: 'Wealth 📈',
+    color: 'var(--neon-purple)',
+  },
+  {
+    id: 'LIABILITY_LOAN',
+    label: 'Liability & Credit Cards',
+    desc: 'Credit cards, personal loans, vehicle EMIs, BNPL accounts.',
+    badge: 'Liability 💳',
+    color: 'var(--neon-rose)',
+  },
+];
 
 function AccountModal({ account, onClose }: { account?: Account; onClose: () => void }) {
   const { addAccount, updateAccount, settings } = useData();
   const [name, setName] = useState(account?.name || '');
   const [type, setType] = useState<AccountType>(account?.type || 'BANK');
+  const [role, setRole] = useState<AccountRole | ''>(account?.account_role || '');
   const [balance, setBalance] = useState(account ? String(account.opening_balance_minor / 100) : '');
   const [institution, setInstitution] = useState(account?.institution || '');
   const [lastFour, setLastFour] = useState(account?.last_four || '');
@@ -34,12 +82,24 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
     if (!name.trim()) { setError('Name is required'); return; }
     setLoading(true);
     const now = Date.now();
+    const roleToSave = (role as AccountRole) || null;
+
     if (account) {
-      await updateAccount(account.id, { name: name.trim(), type, institution: institution || null, last_four: lastFour || null, include_in_net_worth: includeNW, updated_at: now });
+      await updateAccount(account.id, {
+        name: name.trim(),
+        type,
+        account_role: roleToSave,
+        institution: institution || null,
+        last_four: lastFour || null,
+        include_in_net_worth: includeNW,
+        updated_at: now,
+      });
     } else {
       await addAccount({
         id: Math.random().toString(36).substring(2) + Date.now(),
-        name: name.trim(), type,
+        name: name.trim(),
+        type,
+        account_role: roleToSave,
         institution: institution || null,
         last_four: lastFour || null,
         opening_balance_minor: parseMoney(balance || '0', currency),
@@ -47,7 +107,8 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
         include_in_net_worth: includeNW,
         include_in_stats: true,
         archived: false,
-        created_at: now, updated_at: now,
+        created_at: now,
+        updated_at: now,
       });
     }
     setLoading(false);
@@ -56,7 +117,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800 }}>
             {account ? 'Edit Account' : 'Add New Account'}
@@ -73,6 +134,43 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
             <label className="form-label">Account / Wallet Name *</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Axis Bank, HDFC Salary, Cash" autoFocus />
           </div>
+
+          {/* Account Role Selector (§8.6) */}
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Shield size={14} style={{ color: 'var(--neon-cyan)' }} /> Strategic Account Role (§8.6)
+            </label>
+            <select value={role} onChange={e => setRole(e.target.value as AccountRole | '')}>
+              <option value="">General Account (No designated role)</option>
+              {ACCOUNT_ROLES.map(r => (
+                <option key={r.id} value={r.id}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Vault Isolation Warning (§8.6, Video 1 & 14) */}
+          {role === 'INCOME_VAULT' && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                fontSize: '0.78rem',
+                color: '#fef3c7',
+                lineHeight: 1.4,
+                marginBottom: 14,
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-start',
+              }}
+            >
+              <AlertTriangle size={16} style={{ color: 'var(--neon-amber)', flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <strong>Vault Isolation Protocol:</strong> Do not link everyday UPI apps (GPay, PhonePe, Paytm) to this vault account. Keeps your primary salary isolated from continuous micro-leaks and balance drain.
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
@@ -103,7 +201,7 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
                     type="button"
                     onClick={() => {
                       setInstitution(bank.name);
-                      if (!name || name === 'HDFC Salary Account' || name.includes('Account')) {
+                      if (!name || name.includes('Account')) {
                         setName(bank.sampleName);
                       }
                       setType(bank.defaultType);
@@ -163,11 +261,46 @@ function AccountModal({ account, onClose }: { account?: Account; onClose: () => 
 }
 
 export function AccountsPage() {
-  const { accounts, journalEntries, transactions, addAccount, deleteAccount, settings } = useData();
+  const { accounts, journalEntries, transactions, salaryCycles, financialProfile, dailyUpiMeter, addAccount, deleteAccount, settings } = useData();
   const [showModal, setShowModal] = useState(false);
+  const [showNightlyModal, setShowNightlyModal] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | undefined>();
+  const [copiedPlan, setCopiedPlan] = useState(false);
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
+
+  // Configurable UPI Lite Settings (§8.6)
+  const [upiLitePerTxn, setUpiLitePerTxn] = useState<number>(() => {
+    try {
+      const s = localStorage.getItem('wealthos_upi_lite_per_txn');
+      return s ? Number(s) : 500;
+    } catch {
+      return 500;
+    }
+  });
+
+  const [upiLiteBalanceCap, setUpiLiteBalanceCap] = useState<number>(() => {
+    try {
+      const s = localStorage.getItem('wealthos_upi_lite_balance_cap');
+      return s ? Number(s) : 2000;
+    } catch {
+      return 2000;
+    }
+  });
+
+  const [editingUpiLite, setEditingUpiLite] = useState(false);
+
+  const handleSaveUpiLite = (perTxn: number, cap: number) => {
+    setUpiLitePerTxn(perTxn);
+    setUpiLiteBalanceCap(cap);
+    try {
+      localStorage.setItem('wealthos_upi_lite_per_txn', String(perTxn));
+      localStorage.setItem('wealthos_upi_lite_balance_cap', String(cap));
+    } catch (e) {
+      console.warn(e);
+    }
+    setEditingUpiLite(false);
+  };
 
   const deletedTxnIds = useMemo(() => new Set(transactions.filter(t => t.deleted_at).map(t => t.id)), [transactions]);
 
@@ -197,6 +330,34 @@ export function AccountsPage() {
     return map;
   }, [computedAccounts]);
 
+  // Strategic Account Roles Finder (§8.6)
+  const vaultAccount = computedAccounts.find(a => a.account_role === 'INCOME_VAULT') || computedAccounts.find(a => a.type === 'BANK');
+  const dailyUpiAccount = computedAccounts.find(a => a.account_role === 'DAILY_UPI_SPEND') || computedAccounts.find(a => a.type === 'UPI_WALLET');
+  const emergencyAccount = computedAccounts.find(a => a.account_role === 'EMERGENCY_RESERVE') || computedAccounts.find(a => a.type === 'SAVINGS');
+  const wealthAccount = computedAccounts.find(a => a.account_role === 'WEALTH_PORTFOLIO') || computedAccounts.find(a => a.type === 'INVESTMENT');
+
+  // Payday Transfer Plan Calculations (§8.6, Videos 3, 4)
+  const activeCycle = salaryCycles[0] || null;
+  const cycleSalaryPaise = activeCycle?.salary_paise || (financialProfile?.expected_salary_min_paise || 3220000);
+  const baselinePaise = activeCycle?.baseline_paise || (financialProfile?.fixed_baseline_paise || 1771000);
+  const emergencyTransferPaise = activeCycle?.jar_amounts?.LONG_TERM || Math.floor(cycleSalaryPaise * 0.1);
+  const wealthTransferPaise = activeCycle?.jar_amounts?.FREEDOM_SIP || Math.floor(cycleSalaryPaise * 0.1);
+  const weeklyUpiReloadPaise = (dailyUpiMeter.totalPaise > 0 ? dailyUpiMeter.totalPaise : 115000) * 7;
+
+  const copyTransferSteps = () => {
+    const text = [
+      `WealthOS Payday Transfer Plan (${vaultAccount?.name || 'Income Vault'}):`,
+      `1. Move ${formatMoney(emergencyTransferPaise, currency, false)} -> ${emergencyAccount?.name || 'Emergency Reserve'}`,
+      `2. Move ${formatMoney(wealthTransferPaise, currency, false)} -> ${wealthAccount?.name || 'Wealth Portfolio'}`,
+      `3. Move ${formatMoney(weeklyUpiReloadPaise, currency, false)} -> ${dailyUpiAccount?.name || 'Daily UPI Spend'} / UPI Lite`,
+      `4. Retain ${formatMoney(baselinePaise, currency, false)} in Vault for Rent & EMI`,
+    ].join('\n');
+
+    navigator.clipboard.writeText(text);
+    setCopiedPlan(true);
+    setTimeout(() => setCopiedPlan(false), 2000);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Page Header */}
@@ -206,15 +367,25 @@ export function AccountsPage() {
             Bank Accounts & Wallets
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-            Track all your bank balances, cash, cards, and loans in one place
+            Multi-account role segregation, vault isolation protocol & payday transfer plan (§8.6)
           </p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => { setEditAccount(undefined); setShowModal(true); }}
-        >
-          <Plus size={16} /> Add Account
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setShowNightlyModal(true)}
+            style={{ borderColor: 'var(--neon-purple)', color: 'var(--neon-purple)' }}
+          >
+            <Moon size={15} /> Nightly Check-in
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => { setEditAccount(undefined); setShowModal(true); }}
+          >
+            <Plus size={16} /> Add Account
+          </button>
+        </div>
       </div>
 
       {/* Top 3D Spatial Stat Cards */}
@@ -274,6 +445,192 @@ export function AccountsPage() {
         </div>
       </div>
 
+      {/* PAYDAY TRANSFER PLAN & CONFIGURABLE UPI LITE (§8.6) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+        {/* Payday Transfer Plan Card */}
+        <div className="cyber-card" style={{ padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: 'var(--neon-amber)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Shield size={16} />
+              </div>
+              <div>
+                <h3 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#f8fafc' }}>
+                  Payday Transfer Plan (§8.6)
+                </h3>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)' }}>
+                  First 48-hour routing from Salary Vault to daily & wealth buckets
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={copyTransferSteps}
+              style={{ color: 'var(--neon-cyan)', border: '1px solid rgba(0, 240, 255, 0.25)' }}
+            >
+              {copiedPlan ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+              {copiedPlan ? 'Copied Steps!' : 'Copy Plan'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Source Vault */}
+            <div style={{ padding: '8px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}>
+                <span style={{ fontWeight: 800, color: 'var(--neon-amber)' }}>SOURCE VAULT:</span>
+                <span style={{ color: '#f8fafc', fontWeight: 700 }}>{vaultAccount?.name || 'Salary Bank Account'}</span>
+              </div>
+              <span className="badge badge-amber">Do Not Link Daily UPI</span>
+            </div>
+
+            {/* Transfer Steps */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+              {/* Step 1: Emergency Reserve */}
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--neon-emerald)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  1. To Emergency Reserve
+                </div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>
+                  {formatMoney(emergencyTransferPaise, currency, masked)}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                  Target: {emergencyAccount?.name || 'Auto-sweep / Liquid Account'}
+                </div>
+              </div>
+
+              {/* Step 2: Freedom SIP */}
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--neon-purple)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  2. To Wealth / SIP
+                </div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>
+                  {formatMoney(wealthTransferPaise, currency, masked)}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                  Target: {wealthAccount?.name || 'Investment Account'}
+                </div>
+              </div>
+
+              {/* Step 3: Weekly UPI Lite */}
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--neon-cyan)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  3. Weekly UPI Lite Reload
+                </div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>
+                  {formatMoney(weeklyUpiReloadPaise, currency, masked)}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                  Target: {dailyUpiAccount?.name || 'Daily UPI Account'}
+                </div>
+              </div>
+
+              {/* Step 4: Retained in Vault */}
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--radius-sm)', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--glass-border)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  4. Retain in Vault (Bills)
+                </div>
+                <div style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.05rem', fontWeight: 800, color: '#f8fafc', marginTop: 2 }}>
+                  {formatMoney(baselinePaise, currency, masked)}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                  Stays in Vault for Rent & EMI debits
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Configurable UPI Lite Settings Card (§8.6) */}
+        <div className="cyber-card" style={{ padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Zap size={18} style={{ color: 'var(--neon-cyan)' }} />
+                <h3 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#f8fafc' }}>
+                  UPI Lite Settings
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={() => setEditingUpiLite(!editingUpiLite)}
+                style={{ color: 'var(--neon-cyan)' }}
+              >
+                <Sliders size={12} /> {editingUpiLite ? 'Close' : 'Configure'}
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.76rem', color: 'var(--text-tertiary)', margin: '0 0 12px 0' }}>
+              RBI limits must be configurable settings, not constants (§8.6). UPI Lite prevents PIN exhaustion and isolates daily micro-spends.
+            </p>
+
+            {editingUpiLite ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.74rem' }}>Per-Transaction Cap (₹)</label>
+                  <input
+                    type="number"
+                    value={upiLitePerTxn}
+                    onChange={e => setUpiLitePerTxn(Number(e.target.value))}
+                    style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.74rem' }}>Wallet Balance Cap (₹)</label>
+                  <input
+                    type="number"
+                    value={upiLiteBalanceCap}
+                    onChange={e => setUpiLiteBalanceCap(Number(e.target.value))}
+                    style={{ fontSize: '0.8rem', padding: '6px 10px' }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => handleSaveUpiLite(upiLitePerTxn, upiLiteBalanceCap)}
+                >
+                  Save UPI Lite Limits
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Per-Txn Pinless Cap</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.84rem', color: 'var(--neon-cyan)' }}>₹{upiLitePerTxn}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Max Balance Cap</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.84rem', color: 'var(--neon-cyan)' }}>₹{upiLiteBalanceCap}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Suggested Weekly Reload</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.84rem', color: 'var(--neon-emerald)' }}>
+                    {formatMoney(weeklyUpiReloadPaise, currency, masked)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginTop: 12, fontSize: '0.7rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Info size={12} /> Reload weekly to enforce automatic impulse guardrails
+          </div>
+        </div>
+      </div>
+
       {/* Account Groups */}
       {computedAccounts.length === 0 ? (
         <div
@@ -318,6 +675,7 @@ export function AccountsPage() {
                       id: newId,
                       name: bank.sampleName,
                       type: bank.defaultType,
+                      account_role: bank.id === 'axis' ? 'INCOME_VAULT' : 'DAILY_UPI_SPEND',
                       institution: bank.name,
                       last_four: '0000',
                       opening_balance_minor: 0,
@@ -367,6 +725,8 @@ export function AccountsPage() {
               const balanceMinor = acc.current_balance_minor || 0;
               const isPositive = balanceMinor >= 0;
               const accentColor = getBankColor(acc.institution, acc.type);
+              const isVault = acc.account_role === 'INCOME_VAULT';
+              const roleMeta = ACCOUNT_ROLES.find(r => r.id === acc.account_role);
 
               return (
                 <Tilt3DCard key={acc.id}>
@@ -377,8 +737,10 @@ export function AccountsPage() {
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
-                      borderLeft: `4px solid ${accentColor}`,
-                      boxShadow: `0 10px 30px -10px ${accentColor}25`,
+                      borderLeft: `4px solid ${isVault ? 'var(--neon-amber)' : accentColor}`,
+                      boxShadow: isVault
+                        ? '0 10px 30px -10px rgba(245, 158, 11, 0.3)'
+                        : `0 10px 30px -10px ${accentColor}25`,
                     }}
                   >
                     <div>
@@ -387,6 +749,22 @@ export function AccountsPage() {
                           <span className="badge" style={{ background: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}33` }}>
                             {ACCOUNT_TYPE_LABELS[acc.type]}
                           </span>
+
+                          {/* Role Badge (§8.6) */}
+                          {roleMeta && (
+                            <span
+                              className="badge"
+                              style={{
+                                background: `${roleMeta.color}22`,
+                                color: roleMeta.color,
+                                border: `1px solid ${roleMeta.color}55`,
+                                fontWeight: 800,
+                              }}
+                            >
+                              {roleMeta.badge}
+                            </span>
+                          )}
+
                           {acc.institution && (
                             <span className="badge" style={{ background: `${accentColor}22`, color: accentColor, border: `1px solid ${accentColor}44`, fontSize: '0.7rem', fontWeight: 700 }}>
                               {acc.institution}
@@ -423,6 +801,24 @@ export function AccountsPage() {
                           {acc.last_four && <span>•••• {acc.last_four}</span>}
                         </div>
                       )}
+
+                      {/* Vault Isolation Warning Banner (§8.6) */}
+                      {isVault && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            padding: '6px 10px',
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '0.7rem',
+                            color: '#fef3c7',
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          ⚠️ <strong>Vault Protected:</strong> Do not link daily UPI apps here (GPay, PhonePe).
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ marginTop: 20 }}>
@@ -452,6 +848,8 @@ export function AccountsPage() {
       )))}
 
       {showModal && <AccountModal account={editAccount} onClose={() => setShowModal(false)} />}
+      {showNightlyModal && <NightlyCheckInModal onClose={() => setShowNightlyModal(false)} />}
     </div>
   );
 }
+

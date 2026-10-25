@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useData } from '../../hooks/useData';
 import { formatMoney, getCategoryDisplayName } from '../../types';
 import { HoloCard3D } from '../shared/HoloCard3D';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
+import { PaydayWizardModal } from './PaydayWizardModal';
 import {
   TrendingUp,
   TrendingDown,
@@ -35,7 +36,19 @@ interface DashboardProps {
 
 export function Dashboard({ onOpenNewTxn }: DashboardProps) {
   const navigate = useNavigate();
-  const { accounts, transactions, journalEntries, settings, categories, recurringTxns, updateSettings } = useData();
+  const {
+    accounts,
+    transactions,
+    journalEntries,
+    settings,
+    categories,
+    recurringTxns,
+    updateSettings,
+    isSalaryWindowActive,
+    isSurvivalMode,
+    survivalDailyCapPaise,
+  } = useData();
+  const [showPaydayWizard, setShowPaydayWizard] = useState(false);
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
   const userName = settings?.user_name || 'WealthOS User';
@@ -222,6 +235,81 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Salary Credited / Window Banner (Spec §5.4 & §8.2) */}
+      {isSalaryWindowActive && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: 'var(--radius-md)',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem' }}>🎉</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#f8fafc' }}>
+                Salary Window Active: Ready for the First 48-Hour Protocol?
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                Allocate your salary across jars and move emergency/SIP money out of your primary account before it leaks.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            onClick={() => setShowPaydayWizard(true)}
+            style={{ background: 'var(--neon-emerald)', color: '#000', fontWeight: 800 }}
+          >
+            Launch Payday Wizard
+          </button>
+        </div>
+      )}
+
+      {/* Survival Mode Banner (Spec §5.5 & §8.2) */}
+      {isSurvivalMode && (
+        <div
+          style={{
+            background: 'rgba(239, 68, 68, 0.14)',
+            border: '1px solid var(--neon-rose)',
+            borderRadius: 'var(--radius-md)',
+            padding: '14px 20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem' }}>🚨</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--neon-rose)' }}>
+                Survival Mode Active: Balance Under Critical Threshold
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#fca5a5', marginTop: 2 }}>
+                Daily spend is strictly capped at {formatMoney(survivalDailyCapPaise || 0, currency, masked)}/day until next expected salary.
+                Checklist: (1) Pause non-essential AutoPay mandates; (2) Stop QR scans for dining/shopping; (3) Keep vault locked.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
+            onClick={() => navigate('/ledger')}
+            style={{ borderColor: 'var(--neon-rose)', color: 'var(--neon-rose)' }}
+          >
+            Audit Leaks
+          </button>
         </div>
       )}
 
@@ -643,6 +731,8 @@ export function Dashboard({ onOpenNewTxn }: DashboardProps) {
           )}
         </div>
       </div>
+
+      {showPaydayWizard && <PaydayWizardModal onClose={() => setShowPaydayWizard(false)} />}
     </div>
   );
 }

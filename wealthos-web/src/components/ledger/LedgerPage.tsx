@@ -2,10 +2,29 @@ import { useState, useMemo } from 'react';
 import { useData } from '../../hooks/useData';
 import { formatMoney, parseMoney, getCategoryDisplayName, formatAccountLabel, type Transaction, type TxnType, type NeedWant } from '../../types';
 import { Tilt3DCard } from '../shared/Tilt3DCard';
-import { Plus, Search, Edit2, Trash2, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Clock, X, Check, Upload } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowLeftRight,
+  Clock,
+  X,
+  Check,
+  Upload,
+  HeartCrack,
+  Activity,
+  Flame,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { CategoryPicker } from '../shared/CategoryPicker';
 import { ImportStatementModal } from './ImportStatementModal';
+import { CycleForensicsCard } from './CycleForensicsCard';
+import { JoylessLeakModal } from './JoylessLeakModal';
 
 const PAGE_SIZE = 40;
 
@@ -23,6 +42,9 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
   const [description, setDescription] = useState(txn?.description || '');
   const [paymentMethod, setPaymentMethod] = useState(txn?.payment_method || 'UPI');
   const [needWant, setNeedWant] = useState<NeedWant | ''>(txn?.need_want || 'NEED');
+  const [spendEmotionTag, setSpendEmotionTag] = useState<string>((txn as any)?.spend_emotion_tag || 'NEED');
+  const [paymentRail, setPaymentRail] = useState<string>((txn as any)?.payment_rail || 'UPI_P2M');
+  const [rrn, setRrn] = useState<string>((txn as any)?.rrn || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -59,7 +81,12 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
         description: description || null, notes: null,
         payment_method: paymentMethod || null, need_want: type === 'EXPENSE' ? (needWant as NeedWant || null) : null,
         updated_at: now,
-      }, updatedEntries);
+        // Spec §4 & §6 fields
+        rrn: rrn || null,
+        payment_rail: paymentRail || null,
+        spend_emotion_tag: type === 'EXPENSE' ? spendEmotionTag : (type === 'INCOME' ? 'INCOME' : 'UNPLANNED_TRANSFER'),
+        user_overridden: true,
+      } as any, updatedEntries);
     } else {
       await addTransaction({
         id, type, amount_minor: amountMinor, currency,
@@ -70,7 +97,11 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
         payment_method: paymentMethod || null, need_want: needWant as NeedWant || null,
         tags: [], imported: false, source: 'WEB_MANUAL',
         created_at: now, updated_at: now, deleted_at: null,
-      }, [
+        rrn: rrn || null,
+        payment_rail: paymentRail || null,
+        spend_emotion_tag: type === 'EXPENSE' ? spendEmotionTag : (type === 'INCOME' ? 'INCOME' : 'UNPLANNED_TRANSFER'),
+        user_overridden: true,
+      } as any, [
         { txn_id: id, account_id: accountId, category_id: null, amount_minor: type === 'INCOME' ? amountMinor : -amountMinor },
         { txn_id: id, account_id: type === 'TRANSFER' ? toAccountId : null, category_id: categoryId || null, amount_minor: type === 'INCOME' ? -amountMinor : amountMinor },
       ]);
@@ -81,7 +112,7 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 540 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontFamily: 'var(--font-outfit)', fontSize: '1.25rem', fontWeight: 800 }}>
             {txn ? 'Edit Transaction' : 'Record Transaction'}
@@ -118,65 +149,108 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
           </div>
 
           <div className="form-group">
-            <label className="form-label">Amount ({currency})</label>
+            <label className="form-label">Amount ({currency}) *</label>
             <input
               type="number"
               step="any"
+              placeholder="0.00"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              placeholder="0.00"
+              required
               autoFocus
-              style={{
-                fontFamily: 'var(--font-outfit)',
-                fontSize: '1.35rem',
-                fontWeight: 800,
-                color: type === 'EXPENSE' ? 'var(--semantic-expense, #f43f5e)' : type === 'INCOME' ? 'var(--semantic-income, #10b981)' : 'var(--semantic-info, #0ea5e9)',
-              }}
+              style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-outfit)' }}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Account</label>
-              <select value={accountId} onChange={e => setAccountId(e.target.value)}>
+              <label className="form-label">Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Account *</label>
+              <select value={accountId} onChange={e => setAccountId(e.target.value)} required>
                 {accounts.map(a => <option key={a.id} value={a.id}>{formatAccountLabel(a)}</option>)}
               </select>
             </div>
-            {type === 'TRANSFER' ? (
-              <div className="form-group">
-                <label className="form-label">Destination Account</label>
-                <select value={toAccountId} onChange={e => setToAccountId(e.target.value)}>
-                  <option value="">Select destination...</option>
-                  {accounts.filter(a => a.id !== accountId).map(a => <option key={a.id} value={a.id}>{formatAccountLabel(a)}</option>)}
-                </select>
-              </div>
-            ) : (
-              <div className="form-group">
-                <label className="form-label">Category</label>
-                <CategoryPicker
-                  type={type}
-                  value={categoryId}
-                  onChange={setCategoryId}
-                  categories={categories}
-                />
-              </div>
-            )}
           </div>
+
+          {type === 'TRANSFER' && (
+            <div className="form-group">
+              <label className="form-label">Destination Account *</label>
+              <select value={toAccountId} onChange={e => setToAccountId(e.target.value)} required>
+                <option value="">Select recipient account</option>
+                {accounts.filter(a => a.id !== accountId).map(a => (
+                  <option key={a.id} value={a.id}>{formatAccountLabel(a)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {type !== 'TRANSFER' && (
+            <div className="form-group">
+              <label className="form-label">Category</label>
+              <select value={categoryId} onChange={e => setCategoryId(e.target.value)}>
+                <option value="">Uncategorised</option>
+                {filteredCategories.map(c => (
+                  <option key={c.id} value={c.id}>{getCategoryDisplayName(c.id, categories)}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Merchant / Description</label>
-              <input value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="e.g. Swiggy, Apple Store" />
+              <label className="form-label">Merchant / Payee</label>
+              <input placeholder="e.g. Swiggy, Amazon, Tea Stall" value={merchant} onChange={e => setMerchant(e.target.value)} />
             </div>
+
             <div className="form-group">
-              <label className="form-label">Date</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+              <label className="form-label">UPI Reference (RRN / UTR)</label>
+              <input placeholder="12-digit RRN" value={rrn} onChange={e => setRrn(e.target.value)} />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 2 }}>
+          {/* Emotion Tag Picker for Expenses */}
+          {type === 'EXPENSE' && (
+            <div className="form-group">
+              <label className="form-label">Psychology &amp; Emotion Tag (Video 12)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                {[
+                  { tag: 'NEED', label: '🛡️ Need' },
+                  { tag: 'PLANNED_WANT', label: '✨ Planned Want' },
+                  { tag: 'REGRET_LEAK', label: '💔 Joyless Leak' },
+                ].map(item => (
+                  <button
+                    key={item.tag}
+                    type="button"
+                    onClick={() => {
+                      setSpendEmotionTag(item.tag);
+                      setNeedWant(item.tag === 'NEED' ? 'NEED' : 'WANT');
+                    }}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: 'var(--radius-md)',
+                      background: spendEmotionTag === item.tag ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.02)',
+                      border: spendEmotionTag === item.tag ? '1px solid var(--border-default)' : '1px solid var(--border-subtle)',
+                      color: spendEmotionTag === item.tag ? '#fff' : 'var(--text-secondary)',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>
               <Check size={16} /> Save Record
             </button>
           </div>
@@ -187,18 +261,47 @@ function TxnModal({ txn, onClose }: { txn?: Transaction; onClose: () => void }) 
 }
 
 export function LedgerPage() {
-  const { transactions, accounts, categories, deleteTransaction, settings } = useData();
+  const { transactions, accounts, categories, deleteTransaction, salaryCycles, settings } = useData();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterAccount, setFilterAccount] = useState<string>('');
   const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterEmotion, setFilterEmotion] = useState<string>('ALL');
   const [page, setPage] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showJoylessModal, setShowJoylessModal] = useState(false);
+  const [showForensics, setShowForensics] = useState(true);
   const [editTxn, setEditTxn] = useState<Transaction | undefined>();
 
   const currency = settings?.currency || 'INR';
   const masked = settings?.mask_amounts || false;
+
+  const activeCycle = salaryCycles[0] || null;
+  const cycleSalary = activeCycle?.salary_paise || 3220000;
+  const cyclePlayJar = activeCycle?.jar_amounts?.PLAY || activeCycle?.jar_amounts?.WANTS || Math.floor(cycleSalary * 0.1);
+
+  // 7-Day Velocity calculation
+  const velocityMetrics = useMemo(() => {
+    const cycleStart = activeCycle?.cycle_start_date || '2026-10-01';
+    const startMs = new Date(cycleStart + 'T00:00:00Z').getTime();
+    const sevenDaysEndMs = startMs + 6 * 24 * 60 * 60 * 1000;
+    const sevenDaysEndDate = new Date(sevenDaysEndMs).toISOString().split('T')[0];
+
+    const first7DaysSpend = transactions
+      .filter(t => t.type === 'EXPENSE' && t.local_date >= cycleStart && t.local_date <= sevenDaysEndDate)
+      .reduce((sum, t) => sum + t.amount_minor, 0);
+
+    const velocityPct = cyclePlayJar > 0
+      ? Math.min(100, Math.floor((first7DaysSpend * 100) / cyclePlayJar))
+      : 0;
+
+    return {
+      first7DaysSpend,
+      velocityPct,
+      isAlert: velocityPct > 50,
+    };
+  }, [transactions, activeCycle, cyclePlayJar]);
 
   const uniqueFilterCategories = useMemo(() => {
     const seen = new Set<string>();
@@ -216,15 +319,19 @@ export function LedgerPage() {
     if (filterType !== 'ALL') txns = txns.filter(t => t.type === filterType);
     if (filterAccount) txns = txns.filter(t => t.account_id === filterAccount);
     if (filterCategory) txns = txns.filter(t => t.category_id === filterCategory);
+    if (filterEmotion !== 'ALL') {
+      txns = txns.filter(t => (t as any).spend_emotion_tag === filterEmotion);
+    }
     if (search) {
       const q = search.toLowerCase();
       txns = txns.filter(t =>
         t.merchant?.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q)
+        t.description?.toLowerCase().includes(q) ||
+        (t as any).rrn?.toLowerCase().includes(q)
       );
     }
     return txns;
-  }, [transactions, filterType, filterAccount, filterCategory, search]);
+  }, [transactions, filterType, filterAccount, filterCategory, filterEmotion, search]);
 
   const paginated = filtered.slice(0, (page + 1) * PAGE_SIZE);
   const totalExpense = filtered.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + t.amount_minor, 0);
@@ -250,10 +357,24 @@ export function LedgerPage() {
             Transactions
           </h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-            All your income, expense, and transfer records in one place
+            All your income, expense, and transfer records with emotion tags &amp; bank reconciliation
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowForensics(!showForensics)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--neon-cyan)' }}
+          >
+            <Activity size={16} /> {showForensics ? 'Hide Forensics' : 'Show Forensics'}
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowJoylessModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--neon-rose)' }}
+          >
+            <HeartCrack size={16} /> Joyless Leak Review
+          </button>
           <button
             className="btn btn-secondary"
             onClick={() => setShowImportModal(true)}
@@ -269,6 +390,49 @@ export function LedgerPage() {
           </button>
         </div>
       </div>
+
+      {/* 7-Day Velocity Bar (Spec §5.14 & §8.4) */}
+      <div
+        className="cyber-card"
+        style={{
+          padding: '12px 18px',
+          background: velocityMetrics.isAlert ? 'rgba(239, 68, 68, 0.08)' : 'rgba(6, 182, 212, 0.05)',
+          border: velocityMetrics.isAlert ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid var(--glass-border)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {velocityMetrics.isAlert ? <Flame size={16} style={{ color: 'var(--neon-rose)' }} /> : <Activity size={16} style={{ color: 'var(--neon-cyan)' }} />}
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f1f5f9' }}>
+              7-Day Discretionary Velocity Indicator (Video 12)
+            </span>
+            {velocityMetrics.isAlert && (
+              <span className="badge badge-rose" style={{ fontSize: '0.68rem' }}>
+                Alert: &gt;50% spent in first 7 days
+              </span>
+            )}
+          </div>
+          <span style={{ fontFamily: 'var(--font-outfit)', fontSize: '0.85rem', fontWeight: 800, color: velocityMetrics.isAlert ? 'var(--neon-rose)' : 'var(--neon-cyan)' }}>
+            {velocityMetrics.velocityPct}% of Play Budget Spent
+          </span>
+        </div>
+
+        <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%',
+              width: `${Math.min(100, velocityMetrics.velocityPct)}%`,
+              background: velocityMetrics.isAlert ? 'var(--neon-rose)' : 'var(--neon-cyan)',
+              transition: 'width 0.4s ease',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Cycle Forensics Card (§7) */}
+      {showForensics && (
+        <CycleForensicsCard onOpenJoylessReview={() => setShowJoylessModal(true)} />
+      )}
 
       {/* 3D Summary Cards */}
       <div className="bento-grid">
@@ -313,7 +477,7 @@ export function LedgerPage() {
             <div className="cyber-card">
               <div className="cyber-card-glow" style={{ background: 'var(--neon-cyan)' }} />
               <div className="stat-label">
-                <span>Net Balance</span>
+                <span>Net Cashflow</span>
                 <div className="cyber-icon-badge" style={{ background: 'var(--neon-cyan-glow)', color: 'var(--neon-cyan)' }}>
                   <ArrowLeftRight size={18} />
                 </div>
@@ -334,7 +498,7 @@ export function LedgerPage() {
           <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
             <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
             <input
-              placeholder="Search merchant, tags, notes..."
+              placeholder="Search merchant, RRN, tags..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ paddingLeft: 42 }}
@@ -355,14 +519,23 @@ export function LedgerPage() {
             ))}
           </div>
 
+          {/* Emotion Tag Filter */}
+          <select value={filterEmotion} onChange={e => setFilterEmotion(e.target.value)} style={{ width: 150 }}>
+            <option value="ALL">All Emotion Tags</option>
+            <option value="NEED">🛡️ Needs</option>
+            <option value="PLANNED_WANT">✨ Planned Wants</option>
+            <option value="REGRET_LEAK">💔 Joyless Leaks</option>
+            <option value="UNPLANNED_TRANSFER">💸 Transfers</option>
+          </select>
+
           {/* Account Filter */}
-          <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ width: 170 }}>
+          <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ width: 160 }}>
             <option value="">All Accounts</option>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
 
           {/* Category Filter */}
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: 170 }}>
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: 160 }}>
             <option value="">All Categories</option>
             {uniqueFilterCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -388,7 +561,10 @@ export function LedgerPage() {
                 const sign = isExpense ? '-' : isIncome ? '+' : '';
                 const color = isExpense ? 'var(--neon-rose)' : isIncome ? 'var(--neon-emerald)' : 'var(--neon-cyan)';
                 const acc = accounts.find(a => a.id === txn.account_id);
-                const cat = categories.find(c => c.id === txn.category_id);
+
+                const emotionTag = (txn as any).spend_emotion_tag || (txn.need_want === 'NEED' ? 'NEED' : 'PLANNED_WANT');
+                const paymentRail = (txn as any).payment_rail;
+                const rrn = (txn as any).rrn;
 
                 return (
                   <div
@@ -426,13 +602,37 @@ export function LedgerPage() {
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
                           {txn.merchant || txn.description || 'Transaction'}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                           <span>{acc?.name || 'Account'}</span>
                           {txn.category_id && <span>• {getCategoryDisplayName(txn.category_id, categories)}</span>}
-                          {txn.payment_method && <span>• {txn.payment_method}</span>}
-                          {txn.need_want && (
-                            <span className={`badge ${txn.need_want === 'NEED' ? 'badge-cyan' : txn.need_want === 'WANT' ? 'badge-purple' : 'badge-green'}`}>
-                              {txn.need_want}
+
+                          {/* Payment Rail Badge */}
+                          {paymentRail && (
+                            <span className="badge badge-purple" style={{ fontSize: '0.68rem' }}>
+                              {paymentRail}
+                            </span>
+                          )}
+
+                          {/* Emotion Tag Badge */}
+                          {isExpense && (
+                            <span
+                              className={`badge ${
+                                emotionTag === 'REGRET_LEAK'
+                                  ? 'badge-rose'
+                                  : emotionTag === 'NEED'
+                                  ? 'badge-cyan'
+                                  : 'badge-purple'
+                              }`}
+                              style={{ fontSize: '0.68rem' }}
+                            >
+                              {emotionTag === 'REGRET_LEAK' ? '💔 JOYLESS' : emotionTag}
+                            </span>
+                          )}
+
+                          {/* RRN Badge */}
+                          {rrn && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                              RRN: {rrn}
                             </span>
                           )}
                         </div>
@@ -497,6 +697,7 @@ export function LedgerPage() {
 
       {showModal && <TxnModal txn={editTxn} onClose={() => setShowModal(false)} />}
       {showImportModal && <ImportStatementModal onClose={() => setShowImportModal(false)} />}
+      {showJoylessModal && <JoylessLeakModal onClose={() => setShowJoylessModal(false)} />}
     </div>
   );
 }

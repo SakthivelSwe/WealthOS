@@ -24,6 +24,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  float-math-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Verify zero float math in domain financial paths
+        run: |
+          echo "Checking domain money paths for floating point usage..."
+          ! git grep -n -E "(\.toDouble\(\)|\.toFloat\(\)|Double\.(valueOf|parseDouble)|Float\.(valueOf|parseFloat))" domain/src/main/kotlin/app/privatemoney/domain/model/Money.kt domain/src/main/kotlin/app/privatemoney/domain/planning/
+      - name: Verify zero float math in web financial library
+        run: |
+          echo "Checking web money paths for floating point usage..."
+          ! git grep -n -E "parseFloat" wealthos-web/src/lib/money.ts wealthos-web/src/lib/allocation.ts wealthos-web/src/lib/sipProjection.ts wealthos-web/src/lib/debtPayoff.ts wealthos-web/src/lib/emiSimulator.ts wealthos-web/src/lib/healthRules.ts wealthos-web/src/lib/forensics.ts wealthos-web/src/lib/statementParser.ts wealthos-web/src/types/index.ts
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45

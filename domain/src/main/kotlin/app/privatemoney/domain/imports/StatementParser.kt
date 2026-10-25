@@ -2,9 +2,6 @@ package app.privatemoney.domain.imports
 
 import app.privatemoney.domain.ledger.TransactionType
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import java.util.zip.ZipInputStream
 
 data class ParsedStatementRow(
     val id: String,
@@ -15,6 +12,13 @@ data class ParsedStatementRow(
     val type: TransactionType,
     val reference: String?,
     val rawText: String,
+    val balanceMinor: Long? = null,
+    val paymentRail: PaymentRail = PaymentRail.NON_UPI,
+    val jarBucket: String = "NEEDS",
+    val emotionTag: SpendEmotionTag = SpendEmotionTag.NEED,
+    val isRecurringMandate: Boolean = false,
+    val isSelfTransfer: Boolean = false,
+    val formatName: String = "GENERIC",
 )
 
 data class StatementParseResult(
@@ -23,66 +27,48 @@ data class StatementParseResult(
     val invalidRows: Int,
     val detectedDelimiter: Char,
     val headers: List<String>,
+    val formatName: String = "GENERIC",
+    val totalDebitsMinor: Long = 0L,
+    val totalCreditsMinor: Long = 0L,
+    val smallScansTotalMinor: Long = 0L,
+    val smallScansCount: Int = 0,
+    val detectedMandatesCount: Int = 0,
+    val openingBalanceMinor: Long? = null,
+    val closingBalanceMinor: Long? = null,
+    val isReconciled: Boolean = false,
 )
 
 object StatementParser {
 
-    private val DATE_FORMATTERS = listOf(
-        DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-        DateTimeFormatter.ofPattern("dd-MM-yyyy"),
-        DateTimeFormatter.ofPattern("MM/dd/yyyy"),
-        DateTimeFormatter.ofPattern("d/M/yyyy"),
-        DateTimeFormatter.ofPattern("d-M-yyyy"),
-        DateTimeFormatter.ofPattern("dd-MMM-yyyy", Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("yyyy/MM/dd"),
-    )
+    private const val DEFAULT_SMALL_SCAN_THRESHOLD_PAISE = 20000L // ₹200
 
-    fun parseCsv(text: String, limits: ImportLimits = ImportLimits()): StatementParseResult {
-        val rawRows = CsvFormat.parse(text, limits)
+    fun parseCsv(
+        text: String,
+        limits: ImportLimits = ImportLimits(),
+        smallScanThresholdPaise: Long = DEFAULT_SMALL_SCAN_THRESHOLD_PAISE
+    ): StatementParseResult {
+        val detectedDelim = CsvReader.detectDelimiter(text)
+        val rawRows = CsvReader.read(text, detectedDelim, limits)
         if (rawRows.isEmpty()) {
-            return StatementParseResult(emptyList(), 0, 0, ',', emptyList())
+            return StatementParseResult(emptyList(), 0, 0, detectedDelim, emptyList())
         }
 
-        // Find header row (first row with recognisable column names)
-        var headerIndex = -1
-        var dateCol = -1
-        var descCol = -1
-        var debitCol = -1
-        var creditCol = -1
-        var amountCol = -1
+        val mapping = ColumnMapper.discoverMapping(rawRows)
+        val headerIndex = mapping?.headerRowIndex ?: 0
+        val headers = rawRows.getOrNull(headerIndex) ?: emptyList()
 
-        for (i in 0 until minOf(15, rawRows.size)) {
-            val candidate = rawRows[i].map { it.lowercase().trim() }
-            val dIdx = candidate.indexOfFirst { it.contains("date") || it == "dt" }
-            val descIdx = candidate.indexOfFirst {
-                it.contains("description") || it.contains("narration") || it.contains("particular") ||
-                    it.contains("detail") || it.contains("remarks") || it.contains("payee") || it == "memo"
-            }
-            if (dIdx >= 0 && descIdx >= 0) {
-                headerIndex = i
-                dateCol = dIdx
-                descCol = descIdx
-                debitCol = candidate.indexOfFirst { it.contains("debit") || it.contains("withdrawal") || it == "dr" }
-                creditCol = candidate.indexOfFirst { it.contains("credit") || it.contains("deposit") || it == "cr" }
-                amountCol = candidate.indexOfFirst { it == "amount" || it.contains("net amount") || it.contains("txn amount") }
-                break
-            }
-        }
+        val dateCol = mapping?.dateCol ?: 0
+        val descCol = mapping?.descriptionCol ?: 1
+        val debitCol = mapping?.debitCol ?: -1
+        val creditCol = mapping?.creditCol ?: -1
+        val amountCol = mapping?.amountCol ?: -1
+        val indicatorCol = mapping?.indicatorCol ?: -1
+        val balanceCol = mapping?.balanceCol ?: -1
+        val refCol = mapping?.referenceCol ?: -1
 
-        if (headerIndex == -1) {
-            // Fallback: assume first row is headers if >= 3 columns
-            headerIndex = 0
-            val candidate = rawRows[0].map { it.lowercase().trim() }
-            dateCol = candidate.indexOfFirst { it.contains("date") }.coerceAtLeast(0)
-            descCol = candidate.indexOfFirst { it.contains("desc") || it.contains("detail") || it.contains("narration") }.coerceAtLeast(1)
-            amountCol = candidate.indexOfFirst { it.contains("amount") }.coerceAtLeast(2)
-        }
-
-        val headers = rawRows[headerIndex]
         val parsed = mutableListOf<ParsedStatementRow>()
         var invalid = 0
+        val runningBalances = mutableListOf<Long>()
 
         for (i in (headerIndex + 1) until rawRows.size) {
             val row = rawRows[i]
@@ -91,8 +77,8 @@ object StatementParser {
             try {
                 val dateStr = row.getOrNull(dateCol)?.trim().orEmpty()
                 val desc = row.getOrNull(descCol)?.trim().orEmpty()
-                val date = parseDate(dateStr)
-                if (date == null) {
+                val date = ColumnMapper.parseDate(dateStr)
+                if (date == null || desc.isBlank()) {
                     invalid++
                     continue
                 }
@@ -100,47 +86,127 @@ object StatementParser {
                 var amountMinor = 0L
                 var type = TransactionType.EXPENSE
 
+                // 1. Split debit/credit columns
                 if (debitCol >= 0 && creditCol >= 0) {
                     val debitStr = row.getOrNull(debitCol)?.trim().orEmpty()
                     val creditStr = row.getOrNull(creditCol)?.trim().orEmpty()
                     val debitVal = parseAmountMinor(debitStr)
                     val creditVal = parseAmountMinor(creditStr)
 
-                    if (debitVal > 0) {
+                    if (debitVal > 0L) {
                         amountMinor = debitVal
                         type = TransactionType.EXPENSE
-                    } else if (creditVal > 0) {
+                    } else if (creditVal > 0L) {
                         amountMinor = creditVal
                         type = TransactionType.INCOME
                     }
                 }
 
+                // 2. Single amount column
                 if (amountMinor == 0L && amountCol >= 0) {
                     val amtStr = row.getOrNull(amountCol)?.trim().orEmpty()
-                    val isNegative = amtStr.startsWith("-") || (amtStr.startsWith("(") && amtStr.endsWith(")"))
+                    val indicatorStr = if (indicatorCol >= 0) row.getOrNull(indicatorCol)?.trim().orEmpty().uppercase() else ""
+                    val isNegativeByFormat = amtStr.startsWith("-") || (amtStr.startsWith("(") && amtStr.endsWith(")")) || amtStr.endsWith("Dr", ignoreCase = true)
+                    val isDebitIndicator = indicatorStr == "DR" || indicatorStr == "D" || indicatorStr == "DEBIT" || indicatorStr == "W"
+                    val isCreditIndicator = indicatorStr == "CR" || indicatorStr == "C" || indicatorStr == "CREDIT" || indicatorStr == "DEP"
+
                     val parsedAmt = parseAmountMinor(amtStr)
                     amountMinor = parsedAmt
-                    type = if (isNegative) TransactionType.EXPENSE else TransactionType.INCOME
+
+                    type = when {
+                        isCreditIndicator -> TransactionType.INCOME
+                        isDebitIndicator -> TransactionType.EXPENSE
+                        isNegativeByFormat -> TransactionType.EXPENSE
+                        else -> TransactionType.INCOME // default positive credit unless indicator says debit
+                    }
                 }
 
-                if (amountMinor > 0 && desc.isNotBlank()) {
-                    parsed.add(
-                        ParsedStatementRow(
-                            id = "import_row_$i",
-                            date = date,
-                            description = desc,
-                            merchant = extractMerchant(desc),
-                            amountMinor = amountMinor,
-                            type = type,
-                            reference = null,
-                            rawText = row.joinToString(","),
-                        )
-                    )
-                } else {
+                if (amountMinor <= 0L) {
                     invalid++
+                    continue
                 }
-            } catch (e: Exception) {
+
+                val balanceMinor = if (balanceCol >= 0) {
+                    val bStr = row.getOrNull(balanceCol)?.trim().orEmpty()
+                    if (bStr.isNotBlank() && bStr != "-" && bStr != "—") {
+                        val bVal = parseAmountMinor(bStr)
+                        runningBalances.add(bVal)
+                        bVal
+                    } else null
+                } else null
+
+                // Decode narration
+                val decoded = NarrationDecoder.decode(desc)
+                val explicitRef = if (refCol >= 0) row.getOrNull(refCol)?.trim()?.takeIf { it.isNotBlank() } else null
+                val finalReference = explicitRef ?: decoded.referenceOrRrn
+
+                val finalType = if (decoded.isSelfTransfer) {
+                    TransactionType.TRANSFER
+                } else {
+                    type
+                }
+
+                // Classify
+                val isCredit = finalType == TransactionType.INCOME
+                val classification = Classifier.classify(
+                    merchantOrNarration = decoded.cleanMerchantOrPayee,
+                    amountMinor = amountMinor,
+                    rail = decoded.paymentRail,
+                    isCredit = isCredit
+                )
+
+                parsed.add(
+                    ParsedStatementRow(
+                        id = "import_row_${i}_${System.nanoTime() % 1000000}",
+                        date = date,
+                        description = desc,
+                        merchant = decoded.cleanMerchantOrPayee,
+                        amountMinor = amountMinor,
+                        type = finalType,
+                        reference = finalReference,
+                        rawText = row.joinToString(","),
+                        balanceMinor = balanceMinor,
+                        paymentRail = decoded.paymentRail,
+                        jarBucket = classification.jarBucket,
+                        emotionTag = classification.emotionTag,
+                        isRecurringMandate = decoded.isRecurringMandate || classification.isRecurringMandate,
+                        isSelfTransfer = decoded.isSelfTransfer,
+                        formatName = decoded.formatName
+                    )
+                )
+            } catch (_: Exception) {
                 invalid++
+            }
+        }
+
+        val totalDebits = parsed.filter { it.type == TransactionType.EXPENSE || it.type == TransactionType.TRANSFER }.sumOf { it.amountMinor }
+        val totalCredits = parsed.filter { it.type == TransactionType.INCOME }.sumOf { it.amountMinor }
+        val smallScans = parsed.filter { it.type == TransactionType.EXPENSE && it.amountMinor <= smallScanThresholdPaise }
+        val smallScansTotal = smallScans.sumOf { it.amountMinor }
+        val mandateCount = parsed.count { it.isRecurringMandate }
+
+        // Reconciliation
+        var openBal: Long? = null
+        var closeBal: Long? = null
+        var isReconciled = false
+
+        if (runningBalances.size >= 2 && parsed.isNotEmpty()) {
+            val first = parsed.first()
+            val last = parsed.last()
+            if (first.balanceMinor != null && last.balanceMinor != null) {
+                if (!first.date.isAfter(last.date)) {
+                    // Chronological ascending
+                    val firstEffect = if (first.type == TransactionType.INCOME) first.amountMinor else -first.amountMinor
+                    openBal = first.balanceMinor - firstEffect
+                    closeBal = last.balanceMinor
+                } else {
+                    // Chronological descending
+                    val lastEffect = if (last.type == TransactionType.INCOME) last.amountMinor else -last.amountMinor
+                    openBal = last.balanceMinor - lastEffect
+                    closeBal = first.balanceMinor
+                }
+                val expectedClosing = openBal + totalCredits - totalDebits
+                isReconciled = (expectedClosing == closeBal)
             }
         }
 
@@ -148,43 +214,31 @@ object StatementParser {
             rows = parsed,
             totalFound = rawRows.size - headerIndex - 1,
             invalidRows = invalid,
-            detectedDelimiter = ',',
+            detectedDelimiter = detectedDelim,
             headers = headers,
+            formatName = parsed.firstOrNull()?.formatName ?: "UNKNOWN",
+            totalDebitsMinor = totalDebits,
+            totalCreditsMinor = totalCredits,
+            smallScansTotalMinor = smallScansTotal,
+            smallScansCount = smallScans.size,
+            detectedMandatesCount = mandateCount,
+            openingBalanceMinor = openBal,
+            closingBalanceMinor = closeBal,
+            isReconciled = isReconciled
         )
     }
 
+    /**
+     * Pure integer parsing of minor units from amount strings.
+     */
     fun parseAmountMinor(text: String): Long {
         val clean = text.replace(Regex("[^0-9.]"), "")
         if (clean.isBlank()) return 0L
         val parts = clean.split(".")
         val integerPart = parts[0].toLongOrNull() ?: 0L
-        val decimalPart = if (parts.size > 1) parts[1].padEnd(2, '0').take(2).toIntOrNull() ?: 0 else 0
-        return integerPart * 100 + decimalPart
-    }
-
-    private fun parseDate(text: String): LocalDate? {
-        val clean = text.trim().replace('.', '-').replace('/', '-')
-        for (f in DATE_FORMATTERS) {
-            try {
-                return LocalDate.parse(text, f)
-            } catch (e: Exception) {}
-            try {
-                return LocalDate.parse(clean, f)
-            } catch (e: Exception) {}
-        }
-        return null
-    }
-
-    private fun extractMerchant(description: String): String {
-        val cleaned = description
-            .replace(Regex("(?i)upi[-/:]"), " ")
-            .replace(Regex("(?i)pos[-/:]"), " ")
-            .replace(Regex("(?i)card[-/:]"), " ")
-            .replace(Regex("(?i)atm[-/:]"), " ")
-            .replace(Regex("(?i)ach[-/:]"), " ")
-            .replace(Regex("[0-9]{6,}"), " ") // Strip long reference numbers
-            .trim()
-        val tokens = cleaned.split(Regex("[^a-zA-Z0-9&]+")).filter { it.length > 1 }
-        return tokens.take(3).joinToString(" ").ifBlank { description.take(25) }
+        val decimalPart = if (parts.size > 1) {
+            parts[1].take(2).padEnd(2, '0').toLongOrNull() ?: 0L
+        } else 0L
+        return integerPart * 100L + decimalPart
     }
 }

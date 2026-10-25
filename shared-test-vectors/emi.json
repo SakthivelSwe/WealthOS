@@ -1,0 +1,9 @@
+{
+  "description": "Appendix A.5 EMI Simulator Golden Values from WEALTHOS_FINAL_SPEC.md v3",
+  "principalPaise": 50000000,
+  "annualPercent": 12,
+  "tenureMonths": 36,
+  "expectedEmiPaise": 1660715,
+  "expectedTotalInterestPaise": 9785763,
+  "expectedTotalRepaymentPaise": 59785763
+}

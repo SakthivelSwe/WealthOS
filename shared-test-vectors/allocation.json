@@ -1,0 +1,246 @@
+{
+  "description": "Appendix A.1 & A.2 Allocation Golden Values from WEALTHOS_FINAL_SPEC.md v3",
+  "defaults": {
+    "baselinePaise": 1771000,
+    "bufferPaise": 150000,
+    "creepLock": true,
+    "emergencyBalancePaise": 0,
+    "emergencyTargetMonths": 7,
+    "daysInCycle": 30,
+    "framework": "SIX_JAR",
+    "emiPaise": 0,
+    "shiftPlayToLongTerm": false
+  },
+  "cases": [
+    {
+      "id": "A.1-25k",
+      "name": "Salary ₹25,000",
+      "salaryPaise": 2500000,
+      "expectedJars": {
+        "NEEDS": 1771000,
+        "FREEDOM_SIP": 250000,
+        "EDUCATION": 104000,
+        "PLAY": 0,
+        "LONG_TERM": 250000,
+        "GIVING": 125000
+      },
+      "expectedDailyPaise": 0,
+      "expectedWeeklyPaise": 0,
+      "expectedFlags": ["SPEND_JAR_EMPTY"]
+    },
+    {
+      "id": "A.1-32.2k",
+      "name": "Salary ₹32,200",
+      "salaryPaise": 3220000,
+      "expectedJars": {
+        "NEEDS": 1771000,
+        "FREEDOM_SIP": 322000,
+        "EDUCATION": 322000,
+        "PLAY": 322000,
+        "LONG_TERM": 322000,
+        "GIVING": 161000
+      },
+      "expectedDailyPaise": 10733,
+      "expectedWeeklyPaise": 75133,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.1-35k",
+      "name": "Salary ₹35,000",
+      "salaryPaise": 3500000,
+      "expectedJars": {
+        "NEEDS": 1921000,
+        "FREEDOM_SIP": 350000,
+        "EDUCATION": 350000,
+        "PLAY": 350000,
+        "LONG_TERM": 354000,
+        "GIVING": 175000
+      },
+      "expectedDailyPaise": 11666,
+      "expectedWeeklyPaise": 81666,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.1-40k",
+      "name": "Salary ₹40,000",
+      "salaryPaise": 4000000,
+      "expectedJars": {
+        "NEEDS": 1921000,
+        "FREEDOM_SIP": 400000,
+        "EDUCATION": 400000,
+        "PLAY": 400000,
+        "LONG_TERM": 679000,
+        "GIVING": 200000
+      },
+      "expectedDailyPaise": 13333,
+      "expectedWeeklyPaise": 93333,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.1-45k",
+      "name": "Salary ₹45,000",
+      "salaryPaise": 4500000,
+      "expectedJars": {
+        "NEEDS": 1921000,
+        "FREEDOM_SIP": 450000,
+        "EDUCATION": 450000,
+        "PLAY": 450000,
+        "LONG_TERM": 1004000,
+        "GIVING": 225000
+      },
+      "expectedDailyPaise": 15000,
+      "expectedWeeklyPaise": 105000,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.1-60k",
+      "name": "Salary ₹60,000",
+      "salaryPaise": 6000000,
+      "expectedJars": {
+        "NEEDS": 1921000,
+        "FREEDOM_SIP": 600000,
+        "EDUCATION": 600000,
+        "PLAY": 600000,
+        "LONG_TERM": 1979000,
+        "GIVING": 300000
+      },
+      "expectedDailyPaise": 20000,
+      "expectedWeeklyPaise": 140000,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.2-32.2k-emi-5k",
+      "name": "₹32,200 with EMI ₹5,000",
+      "salaryPaise": 3220000,
+      "emiPaise": 500000,
+      "expectedJars": {
+        "NEEDS": 2271000,
+        "FREEDOM_SIP": 322000,
+        "EDUCATION": 144000,
+        "PLAY": 0,
+        "LONG_TERM": 322000,
+        "GIVING": 161000
+      },
+      "expectedDailyPaise": 0,
+      "expectedWeeklyPaise": 0,
+      "expectedFlags": ["SPEND_JAR_EMPTY"]
+    },
+    {
+      "id": "A.2-45k-emergency-complete",
+      "name": "₹45,000, emergency fund complete",
+      "salaryPaise": 4500000,
+      "emergencyBalancePaise": 12397000,
+      "expectedJars": {
+        "NEEDS": 1921000,
+        "FREEDOM_SIP": 1454000,
+        "EDUCATION": 450000,
+        "PLAY": 450000,
+        "LONG_TERM": 0,
+        "GIVING": 225000
+      },
+      "expectedDailyPaise": 15000,
+      "expectedWeeklyPaise": 105000,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.2-32.2k-deficit",
+      "name": "₹32,200, baseline ₹20,000 + EMI ₹5,000 (deficit)",
+      "salaryPaise": 3220000,
+      "baselinePaise": 2000000,
+      "emiPaise": 500000,
+      "expectedJars": {
+        "NEEDS": 2500000,
+        "FREEDOM_SIP": 322000,
+        "EDUCATION": 0,
+        "PLAY": 0,
+        "LONG_TERM": 322000,
+        "GIVING": 76000
+      },
+      "expectedDailyPaise": 0,
+      "expectedWeeklyPaise": 0,
+      "expectedFlags": ["SPEND_JAR_EMPTY"]
+    },
+    {
+      "id": "A.2-32.2k-shortfall",
+      "name": "₹32,200, baseline ₹30,000 + EMI ₹3,000 (shortfall)",
+      "salaryPaise": 3220000,
+      "baselinePaise": 3000000,
+      "emiPaise": 300000,
+      "expectedJars": {
+        "NEEDS": 3220000,
+        "FREEDOM_SIP": 0,
+        "EDUCATION": 0,
+        "PLAY": 0,
+        "LONG_TERM": 0,
+        "GIVING": 0
+      },
+      "expectedDailyPaise": 0,
+      "expectedWeeklyPaise": 0,
+      "expectedFlags": ["SHORTFALL"]
+    },
+    {
+      "id": "A.2-32.2k-shift",
+      "name": "₹32,200 with Play→Long-Term shift",
+      "salaryPaise": 3220000,
+      "shiftPlayToLongTerm": true,
+      "expectedJars": {
+        "NEEDS": 1771000,
+        "FREEDOM_SIP": 322000,
+        "EDUCATION": 322000,
+        "PLAY": 161000,
+        "LONG_TERM": 483000,
+        "GIVING": 161000
+      },
+      "expectedDailyPaise": 5366,
+      "expectedWeeklyPaise": 37566,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.2-45k-creep-off",
+      "name": "₹45,000, creep lock off",
+      "salaryPaise": 4500000,
+      "creepLock": false,
+      "expectedJars": {
+        "NEEDS": 2475000,
+        "FREEDOM_SIP": 450000,
+        "EDUCATION": 450000,
+        "PLAY": 450000,
+        "LONG_TERM": 450000,
+        "GIVING": 225000
+      },
+      "expectedDailyPaise": 15000,
+      "expectedWeeklyPaise": 105000,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.2-three-box-40k",
+      "name": "THREE_BOX, ₹40,000",
+      "framework": "THREE_BOX",
+      "salaryPaise": 4000000,
+      "expectedJars": {
+        "NEEDS": 1921000,
+        "EMERGENCY": 479000,
+        "BUFFER": 400000,
+        "MEDIUM_TERM": 400000,
+        "LONG_TERM_SIP": 800000
+      },
+      "expectedDailyPaise": 0,
+      "expectedWeeklyPaise": 0,
+      "expectedFlags": []
+    },
+    {
+      "id": "A.2-50-30-20-32.2k",
+      "name": "50/30/20, ₹32,200",
+      "framework": "FIFTY_THIRTY_TWENTY",
+      "salaryPaise": 3220000,
+      "expectedJars": {
+        "NEEDS": 1771000,
+        "WANTS": 805000,
+        "SAVINGS": 644000
+      },
+      "expectedDailyPaise": 26833,
+      "expectedWeeklyPaise": 187833,
+      "expectedFlags": []
+    }
+  ]
+}

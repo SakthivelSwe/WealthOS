@@ -19,6 +19,12 @@ data class AccountEntity(
     val archived: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val accountRole: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val bankName: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val interestRatePercentBps: Int = 0,
+    @androidx.room.ColumnInfo(defaultValue = "0") val monthlyEmiPaise: Long = 0L,
+    @androidx.room.ColumnInfo(defaultValue = "0") val outstandingPaise: Long = 0L,
+    @androidx.room.ColumnInfo(defaultValue = "0") val isBnpl: Boolean = false,
 )
 
 @Entity(tableName = "category", indices = [Index("parentId")])
@@ -44,6 +50,7 @@ data class CategoryEntity(
         Index("merchant"),
         Index("createdAt"),
         Index("updatedAt"),
+        Index("rrn"),
     ],
 )
 data class TxnEntity(
@@ -66,6 +73,38 @@ data class TxnEntity(
     val createdAt: Long,
     val updatedAt: Long,
     val deletedAt: Long?,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val jarBucket: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val spendEmotionTag: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val paymentRail: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val rrn: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val counterpartyName: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val vpa: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val importBatchId: String? = null,
+    @androidx.room.ColumnInfo(defaultValue = "0") val userOverridden: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "0") val isRecurringMandate: Boolean = false,
+)
+
+@Entity(
+    tableName = "salary_cycles",
+    indices = [
+        Index("cycleStartDate"),
+        Index("userId", "cycleStartDate", unique = true),
+    ],
+)
+data class SalaryCycleEntity(
+    @PrimaryKey val id: String,
+    val userId: String = "",
+    val cycleStartDate: String,
+    val salaryPaise: Long,
+    val baselinePaise: Long,
+    val emiPaise: Long = 0L,
+    val framework: String,
+    val jarAmountsJson: String,
+    val daysInCycle: Int,
+    val dailySafeUpiPaise: Long = 0L,
+    val netWorthSnapshotPaise: Long? = null,
+    val checklistStateJson: String = "{}",
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Entity(

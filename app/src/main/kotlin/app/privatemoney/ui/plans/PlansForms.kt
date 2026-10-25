@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import app.privatemoney.domain.model.Currency
+import app.privatemoney.domain.model.Money
 import app.privatemoney.ui.MoneyFormat
 import java.time.LocalDate
 
@@ -125,11 +126,11 @@ fun AddGoalDialog(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            val t = (target.toDoubleOrNull() ?: 0.0) * 100
-                            val c = (current.toDoubleOrNull() ?: 0.0) * 100
-                            val m = (monthly.toDoubleOrNull() ?: 0.0) * 100
+                            val t = Money.parseIndian(target, currency).amountMinor
+                            val c = Money.parseIndian(current, currency).amountMinor
+                            val m = Money.parseIndian(monthly, currency).amountMinor
                             if (name.isNotBlank() && t > 0) {
-                                onSave(name, t.toLong(), c.toLong(), m.toLong(), currency.code, date)
+                                onSave(name, t, c, m, currency.code, date)
                                 onDismiss()
                             }
                         },
@@ -179,11 +180,11 @@ fun AddDebtDialog(
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(Modifier.width(8.dp))
                     Button(onClick = {
-                        val p = (principal.toDoubleOrNull() ?: 0.0) * 100
-                        val b = (balance.toDoubleOrNull() ?: 0.0) * 100
-                        val m = (monthly.toDoubleOrNull() ?: 0.0) * 100
+                        val p = Money.parseIndian(principal, currency).amountMinor
+                        val b = Money.parseIndian(balance, currency).amountMinor
+                        val m = Money.parseIndian(monthly, currency).amountMinor
                         if (name.isNotBlank() && p > 0) {
-                            onSave(name, p.toLong(), b.toLong(), apr, m.toLong(), currency.code)
+                            onSave(name, p, b, apr, m, currency.code)
                             onDismiss()
                         }
                     }, shape = RoundedCornerShape(10.dp)) {
@@ -212,8 +213,8 @@ fun AddChitFundDialog(
     val sym = MoneyFormat.symbol(currency)
 
     val monthsInt = totalMonths.toIntOrNull() ?: 0
-    val monthlyDouble = monthly.toDoubleOrNull() ?: 0.0
-    val totalPrizePoolMinor = (monthsInt * monthlyDouble * 100).toLong()
+    val monthlyMinor = Money.parseIndian(monthly, currency).amountMinor
+    val totalPrizePoolMinor = monthsInt * monthlyMinor
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -343,7 +344,7 @@ fun AddChitFundDialog(
                             style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White),
                         )
                         Text(
-                            text = "$monthsInt members × ${MoneyFormat.format((monthlyDouble * 100).toLong(), currency)} monthly",
+                            text = "$monthsInt members × ${MoneyFormat.format(monthlyMinor, currency)} monthly",
                             style = TextStyle(fontSize = 10.sp, color = Color.Gray),
                         )
                     }
@@ -364,7 +365,7 @@ fun AddChitFundDialog(
                                     append(name)
                                     if (company.isNotBlank()) append(" ($company)")
                                 }
-                                val m = (monthlyDouble * 100).toLong()
+                                val m = monthlyMinor
                                 onSave(fullName, monthsInt, startDate.take(7), m, currency.code)
                                 onDismiss()
                             }

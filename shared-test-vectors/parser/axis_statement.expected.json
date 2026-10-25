@@ -1,0 +1,28 @@
+{
+  "description": "Expected parse results for axis_statement.csv",
+  "totalRows": 5,
+  "totalCreditsMinor": 3220000,
+  "totalDebitsMinor": 618400,
+  "netCashflowMinor": 2601600,
+  "openingBalanceMinor": 0,
+  "closingBalanceMinor": 2601600,
+  "isReconciled": true,
+  "smallScansCount": 1,
+  "smallScansTotalMinor": 8500,
+  "detectedMandatesCount": 2,
+  "firstRow": {
+    "date": "2026-10-05",
+    "amountMinor": 3220000,
+    "type": "INCOME",
+    "merchant": "TECHCORP SALARY",
+    "reference": "N0981726451"
+  },
+  "secondRow": {
+    "date": "2026-10-06",
+    "amountMinor": 45000,
+    "type": "EXPENSE",
+    "merchant": "SWIGGY",
+    "reference": "327918291048",
+    "jarBucket": "PLAY"
+  }
+}

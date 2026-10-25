@@ -160,6 +160,89 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(KEY_HIDE_SENSITIVE_NOTIFICATIONS, true)
         set(value) = prefs.edit().putBoolean(KEY_HIDE_SENSITIVE_NOTIFICATIONS, value).apply()
 
+    // WealthOS Spec 4.1 Financial Profile Additions
+    var incomeScheduleType: String
+        get() = prefs.getString(KEY_INCOME_SCHEDULE_TYPE, "VARIABLE_WINDOW") ?: "VARIABLE_WINDOW"
+        set(value) = prefs.edit().putString(KEY_INCOME_SCHEDULE_TYPE, value).apply()
+
+    var paydayWindowStartDay: Int
+        get() = prefs.getInt(KEY_PAYDAY_WINDOW_START_DAY, 2)
+        set(value) = prefs.edit().putInt(KEY_PAYDAY_WINDOW_START_DAY, value).apply()
+
+    var paydayWindowEndDay: Int
+        get() = prefs.getInt(KEY_PAYDAY_WINDOW_END_DAY, 5)
+        set(value) = prefs.edit().putInt(KEY_PAYDAY_WINDOW_END_DAY, value).apply()
+
+    var expectedSalaryMinPaise: Long
+        get() = prefs.getLong(KEY_EXPECTED_SALARY_MIN_PAISE, 0L)
+        set(value) = prefs.edit().putLong(KEY_EXPECTED_SALARY_MIN_PAISE, value).apply()
+
+    var expectedSalaryMaxPaise: Long
+        get() = prefs.getLong(KEY_EXPECTED_SALARY_MAX_PAISE, 0L)
+        set(value) = prefs.edit().putLong(KEY_EXPECTED_SALARY_MAX_PAISE, value).apply()
+
+    var fixedBaselinePaise: Long?
+        get() = if (prefs.contains(KEY_FIXED_BASELINE_PAISE)) prefs.getLong(KEY_FIXED_BASELINE_PAISE, 0L) else null
+        set(value) {
+            if (value != null) prefs.edit().putLong(KEY_FIXED_BASELINE_PAISE, value).apply()
+            else prefs.edit().remove(KEY_FIXED_BASELINE_PAISE).apply()
+        }
+
+    var baselineMethod: String
+        get() = prefs.getString(KEY_BASELINE_METHOD, "ESTIMATE_55_PERCENT") ?: "ESTIMATE_55_PERCENT"
+        set(value) = prefs.edit().putString(KEY_BASELINE_METHOD, value).apply()
+
+    var lifestyleCreepLock: Boolean
+        get() = prefs.getBoolean(KEY_LIFESTYLE_CREEP_LOCK, true)
+        set(value) = prefs.edit().putBoolean(KEY_LIFESTYLE_CREEP_LOCK, value).apply()
+
+    var needsBufferPaise: Long
+        get() = prefs.getLong(KEY_NEEDS_BUFFER_PAISE, 150000L) // ₹1,500
+        set(value) = prefs.edit().putLong(KEY_NEEDS_BUFFER_PAISE, value).apply()
+
+    var allocationFramework: String
+        get() = prefs.getString(KEY_ALLOCATION_FRAMEWORK, "SIX_JAR") ?: "SIX_JAR"
+        set(value) = prefs.edit().putString(KEY_ALLOCATION_FRAMEWORK, value).apply()
+
+    var customBpsJson: String
+        get() = prefs.getString(KEY_CUSTOM_BPS_JSON, "{}") ?: "{}"
+        set(value) = prefs.edit().putString(KEY_CUSTOM_BPS_JSON, value).apply()
+
+    var playToLongTermShift: Boolean
+        get() = prefs.getBoolean(KEY_PLAY_TO_LONG_TERM_SHIFT, false)
+        set(value) = prefs.edit().putBoolean(KEY_PLAY_TO_LONG_TERM_SHIFT, value).apply()
+
+    var upiNeedsAllowancePaise: Long
+        get() = prefs.getLong(KEY_UPI_NEEDS_ALLOWANCE_PAISE, 0L)
+        set(value) = prefs.edit().putLong(KEY_UPI_NEEDS_ALLOWANCE_PAISE, value).apply()
+
+    var emergencyTargetMonths: Int
+        get() = prefs.getInt(KEY_EMERGENCY_TARGET_MONTHS, 7)
+        set(value) = prefs.edit().putInt(KEY_EMERGENCY_TARGET_MONTHS, value).apply()
+
+    var survivalThresholdPaise: Long?
+        get() = if (prefs.contains(KEY_SURVIVAL_THRESHOLD_PAISE)) prefs.getLong(KEY_SURVIVAL_THRESHOLD_PAISE, 0L) else null
+        set(value) {
+            if (value != null) prefs.edit().putLong(KEY_SURVIVAL_THRESHOLD_PAISE, value).apply()
+            else prefs.edit().remove(KEY_SURVIVAL_THRESHOLD_PAISE).apply()
+        }
+
+    var smallScanThresholdPaise: Long
+        get() = prefs.getLong(KEY_SMALL_SCAN_THRESHOLD_PAISE, 20000L) // ₹200
+        set(value) = prefs.edit().putLong(KEY_SMALL_SCAN_THRESHOLD_PAISE, value).apply()
+
+    var egoCheckThresholdPaise: Long
+        get() = prefs.getLong(KEY_EGO_CHECK_THRESHOLD_PAISE, 200000L) // ₹2,000
+        set(value) = prefs.edit().putLong(KEY_EGO_CHECK_THRESHOLD_PAISE, value).apply()
+
+    var cooldownHours: Int
+        get() = prefs.getInt(KEY_COOLDOWN_HOURS, 48)
+        set(value) = prefs.edit().putInt(KEY_COOLDOWN_HOURS, value).apply()
+
+    var language: String
+        get() = prefs.getString(KEY_LANGUAGE, "en") ?: "en"
+        set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
+
     companion object {
         const val DEFAULT_TIMEOUT_MS = 60_000L
         const val DEFAULT_SUPABASE_URL = "https://zahzagnindkkttdpmqii.supabase.co"
@@ -196,5 +279,26 @@ class AppSettings(context: Context) {
         private const val KEY_QUIET_START_HOUR = "quiet_start_hour"
         private const val KEY_QUIET_END_HOUR = "quiet_end_hour"
         private const val KEY_LAST_REVIEW_DATE = "last_review_date"
+
+        // Financial Profile Keys
+        private const val KEY_INCOME_SCHEDULE_TYPE = "income_schedule_type"
+        private const val KEY_PAYDAY_WINDOW_START_DAY = "payday_window_start_day"
+        private const val KEY_PAYDAY_WINDOW_END_DAY = "payday_window_end_day"
+        private const val KEY_EXPECTED_SALARY_MIN_PAISE = "expected_salary_min_paise"
+        private const val KEY_EXPECTED_SALARY_MAX_PAISE = "expected_salary_max_paise"
+        private const val KEY_FIXED_BASELINE_PAISE = "fixed_baseline_paise"
+        private const val KEY_BASELINE_METHOD = "baseline_method"
+        private const val KEY_LIFESTYLE_CREEP_LOCK = "lifestyle_creep_lock"
+        private const val KEY_NEEDS_BUFFER_PAISE = "needs_buffer_paise"
+        private const val KEY_ALLOCATION_FRAMEWORK = "allocation_framework"
+        private const val KEY_CUSTOM_BPS_JSON = "custom_bps_json"
+        private const val KEY_PLAY_TO_LONG_TERM_SHIFT = "play_to_long_term_shift"
+        private const val KEY_UPI_NEEDS_ALLOWANCE_PAISE = "upi_needs_allowance_paise"
+        private const val KEY_EMERGENCY_TARGET_MONTHS = "emergency_target_months"
+        private const val KEY_SURVIVAL_THRESHOLD_PAISE = "survival_threshold_paise"
+        private const val KEY_SMALL_SCAN_THRESHOLD_PAISE = "small_scan_threshold_paise"
+        private const val KEY_EGO_CHECK_THRESHOLD_PAISE = "ego_check_threshold_paise"
+        private const val KEY_COOLDOWN_HOURS = "cooldown_hours"
+        private const val KEY_LANGUAGE = "language"
     }
 }
