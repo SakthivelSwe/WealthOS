@@ -15,10 +15,15 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import app.privatemoney.notification.NightlyReminderScheduler
 import app.privatemoney.notification.NotificationHub
 import app.privatemoney.security.BiometricAuth
 import app.privatemoney.ui.PmosRoot
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.widget.Toast
 
 class MainActivity : FragmentActivity() {
     private val app get() = application as App
@@ -34,6 +39,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         updateSecureFlag()
         handleNotificationAction(intent)
+        handleDeepLinkAuth(intent)
 
         // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -65,6 +71,28 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleNotificationAction(intent)
+        handleDeepLinkAuth(intent)
+    }
+
+    private fun handleDeepLinkAuth(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme == "wealthos" || uri.host?.contains("supabase") == true || uri.host?.contains("pages.dev") == true) {
+            val fullUrl = uri.toString()
+            lifecycleScope.launch(Dispatchers.IO) {
+                val email = app.authService.currentUserEmail() ?: app.settings.supabaseUserEmail ?: ""
+                val res = app.authService.verifyTokenOrLink(email, fullUrl)
+                if (res.isSuccess) {
+                    val syncRes = app.syncEngine.syncAll()
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Cloud account verified! Pulled ${syncRes.accountsPulled} accounts.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
     }
 
     override fun onRequestPermissionsResult(

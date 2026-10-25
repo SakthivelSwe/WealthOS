@@ -1,5 +1,7 @@
 package app.privatemoney.ui.auth
 
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -20,11 +22,15 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,6 +56,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.privatemoney.App
@@ -76,7 +84,10 @@ fun SupabaseLoginSheet(
 
     val isLoggedIn = app.authService.isLoggedIn()
     var email by remember { mutableStateOf(app.authService.currentUserEmail() ?: "") }
-    var otpCode by remember { mutableStateOf("") }
+    var verificationInput by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isPasswordMode by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
     var step by remember { mutableStateOf(if (isLoggedIn) "LOGGED_IN" else "EMAIL") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -314,7 +325,11 @@ fun SupabaseLoginSheet(
 
                 "EMAIL" -> {
                     Text(
-                        text = "Enter the email ID you used on the WealthOS Web application. We will send you a 6-digit verification code to instantly connect and sync your ledger.",
+                        text = if (isPasswordMode) {
+                            "Sign in with your email address and password to connect and sync your WealthOS cloud ledger."
+                        } else {
+                            "Enter the email ID you used on WealthOS Web. We'll send you an instant sign-in link or 6-digit code to connect and sync your ledger."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = finance.muted,
                         lineHeight = 22.sp,
@@ -333,6 +348,31 @@ fun SupabaseLoginSheet(
                         enabled = !isLoading,
                     )
 
+                    if (isPasswordMode) {
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Your Password") },
+                            placeholder = { Text("••••••••") },
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = finance.muted) },
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = "Toggle password visibility",
+                                        tint = finance.muted,
+                                    )
+                                }
+                            },
+                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading,
+                        )
+                    }
+
                     if (app.settings.supabaseAnonKey.isBlank()) {
                         Text(
                             text = "⚠️ Supabase Publishable Key not configured. Click the gear icon above to paste your key.",
@@ -349,7 +389,7 @@ fun SupabaseLoginSheet(
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(12.dp))
-                            Text("Sending verification email...", style = MaterialTheme.typography.bodyMedium)
+                            Text(if (isPasswordMode) "Authenticating..." else "Sending sign-in email...", style = MaterialTheme.typography.bodyMedium)
                         }
                     } else {
                         Button(
@@ -359,21 +399,49 @@ fun SupabaseLoginSheet(
                                     errorMessage = "Please enter a valid email address."
                                     return@Button
                                 }
-                                isLoading = true
-                                errorMessage = null
-                                scope.launch(Dispatchers.IO) {
-                                    val result = app.authService.sendEmailOtp(cleanEmail)
-                                    withContext(Dispatchers.Main) {
-                                        isLoading = false
-                                        result.fold(
-                                            onSuccess = {
-                                                step = "OTP"
-                                                successMessage = "Code sent to $cleanEmail. Please check your inbox or spam folder."
-                                            },
-                                            onFailure = { err ->
-                                                errorMessage = err.message ?: "Failed to send verification code"
-                                            },
-                                        )
+
+                                if (isPasswordMode) {
+                                    if (password.isBlank()) {
+                                        errorMessage = "Please enter your password."
+                                        return@Button
+                                    }
+                                    isLoading = true
+                                    errorMessage = null
+                                    scope.launch(Dispatchers.IO) {
+                                        val res = app.authService.signInWithPassword(cleanEmail, password)
+                                        if (res.isFailure) {
+                                            withContext(Dispatchers.Main) {
+                                                isLoading = false
+                                                errorMessage = res.exceptionOrNull()?.message ?: "Invalid email or password"
+                                            }
+                                            return@launch
+                                        }
+                                        val syncRes = app.syncEngine.syncAll()
+                                        withContext(Dispatchers.Main) {
+                                            isLoading = false
+                                            step = "LOGGED_IN"
+                                            successMessage = "Successfully connected as $cleanEmail! Pulled ${syncRes.accountsPulled} accounts."
+                                            onLoginSuccess(cleanEmail)
+                                            Toast.makeText(context, "Account verified & synchronized!", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                } else {
+                                    isLoading = true
+                                    errorMessage = null
+                                    scope.launch(Dispatchers.IO) {
+                                        val result = app.authService.sendEmailOtp(cleanEmail)
+                                        withContext(Dispatchers.Main) {
+                                            isLoading = false
+                                            result.fold(
+                                                onSuccess = {
+                                                    step = "OTP"
+                                                    successMessage = "Sign-in link / code sent to $cleanEmail. Check your inbox!"
+                                                },
+                                                onFailure = { err ->
+                                                    errorMessage = err.message ?: "Failed to send sign-in link"
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             },
@@ -381,30 +449,92 @@ fun SupabaseLoginSheet(
                             shape = RoundedCornerShape(12.dp),
                             enabled = email.isNotBlank(),
                         ) {
-                            Text("Send Verification Code", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(
+                                text = if (isPasswordMode) "Sign In with Password & Sync" else "Send Sign-in Link / Code",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                            )
+                        }
+
+                        TextButton(
+                            onClick = {
+                                isPasswordMode = !isPasswordMode
+                                errorMessage = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (isPasswordMode) "← Switch back to Email Sign-In Link" else "Or Sign In with Password")
                         }
                     }
                 }
 
                 "OTP" -> {
                     Text(
-                        text = "Enter the 6-digit verification code sent to $email:",
+                        text = "Enter the 6-digit code OR paste the sign-in link sent to $email:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = finance.muted,
+                        lineHeight = 20.sp,
                     )
 
                     OutlinedTextField(
-                        value = otpCode,
-                        onValueChange = { otpCode = it.filter { ch -> ch.isDigit() }.take(6) },
-                        label = { Text("6-Digit Code") },
-                        placeholder = { Text("123456") },
-                        singleLine = true,
+                        value = verificationInput,
+                        onValueChange = { verificationInput = it },
+                        label = { Text("Code or Sign-in Link") },
+                        placeholder = { Text("123456 or https://...") },
+                        singleLine = false,
+                        maxLines = 3,
                         leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = finance.muted) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        trailingIcon = {
+                            if (verificationInput.isNotBlank()) {
+                                IconButton(onClick = { verificationInput = "" }) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Clear input", tint = finance.muted, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !isLoading,
                     )
+
+                    // Quick Paste from Clipboard Button
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            val clipText = clipboard?.primaryClip?.getItemAt(0)?.text?.toString()?.trim()
+                            if (!clipText.isNullOrBlank()) {
+                                verificationInput = clipText
+                                Toast.makeText(context, "Pasted link from clipboard", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("📋 Paste Link from Clipboard", fontSize = 13.sp)
+                    }
+
+                    // Helper Instructions Card
+                    GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.Link, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Text("How to verify with your email:", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                            }
+                            Text(
+                                text = "• If your email has a 6-digit code: Type the digits above.\n• If your email has a 'Sign in' button: Long-press the 'Sign in' button in Gmail, tap 'Copy link address', then tap 'Paste Link from Clipboard' above!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = finance.muted,
+                                lineHeight = 18.sp,
+                            )
+                        }
+                    }
 
                     if (isLoading) {
                         Row(
@@ -419,18 +549,19 @@ fun SupabaseLoginSheet(
                     } else {
                         Button(
                             onClick = {
-                                if (otpCode.length < 6) {
-                                    errorMessage = "Please enter all 6 digits."
+                                val input = verificationInput.trim()
+                                if (input.isBlank()) {
+                                    errorMessage = "Please enter the 6-digit code or paste the sign-in link."
                                     return@Button
                                 }
                                 isLoading = true
                                 errorMessage = null
                                 scope.launch(Dispatchers.IO) {
-                                    val verifyResult = app.authService.verifyEmailOtp(email, otpCode)
+                                    val verifyResult = app.authService.verifyTokenOrLink(email, input)
                                     if (verifyResult.isFailure) {
                                         withContext(Dispatchers.Main) {
                                             isLoading = false
-                                            errorMessage = verifyResult.exceptionOrNull()?.message ?: "Invalid code"
+                                            errorMessage = verifyResult.exceptionOrNull()?.message ?: "Invalid verification code or link"
                                         }
                                         return@launch
                                     }
@@ -448,15 +579,15 @@ fun SupabaseLoginSheet(
                             },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = RoundedCornerShape(12.dp),
-                            enabled = otpCode.length >= 6,
+                            enabled = verificationInput.isNotBlank(),
                         ) {
-                            Text("Verify Code & Sync Account", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("Verify & Sync Account", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
 
                         TextButton(
                             onClick = {
                                 step = "EMAIL"
-                                otpCode = ""
+                                verificationInput = ""
                                 errorMessage = null
                                 successMessage = null
                             },
